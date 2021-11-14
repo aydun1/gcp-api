@@ -2,7 +2,7 @@ import { allowedPallets, keyHash, sqlConfig, webConfig } from './config';
 import { TYPES, Request, connect } from 'mssql';
 import { compare } from 'bcrypt';
 import express from 'express';
-import helmet from 'helmet'
+import helmet from 'helmet';
 
 interface Body {
   customer: string,
@@ -15,7 +15,7 @@ const storedProcedure = 'usp_PalletUpdate';
 
 const app = express();
 app.use(express.json());
-app.use(helmet())
+app.use(helmet());
 
 app.get( '/', ( req, res ) => {
   return res.send('');
