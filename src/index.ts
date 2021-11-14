@@ -11,7 +11,7 @@ interface Body {
   palletDate: string
 }
 
-const storedProcedure = 'usp.PalletUpdate';
+const storedProcedure = 'usp_PalletUpdate';
 
 const app = express();
 app.use(express.json());
@@ -60,6 +60,3 @@ connect(sqlConfig, err => {
     console.log( `server started at http://localhost:${webConfig.port}` );
   });
 });
-
-
-
