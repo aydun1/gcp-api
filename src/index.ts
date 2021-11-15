@@ -30,7 +30,7 @@ app.post('/pallet-api', (req, res) => {
     const palletType = body.palletType;
     const palletQty = parseInt(body.palletQty, 10);
 
-    if (!customer || !palletType || !palletQty) return res.status(400).json({'result': 'Missing info'});
+    if (!customer || !palletType || !palletQty === undefined) return res.status(400).json({'result': 'Missing info'});
     if (customer.length > 15) return res.status(400).json({'result': 'Bad request'});
     if (!allowedPallets.includes(palletType)) return res.status(400).json({'result': 'Bad pallet'});
     if (palletQty > 1000 || body.palletQty !== palletQty.toString(10)) return res.status(400).json({'result': 'Bad quantity'});
@@ -38,8 +38,8 @@ app.post('/pallet-api', (req, res) => {
 
     const request = new Request();
 
-    request.input('Customer', TYPES.VarChar(15), customer);
-    request.input('PalletType', TYPES.VarChar(15), palletType);
+    request.input('Customer', TYPES.Char(15), customer);
+    request.input('PalletType', TYPES.Char(15), palletType);
     request.input('Qty', TYPES.Int, palletQty.toString(10));
     request.execute(storedProcedure, (err, result) => {
       if (err) return res.status(500).json({'result': err});

@@ -19,4 +19,4 @@ export const webConfig = {
 
 export const keyHash = 'APIKEYBCRYPTHASH';
 
-export const allowedPallets = ['Loscam', 'Chep', 'Plain'];
+export const allowedPallets = ['Loscam', 'Chep', 'Plain', 'Cage'];
