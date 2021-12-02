@@ -21,7 +21,7 @@ app.get( '/', ( req, res ) => {
   return res.send('');
 });
 
-app.post('/pallet-api', (req, res) => {
+app.post('/pallets', (req, res) => {
   const password = req.headers.authorization.replace('Bearer ','');
   compare(password, keyHash).then(auth => {
     if (!auth) return res.status(401).json({'status': 'Not allowed'});
