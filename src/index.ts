@@ -58,7 +58,7 @@ connect(sqlConfig, err => {
     console.log('Failed to open a SQL Database connection.', err.message);
     process.exit(1);
   }
-  app.listen( webConfig.port, () => {
+  app.listen(parseInt(webConfig.port, 10), webConfig.ip, () => {
     console.log( `server started at http://localhost:${webConfig.port}` );
   });
 });
