@@ -1,8 +1,11 @@
 import { allowedPallets, keyHash, sqlConfig, webConfig } from './config';
 import { TYPES, Request, connect } from 'mssql';
 import { compare } from 'bcrypt';
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import helmet from 'helmet';
+import morgan from 'morgan';
 
 interface Body {
   customer: string,
@@ -12,10 +15,12 @@ interface Body {
 }
 
 const storedProcedure = 'usp_PalletUpdate';
+const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' })
 
 const app = express();
 app.use(express.json());
 app.use(helmet());
+app.use(morgan('combined', { stream: accessLogStream }));
 
 app.get( '/', ( req, res ) => {
   return res.send('');
