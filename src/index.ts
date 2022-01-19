@@ -27,7 +27,7 @@ app.get( '/', ( req, res ) => {
 });
 
 app.post('/pallets', (req, res) => {
-  const password = req.headers.authorization.replace('Bearer ','');
+  const password = req.headers.authorization?.replace('Bearer ','') || '';
   compare(password, keyHash).then(auth => {
     if (!auth) return res.status(401).json({'status': 'Not allowed'});
     const body = req.body as Body;
@@ -47,7 +47,7 @@ app.post('/pallets', (req, res) => {
     request.input('PalletType', TYPES.Char(15), palletType);
     request.input('Qty', TYPES.Int, palletQty.toString(10));
     request.execute(storedProcedure, (err, result) => {
-      if (err) return res.status(500).json({'result': err});
+      if (err) {console.log(err); return res.status(500).json({'result': err})};
       return res.json({'result': result});
     });
   });
