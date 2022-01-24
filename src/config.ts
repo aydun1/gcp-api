@@ -14,7 +14,8 @@ export const sqlConfig = {
 };
 
 export const webConfig = {
-  port: process.env.PORT || 8080,
+  ip: '0.0.0.0',
+  port: process.env.PORT || '3000',
 }
 
 export const keyHash = 'APIKEYBCRYPTHASH';

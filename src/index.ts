@@ -40,17 +40,20 @@ app.post('/pallets', (req, res) => {
     if (!allowedPallets.includes(palletType)) return res.status(400).json({'result': 'Bad pallet'});
     if (palletQty > 1000 || body.palletQty !== palletQty.toString(10)) return res.status(400).json({'result': 'Bad quantity'});
 
-
     const request = new Request();
-
     request.input('Customer', TYPES.Char(15), customer);
     request.input('PalletType', TYPES.Char(15), palletType);
     request.input('Qty', TYPES.Int, palletQty.toString(10));
     request.execute(storedProcedure, (err, result) => {
-      if (err) {console.log(err); return res.status(500).json({'result': err})};
-      return res.json({'result': result});
+      if (err) {
+        console.log(err);
+        return res.status(500).json({'result': err as string});
+      }
+      return res.json({result});
     });
-  });
+  }).catch(
+    err => console.log(err)
+  );
 });
 
 connect(sqlConfig, err => {
