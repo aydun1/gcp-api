@@ -1,10 +1,15 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 export const sqlConfig = {
-  server: '127.0.0.1',
+  server: process.env.DB_SERVER || 'localhost',
+  database: process.env.DB_DATABASE || '',
   authentication: {
     type: 'default',
     options: {
-      userName: 'sa',
-      password: 'SQLSERVERPASSWORD'
+      userName: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD
     }
   },
   options: {
@@ -18,6 +23,6 @@ export const webConfig = {
   port: process.env.PORT || '3000',
 }
 
-export const keyHash = 'APIKEYBCRYPTHASH';
+export const keyHash = process.env.API_KEY_BCRYPT_HASH;
 
 export const allowedPallets = ['Loscam', 'Chep', 'Plain', 'Cage'];
