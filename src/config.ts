@@ -23,6 +23,4 @@ export const webConfig = {
   port: process.env.PORT || '3000',
 }
 
-export const keyHash = process.env.API_KEY_BCRYPT_HASH;
-
-export const allowedPallets = ['Loscam', 'Chep', 'Plain', 'Cage'];
+export const keyHash = process.env.API_KEY_BCRYPT_HASH || '';

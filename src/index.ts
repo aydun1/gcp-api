@@ -1,58 +1,96 @@
-import { allowedPallets, keyHash, sqlConfig, webConfig } from './config';
-import { TYPES, Request, connect } from 'mssql';
+import { connect } from 'mssql';
 import { compare } from 'bcrypt';
+import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 'passport-azure-ad';
+import express, { NextFunction, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import passport from 'passport';
+
+import { getPurchaseOrder, getPurchaseOrderNumbers, updatePallets } from './services/gp.service';
+import { keyHash, sqlConfig, webConfig } from './config';
+import config from '../config.json';
 
 interface Body {
-  customer: string,
-  palletType: string,
-  palletQty: string,
-  palletDate: string
+  customer: string;
+  palletType: string;
+  palletQty: string;
+  palletDate: string;
 }
 
-const storedProcedure = 'usp_PalletUpdate';
-const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' })
+const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' });
+
+const options: IBearerStrategyOptionWithRequest = {
+  identityMetadata: `https://${config.metadata.authority}/${config.credentials.tenantID}/${config.metadata.version}/${config.metadata.discovery}`,
+  issuer: `https://${config.metadata.authority}/${config.credentials.tenantID}/${config.metadata.version}`,
+  clientID: config.credentials.clientID,
+  audience: config.credentials.clientID,
+  validateIssuer: config.settings.validateIssuer,
+  passReqToCallback: false,
+  loggingLevel: 'info',
+  scope: config.protectedRoutes.gp.scopes
+};
+
+const bearerStrategy = new BearerStrategy(options, (token: ITokenPayload, done: CallableFunction) => {
+  done(null, {}, token);
+});
 
 const app = express();
 app.use(express.json());
 app.use(helmet());
 app.use(morgan('combined', { stream: accessLogStream }));
+app.use(passport.initialize());
+passport.use(bearerStrategy);
+
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Authorization, Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
+function verifyApiKey(req: Request, res: Response, next: NextFunction) {
+  const bearerHeader = req.headers['authorization'];
+  if (typeof bearerHeader === 'undefined') return res.sendStatus(401);
+  const bearerToken = bearerHeader.split(' ')[1];
+  compare(bearerToken, keyHash, (err, matched) => {
+    if (!matched || err) return res.sendStatus(401);
+    next();
+  });
+}
 
 app.get( '/', ( req, res ) => {
   return res.send('');
 });
 
-app.post('/pallets', (req, res) => {
-  const password = req.headers.authorization?.replace('Bearer ','') || '';
-  compare(password, keyHash).then(auth => {
-    if (!auth) return res.status(401).json({'status': 'Not allowed'});
-    const body = req.body as Body;
-    const customer = body.customer;
-    const palletType = body.palletType;
-    const palletQty = parseInt(body.palletQty, 10);
+app.get('/gp', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  return res.send('');
+});
 
-    if (!customer || !palletType || !palletQty === undefined) return res.status(400).json({'result': 'Missing info'});
-    if (customer.length > 15) return res.status(400).json({'result': 'Bad request'});
-    if (!allowedPallets.includes(palletType)) return res.status(400).json({'result': 'Bad pallet'});
-    if (palletQty > 1000 || body.palletQty !== palletQty.toString(10)) return res.status(400).json({'result': 'Bad quantity'});
+app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const params = req.query;
+  const to = params['to'] as string || '';
+  getPurchaseOrderNumbers(to).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => res.status(500).send(err)
+  );
+});
 
-    const request = new Request();
-    request.input('Customer', TYPES.Char(15), customer);
-    request.input('PalletType', TYPES.Char(15), palletType);
-    request.input('Qty', TYPES.Int, palletQty.toString(10));
-    request.execute(storedProcedure, (err, result) => {
-      if (err) {
-        console.log(err);
-        return res.status(500).json({'result': err as string});
-      }
-      return res.json({result});
-    });
-  }).catch(
-    err => console.log(err)
+app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  getPurchaseOrder(req.params.id).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => res.status(500).send(err)
+  );
+});
+
+app.post('/pallets', verifyApiKey, (req, res) => {
+  const body = req.body as Body;
+  updatePallets(body.customer, body.palletType, body.palletQty).then(
+    result => res.status(200).json({result})
+  ).catch((err: {code: number, message: string}) => 
+    res.status(err.code || 500).json({'result': err?.message || err})
   );
 });
 

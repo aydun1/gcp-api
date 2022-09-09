@@ -14,6 +14,9 @@ module.exports = {
         'eslint-plugin-prefer-arrow',
         '@typescript-eslint'
     ],
+    rules: {
+      "@typescript-eslint/no-unsafe-argument": "warn",
+    },
     extends: [
       'eslint:recommended',
       'plugin:@typescript-eslint/recommended',
