@@ -8,9 +8,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getPurchaseOrder, getPurchaseOrderNumbers, updatePallets } from './services/gp.service';
+import { getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
+import { Transfer } from './transfer';
 
 interface Body {
   customer: string;
@@ -79,6 +80,13 @@ app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req:
       res.status(500).send(err)
     }
   );
+});
+
+app.post('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const body = req.body as Transfer;
+  const writeStream = writeFile(body.fromSite, body.toSite, body);
+  writeStream.on('error', () => res.status(500).send({"status": "result"}));
+  writeStream.on('close', () => res.status(200).send({"status": "Success!!!"}));
 });
 
 app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {

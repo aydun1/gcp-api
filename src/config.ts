@@ -24,3 +24,4 @@ export const webConfig = {
 }
 
 export const keyHash = process.env.API_KEY_BCRYPT_HASH || '';
+export const targetDir = process.env.TARGET_DIR || '';

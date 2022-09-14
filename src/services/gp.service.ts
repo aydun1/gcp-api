@@ -1,5 +1,9 @@
 import { TYPES, Request as sqlRequest, IResult, VarChar } from 'mssql';
+import fs, { WriteStream } from 'fs';
+
 import { allowedPallets } from '../../config.json';
+import { targetDir } from '../config';
+import { Transfer } from '../transfer';
 
 const storedProcedure = 'usp_PalletUpdate';
 
@@ -70,4 +74,17 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   request.input('PalletType', TYPES.Char(15), palletType);
   request.input('Qty', TYPES.Int, qty.toString(10));
   return request.execute(storedProcedure);
+}
+
+export function writeFile(fromSite: string, toSite: string, body: Transfer): WriteStream {
+  const header = ['Transfer Date', 'PO Number', 'From Site', 'Item Number', 'Item Desc', 'To Site', 'Order Qty', 'Qty Shipped', 'Cancelled Qty'];
+  const date = new Date().toLocaleString().replace(',', '').replace('pm', 'PM').replace('am', 'AM')
+  const lines = body.lines.map(_ => [date, _.poNumber, body.fromSite, _.itemNumber, _.itemDesc, body.toSite, _.toTransfer, 0, 0]);
+  const data = lines.map(_ => _.join(',')).join('\r\n');
+  const writeStream = fs.createWriteStream(`${targetDir}/transfer_from_${fromSite}_to_${toSite}.csv`);
+  writeStream.write(header.join(','));
+  writeStream.write('\r\n');
+  writeStream.write(data);
+  writeStream.close();
+  return writeStream;
 }
