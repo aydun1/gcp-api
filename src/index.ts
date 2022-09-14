@@ -85,7 +85,7 @@ app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req:
 app.post('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const body = req.body as Transfer;
   const writeStream = writeFile(body.fromSite, body.toSite, body);
-  writeStream.on('error', () => res.status(500).send({"status": "result"}));
+  writeStream.on('error', e => res.status(500).send({e}));
   writeStream.on('close', () => res.status(200).send({"status": "Success!!!"}));
 });
 
