@@ -30,8 +30,9 @@ export function getPurchaseOrderNumbers(from: string, to: string): Promise<objec
   INNER JOIN IV00101 c
   ON b.ITEMNMBR = c.ITEMNMBR
   WHERE a.VENDORID in('100241', '164403', '164802', '200001', '200113', '200231', '200387', '300298', '300299', '300310', '300365', '404562', '404631', '404632','404633','404634','502014')
-  AND QTYCANCE = 0
-  AND QTYORDER <> 0
+  AND a.POSTATUS = 2
+  AND b.QTYCANCE = 0
+  AND b.QTYORDER <> 0
   `;
   if (from) query += ' AND a.PURCHSTATE = @from_state';
   if (to) query += ' AND b.LOCNCODE = @to_state';
