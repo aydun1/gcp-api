@@ -69,11 +69,15 @@ app.get('/gp', passport.authenticate('oauth-bearer', {session: false}), (req: Re
 
 app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const params = req.query;
+  const from = params['from'] as string || '';
   const to = params['to'] as string || '';
-  getPurchaseOrderNumbers(to).then(
+  getPurchaseOrderNumbers(from, to).then(
     result => res.status(200).send(result)
   ).catch(
-    err => res.status(500).send(err)
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
   );
 });
 
