@@ -27,12 +27,15 @@ export function getPurchaseOrderNumbers(from: string, to: string): Promise<objec
          a.REQDATE Date,
          rtrim(PURCHSTATE) FromSite,
          rtrim(b.LOCNCODE) ToSite,
-         b.DEX_ROW_ID Id
+         b.DEX_ROW_ID Id,
+         d.QTYONHND QtyOnHand
   FROM POP10100 a
   INNER JOIN POP10110 b
   ON a.PONUMBER = b.PONUMBER
   INNER JOIN IV00101 c
   ON b.ITEMNMBR = c.ITEMNMBR
+  LEFT JOIN IV00102 d
+  ON b.ITEMNMBR = d.ITEMNMBR AND d.LOCNCODE = @from_state
   WHERE a.VENDORID in('100241', '164403', '164802', '200001', '200113', '200231', '200387', '300298', '300299', '300310', '300365', '404562', '404631', '404632','404633','404634','502014')
   AND b.QTYCANCE = 0
   AND b.QTYORDER <> 0
