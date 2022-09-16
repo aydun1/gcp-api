@@ -71,8 +71,8 @@ app.get('/gp', passport.authenticate('oauth-bearer', {session: false}), (req: Re
 app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  const sort = params['sort'] as string || '';
-  const order = params['order'] as string || '';
+  const sort = params['order'] as string || '';
+  const order = params['orderby'] as string || '';
   const page = parseInt(params['page'] as string) || 0;
   console.log(page)
   getCustomers(branch, sort, order, page).then(

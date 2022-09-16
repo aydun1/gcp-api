@@ -65,25 +65,26 @@ export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
   return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function getCustomers(branch: string, sort: string, order: string, page: number): Promise<{customers: object[]}> {
+export function getCustomers(branch: string, sort: string, orderby: string, page: number): Promise<{customers: object[]}> {
   const request = new sqlRequest();
   const offset = (page - 1) * 50;
-  
+  const order = sort === 'asc' ? 'ASC' : 'DESC';
   let query =
   `
-  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) custName, COALESCE(USERDEF2, 0) loscamPallets, COALESCE(USERDEF1, 0) chepPallets, COALESCE(b.plains, 0) plainPallets
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) custName, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
   FROM RM00101 a
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plains
     FROM SY90000
     WHERE ObjectType = 'Customer'
     AND PropertyName = 'PLAINQty'
+    AND PropertyValue != 0
   ) b ON a.CUSTNMBR = b.CUSTNMBR
   WHERE a.SALSTERR = @branch
   `;
-  query += ' ORDER BY plains DESC'
+  query += ` ORDER BY ${orderby} ${order}`
   query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY;'
-  return request.input('branch', VarChar(15), branch).input('offset', SmallInt, offset).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
+  return request.input('branch', VarChar(15), branch).input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
