@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
+import { getCustomers, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -66,6 +66,23 @@ app.get( '/', ( req, res ) => {
 
 app.get('/gp', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   return res.send('');
+});
+
+app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  const sort = params['sort'] as string || '';
+  const order = params['order'] as string || '';
+  const page = parseInt(params['page'] as string) || 0;
+  console.log(page)
+  getCustomers(branch, sort, order, page).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
 });
 
 app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {

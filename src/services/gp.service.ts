@@ -1,4 +1,4 @@
-import { TYPES, Request as sqlRequest, IResult, VarChar } from 'mssql';
+import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt } from 'mssql';
 import fs, { WriteStream } from 'fs';
 
 import { allowedPallets } from '../../config.json';
@@ -28,7 +28,8 @@ export function getPurchaseOrderNumbers(from: string, to: string): Promise<objec
          rtrim(PURCHSTATE) FromSite,
          rtrim(b.LOCNCODE) ToSite,
          b.DEX_ROW_ID Id,
-         d.QTYONHND QtyOnHand
+         d.QTYONHND QtyOnHand,
+         d.QTYONHND - d.ATYALLOC QtyAvailable
   FROM POP10100 a
   INNER JOIN POP10110 b
   ON a.PONUMBER = b.PONUMBER
@@ -62,6 +63,27 @@ export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
   AND a.PONUMBER = '${poNumber}'
   `;
   return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
+}
+
+export function getCustomers(branch: string, sort: string, order: string, page: number): Promise<{customers: object[]}> {
+  const request = new sqlRequest();
+  const offset = (page - 1) * 50;
+  
+  let query =
+  `
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) custName, COALESCE(USERDEF2, 0) loscamPallets, COALESCE(USERDEF1, 0) chepPallets, COALESCE(b.plains, 0) plainPallets
+  FROM RM00101 a
+  LEFT JOIN (
+    SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plains
+    FROM SY90000
+    WHERE ObjectType = 'Customer'
+    AND PropertyName = 'PLAINQty'
+  ) b ON a.CUSTNMBR = b.CUSTNMBR
+  WHERE a.SALSTERR = @branch
+  `;
+  query += ' ORDER BY plains DESC'
+  query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY;'
+  return request.input('branch', VarChar(15), branch).input('offset', SmallInt, offset).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
