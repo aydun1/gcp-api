@@ -1,4 +1,4 @@
-import { connect } from 'mssql';
+import { connect, RequestError } from 'mssql';
 import { compare } from 'bcrypt';
 import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 'passport-azure-ad';
 import express, { NextFunction, Request, Response } from 'express';
@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomers, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
+import { cancelLines, getCustomers, getPanList, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -85,6 +85,19 @@ app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false})
   );
 });
 
+app.get('/gp/pan', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  getPanList(branch).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
+});
+
 app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const params = req.query;
   const from = params['from'] as string || '';
@@ -101,12 +114,27 @@ app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req:
 
 app.post('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const body = req.body as Transfer;
-  const writeStream = writeFile(body.fromSite, body.toSite, body);
+  const writeStream = writeFile(body.fromSite, body.toSite, body)
   writeStream.on('error', e => res.status(500).send({e}));
-  writeStream.on('close', () => res.status(200).send({"status": "Success!!!"}));
+  writeStream.on('close', () => {
+    cancelLines(body).then(
+      () => res.status(200).send({"status": "Success!!!"})
+      ).catch(
+        (e: RequestError) => res.status(500).send({e})
+      )
+  });
 });
 
 app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  getPurchaseOrder(req.params.id).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => res.status(500).send(err)
+  );
+});
+
+app.patch('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const body = req.body as Transfer;
   getPurchaseOrder(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
