@@ -79,7 +79,11 @@ export function getPanList(branch: string) {
   RTRIM(a.USCATVLS_3) Category,
   CAST(b.MNMMORDRQTY AS int) Min,
   CAST(b.MXMMORDRQTY AS int) Max,
-  CAST(COALESCE(vic.OnHand, 0) AS int) VicOnHand,
+  CAST(vic.OnHand AS int) OnHandVIC,
+  CAST(e.QLD AS int) OnHandQLD,
+  CAST(e.NSW AS int) OnHandNSW,
+  CAST(e.SA AS int) OnHandSA,
+  CAST(e.WA AS int) OnHandWA,
   CAST(b.QTYONHND AS int) QtyOnHand,
   CAST(b.QTYBKORD AS int) QtyBackordered,
   CAST(b.ATYALLOC AS int) QtyAllocated,
@@ -147,6 +151,19 @@ export function getPanList(branch: string) {
   LEFT JOIN GPLIVE.[labels].dbo.gcp_lbls f
   ON a.ITEMNMBR = f.ItemNumber
 
+  -- Get branch SOHs
+  LEFT JOIN (
+    SELECT * FROM (
+      SELECT ITEMNMBR, LOCNCODE, QTYONHND
+      FROM IV00102
+      WHERE QTYONHND <> 0
+    ) a
+    PIVOT (
+      SUM(QTYONHND)
+      FOR LOCNCODE IN (NSW, QLD, WA, SA)
+    ) Pivot_table
+  ) e
+  ON a.ITEMNMBR = e.ITEMNMBR
 
   WHERE b.LOCNCODE = @branch
   AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.MXMMORDRQTY > 0
