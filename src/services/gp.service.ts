@@ -240,7 +240,7 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
 export function writeFile(fromSite: string, toSite: string, body: Transfer): WriteStream {
   const header = ['Transfer Date', 'PO Number', 'From Site', 'Item Number', 'Item Desc', 'To Site', 'Order Qty', 'Qty Shipped', 'Cancelled Qty'];
   //const date = new Date().toLocaleString('en-AU').replace(',', '');
-  const date = new Date().toISOString().replace('-', '/').replace('-', '/').split('T')[0];
+  const date = new Date().toISOString().split('T')[0];
   const lines = body.lines.map(_ => [date, _.poNumber, body.fromSite, _.itemNumber, _.itemDesc, body.toSite, _.toTransfer, _.toTransfer, 0]);
   const data = lines.map(_ => _.join(',')).join('\r\n');
   const writeStream = fs.createWriteStream(`${targetDir}/transfer_from_${fromSite}_to_${toSite}.csv`);
