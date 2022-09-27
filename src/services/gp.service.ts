@@ -66,9 +66,9 @@ export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
   return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function getPanList(branch: string) {
+export function getItems(branch: string, itemNumbers: Array<string>) {
   const request = new sqlRequest();
-  const query = `
+  let query = `
   SELECT a.DEX_ROW_ID Id,
   RTRIM(a.ITEMNMBR) ItemNumber,
   RTRIM(a.ITEMDESC) ItemDesc,
@@ -166,10 +166,15 @@ export function getPanList(branch: string) {
   ON a.ITEMNMBR = e.ITEMNMBR
 
   WHERE b.LOCNCODE = @branch
-  AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.MXMMORDRQTY > 0
-  ORDER BY a.ITEMNMBR ASC
   `;
-  return request.input('branch', VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
+  if (itemNumbers && itemNumbers.length > 0) {
+    query += 'AND a.ITEMNMBR in (@items)'
+  } else {
+    query += 'AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.MXMMORDRQTY > 0';
+  }
+  query += 'ORDER BY a.ITEMNMBR ASC';
+  const itemList = itemNumbers.map(_ => `'${_}'`).join(',');
+  return request.input('branch', VarChar(15), branch).input('items', VarChar, itemList).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
 export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {

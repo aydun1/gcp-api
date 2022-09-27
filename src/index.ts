@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { cancelLines, getCustomers, getPanList, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
+import { cancelLines, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -88,7 +88,20 @@ app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false})
 app.get('/gp/pan', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getPanList(branch).then(
+  getItems(branch, []).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
+});
+
+app.get('/gp/inventory', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  getItems(branch, []).then(
     result => res.status(200).send(result)
   ).catch(
     err => {
