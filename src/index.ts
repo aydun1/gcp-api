@@ -130,11 +130,11 @@ app.post('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req
   const writeStream = writeFile(body.fromSite, body.toSite, body)
   writeStream.on('error', e => res.status(500).send({e}));
   writeStream.on('close', () => {
-    cancelLines(body).then(
-      () => res.status(200).send({"status": "Success!!!"})
-      ).catch(
-        (e: RequestError) => res.status(500).send({e})
-      )
+    //cancelLines(body).then(
+    //  () => res.status(200).send({"status": "Success!!!"})
+    //  ).catch(
+    //    (e: RequestError) => res.status(500).send({e})
+    //  )
   });
 });
 
