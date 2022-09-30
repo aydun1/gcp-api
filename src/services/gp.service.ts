@@ -76,9 +76,12 @@ export function getItems(branch: string, itemNumbers: Array<string>) {
   CAST(f.PalletQty / COALESCE(NULLIF(f.PackQty, 0), 1) AS int) PackSize,
   RTRIM(b.LOCNCODE) Location,
   RTRIM(d.BIN) Bin,
+  RTRIM(b.PRIMVNDR) Vendor,
   RTRIM(a.USCATVLS_3) Category,
-  CAST(b.MNMMORDRQTY AS int) Min,
-  CAST(b.MXMMORDRQTY AS int) Max,
+  CAST(b.ORDRPNTQTY AS int) Min,
+  CAST(b.ORDRUPTOLVL AS int) Max,
+  CAST(b.MNMMORDRQTY AS int) MinOrderQty,
+  CAST(b.MXMMORDRQTY AS int) MaxOrderQty,
   CAST(vic.OnHand AS int) OnHandVIC,
   CAST(e.QLD AS int) OnHandQLD,
   CAST(e.NSW AS int) OnHandNSW,
@@ -90,7 +93,7 @@ export function getItems(branch: string, itemNumbers: Array<string>) {
   CAST(COALESCE(m.ATYALLOC, 0) AS int) QtyOnOrderAll,
   CAST(COALESCE(m.week, 0) AS int) QtyOnOrderWeek,
   CAST(COALESCE(m.month, 0) AS int) QtyOnOrderMonth,
-  -- b.QTYONHND - b.ATYALLOC QtyAvailable,
+  CAST(b.QTYONHND + COALESCE(c.QTYONHND, 0) - b.ATYALLOC - b.QTYBKORD AS int) QtyAvailable,
   CAST(COALESCE(c.QTYONHND, 0) AS int) InTransit,
   CAST(COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) AS int) QtyRequired
   FROM IV00101 a
@@ -170,7 +173,7 @@ export function getItems(branch: string, itemNumbers: Array<string>) {
   if (itemNumbers && itemNumbers.length > 0) {
     query += 'AND a.ITEMNMBR in (@items)'
   } else {
-    query += 'AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.MXMMORDRQTY > 0';
+    query += 'AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.ORDRUPTOLVL > 0';
   }
   query += 'ORDER BY a.ITEMNMBR ASC';
   const itemList = itemNumbers.map(_ => `'${_}'`).join(',');
