@@ -129,13 +129,7 @@ app.post('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req
   const body = req.body as Transfer;
   const writeStream = writeFile(body.fromSite, body.toSite, body)
   writeStream.on('error', e => res.status(500).send({e}));
-  writeStream.on('close', () => {
-    //cancelLines(body).then(
-    //  () => res.status(200).send({"status": "Success!!!"})
-    //  ).catch(
-    //    (e: RequestError) => res.status(500).send({e})
-    //  )
-  });
+  writeStream.on('close', () => res.status(200).send({"status": "Success!!!"}));
 });
 
 app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
