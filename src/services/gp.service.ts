@@ -204,7 +204,7 @@ export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {
   return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function getCustomers(branches: Array<string>, sort: string, orderby: string, filters: Array<string>, search: string, page: number): Promise<{customers: object[]}> {
+export function getCustomers(branches: Array<string>, sort: string, orderby: string, filters: Array<string>, search: string, page: number): Promise<{customers: gpRes[]}> {
   const request = new sqlRequest();
   const offset = (page - 1) * 50;
   const order = sort === 'asc' ? 'ASC' : 'DESC';
@@ -235,7 +235,7 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   return request.input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
-export function getCustomer(custNmbr: string) {
+export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
   const request = new sqlRequest();
   const query =
   `
@@ -251,6 +251,18 @@ export function getCustomer(custNmbr: string) {
   WHERE a.CUSTNMBR = @custnmbr
   `;
   return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {customer: _.recordset[0]}});
+}
+
+export function getCustomerAddresses(custNmbr: string) {
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT rtrim(ADRSCODE) name, rtrim(CNTCPRSN) contact, rtrim(ADDRESS1) line1, rtrim(ADDRESS2) line2, rtrim(ADDRESS3) line3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIP) postcode
+  FROM RM00102
+  WHERE CUSTNMBR = @custnmbr
+  ORDER BY ADRSCODE ASC
+  `;
+  return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string) {

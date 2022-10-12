@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomer, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -93,6 +93,17 @@ app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false})
 
 app.get('/gp/customers/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   getCustomer(req.params.id).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
+});
+
+app.get('/gp/customers/:id/addresses', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {
