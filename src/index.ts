@@ -1,4 +1,4 @@
-import { connect, RequestError } from 'mssql';
+import { connect } from 'mssql';
 import { compare } from 'bcrypt';
 import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 'passport-azure-ad';
 import express, { NextFunction, Request, Response } from 'express';
@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { cancelLines, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
+import { getCustomer, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -50,6 +50,11 @@ app.use((req, res, next) => {
   next();
 });
 
+function onError() {
+  
+}
+
+
 function verifyApiKey(req: Request, res: Response, next: NextFunction) {
   const bearerHeader = req.headers['authorization'];
   if (typeof bearerHeader === 'undefined') return res.sendStatus(401);
@@ -77,6 +82,17 @@ app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false})
   const search = params['search'] as string || '';
   const page = parseInt(params['page'] as string) || 0;
   getCustomers(branches, sort, order, filters, search, page).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
+});
+
+app.get('/gp/customers/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  getCustomer(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {

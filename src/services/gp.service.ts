@@ -235,6 +235,24 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   return request.input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
+export function getCustomer(custNmbr: string) {
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
+  FROM RM00101 a
+  LEFT JOIN (
+    SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plains
+    FROM SY90000
+    WHERE ObjectType = 'Customer'
+    AND PropertyName = 'PLAINQty'
+    AND PropertyValue != 0
+  ) b ON a.CUSTNMBR = b.CUSTNMBR
+  WHERE a.CUSTNMBR = @custnmbr
+  `;
+  return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {customer: _.recordset[0]}});
+}
+
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw {code: 400, message: 'Missing info'};
