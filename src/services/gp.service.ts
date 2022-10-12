@@ -210,7 +210,7 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   const order = sort === 'asc' ? 'ASC' : 'DESC';
   let query =
   `
-  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) custName, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
   FROM RM00101 a
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plains
