@@ -204,7 +204,7 @@ export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {
   return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function getCustomers(branch: string, sort: string, orderby: string, page: number): Promise<{customers: object[]}> {
+export function getCustomers(branches: Array<string>, sort: string, orderby: string, filters: Array<string>, search: string, page: number): Promise<{customers: object[]}> {
   const request = new sqlRequest();
   const offset = (page - 1) * 50;
   const order = sort === 'asc' ? 'ASC' : 'DESC';
@@ -219,11 +219,20 @@ export function getCustomers(branch: string, sort: string, orderby: string, page
     AND PropertyName = 'PLAINQty'
     AND PropertyValue != 0
   ) b ON a.CUSTNMBR = b.CUSTNMBR
-  WHERE a.SALSTERR = @branch
   `;
-  query += ` ORDER BY ${orderby} ${order}`
-  query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY;'
-  return request.input('branch', VarChar(15), branch).input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
+  const filterConditions = [];
+  const palletFilters = [];
+  if (branches.length > 0) filterConditions.push(`a.SALSTERR in ('${branches.join('\', \'')}')`);
+  if (filters.length === 0) filterConditions.push(`a.INACTIVE = 0`);
+  if (filters.includes('loscam')) palletFilters.push('USERDEF2 <> 0');
+  if (filters.includes('chep')) palletFilters.push('USERDEF1 <> 0');
+  if (filters.includes('plain')) palletFilters.push('b.plains <> 0');
+  if (search) filterConditions.push(`(a.CUSTNMBR LIKE '${search}%' OR a.CUSTNAME LIKE '%${search}%')`);
+  if (palletFilters.length > 0) filterConditions.push(`(${palletFilters.join(' OR ')})`);
+  if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
+  query += ` ORDER BY ${orderby.replace('name', 'custName')} ${order}`;
+  query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY';
+  return request.input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
