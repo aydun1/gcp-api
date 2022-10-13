@@ -240,13 +240,27 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   return request.execute(storedProcedure);
 }
 
-export function writeFile(fromSite: string, toSite: string, body: Transfer): WriteStream {
+export function writeTransferFile(fromSite: string, toSite: string, body: Transfer): WriteStream {
   const header = ['Transfer Date', 'PO Number', 'From Site', 'Item Number', 'Item Desc', 'To Site', 'Order Qty', 'Qty Shipped', 'Cancelled Qty'];
-  //const date = new Date().toLocaleString('en-AU').replace(',', '');
   const date = new Date().toISOString().split('T')[0];
   const lines = body.lines.map(_ => [date, _.poNumber, body.fromSite, _.itemNumber, _.itemDesc, body.toSite, _.toTransfer, _.toTransfer, 0]);
   const data = lines.map(_ => _.join(',')).join('\r\n');
-  const writeStream = fs.createWriteStream(`${targetDir}/transfer_from_${fromSite}_to_${toSite}.csv`);
+  const writeStream = fs.createWriteStream(`${targetDir}/Transfers/transfer_from_${fromSite}_to_${toSite}.csv`);
+  writeStream.write(header.join(','));
+  writeStream.write('\r\n');
+  writeStream.write(data);
+  writeStream.close();
+  return writeStream;
+}
+
+export function writeInTransitTransferFile(fromSite: string, toSite: string, body: Transfer): WriteStream {
+  let i = 0;
+  const fileName = `${targetDir}/PICKS/ITT Between SITES/itt_transfer_from_${fromSite}_to_${toSite}.csv`
+  const header = ['Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
+  const date = new Date().toISOString().split('T')[0];
+  const lines = body.lines.map(_ => [i += 1, date, body.fromSite, body.toSite, _.itemNumber, _.toTransfer]);
+  const data = lines.map(_ => _.join(',')).join('\r\n');
+  const writeStream = fs.createWriteStream(fileName);
   writeStream.write(header.join(','));
   writeStream.write('\r\n');
   writeStream.write(data);

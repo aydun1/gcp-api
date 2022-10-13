@@ -1,4 +1,4 @@
-import { connect, RequestError } from 'mssql';
+import { connect } from 'mssql';
 import { compare } from 'bcrypt';
 import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 'passport-azure-ad';
 import express, { NextFunction, Request, Response } from 'express';
@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { cancelLines, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeFile } from './services/gp.service';
+import { getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeTransferFile, writeInTransitTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -127,9 +127,9 @@ app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req:
 
 app.post('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const body = req.body as Transfer;
-  const writeStream = writeFile(body.fromSite, body.toSite, body)
+  const writeStream = writeTransferFile(body.fromSite, body.toSite, body);
   writeStream.on('error', e => res.status(500).send({e}));
-  writeStream.on('close', () => res.status(200).send({"status": "Success!!!"}));
+  writeStream.on('close', () => res.status(200).send({'status': 'Success!!!'}));
 });
 
 app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
@@ -141,12 +141,18 @@ app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (
 });
 
 app.patch('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
-  const body = req.body as Transfer;
   getPurchaseOrder(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => res.status(500).send(err)
   );
+});
+
+app.post('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const body = req.body as Transfer;
+  const writeStream = writeInTransitTransferFile(body.fromSite, body.toSite, body)
+  writeStream.on('error', e => res.status(500).send({e}));
+  writeStream.on('close', () => res.status(200).send({'status': 'Success!!!'}));
 });
 
 app.post('/pallets', verifyApiKey, (req, res) => {
