@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeTransferFile, writeInTransitTransferFile } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -50,6 +50,11 @@ app.use((req, res, next) => {
   next();
 });
 
+function onError() {
+  
+}
+
+
 function verifyApiKey(req: Request, res: Response, next: NextFunction) {
   const bearerHeader = req.headers['authorization'];
   if (typeof bearerHeader === 'undefined') return res.sendStatus(401);
@@ -70,12 +75,35 @@ app.get('/gp', passport.authenticate('oauth-bearer', {session: false}), (req: Re
 
 app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const params = req.query;
-  const branch = params['branch'] as string || '';
+  const branches = (Array.isArray(params['branch']) ? params['branch'] : [params['branch']].filter(_ => _)) as Array<string>;
   const sort = params['order'] as string || '';
   const order = params['orderby'] as string || '';
+  const filters = (Array.isArray(params['filter']) ? params['filter'] : [params['filter']].filter(_ => _)) as Array<string>;
+  const search = params['search'] as string || '';
   const page = parseInt(params['page'] as string) || 0;
-  console.log(page)
-  getCustomers(branch, sort, order, page).then(
+  getCustomers(branches, sort, order, filters, search, page).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
+});
+
+app.get('/gp/customers/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  getCustomer(req.params.id).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
+});
+
+app.get('/gp/customers/:id/addresses', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {

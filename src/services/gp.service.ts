@@ -204,13 +204,13 @@ export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {
   return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function getCustomers(branch: string, sort: string, orderby: string, page: number): Promise<{customers: object[]}> {
+export function getCustomers(branches: Array<string>, sort: string, orderby: string, filters: Array<string>, search: string, page: number): Promise<{customers: gpRes[]}> {
   const request = new sqlRequest();
   const offset = (page - 1) * 50;
   const order = sort === 'asc' ? 'ASC' : 'DESC';
   let query =
   `
-  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) custName, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
   FROM RM00101 a
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plains
@@ -219,11 +219,50 @@ export function getCustomers(branch: string, sort: string, orderby: string, page
     AND PropertyName = 'PLAINQty'
     AND PropertyValue != 0
   ) b ON a.CUSTNMBR = b.CUSTNMBR
-  WHERE a.SALSTERR = @branch
   `;
-  query += ` ORDER BY ${orderby} ${order}`
-  query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY;'
-  return request.input('branch', VarChar(15), branch).input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
+  const filterConditions = [];
+  const palletFilters = [];
+  if (branches.length > 0) filterConditions.push(`a.SALSTERR in ('${branches.join('\', \'')}')`);
+  if (filters.length === 0) filterConditions.push(`a.INACTIVE = 0`);
+  if (filters.includes('loscam')) palletFilters.push('USERDEF2 <> 0');
+  if (filters.includes('chep')) palletFilters.push('USERDEF1 <> 0');
+  if (filters.includes('plain')) palletFilters.push('b.plains <> 0');
+  if (search) filterConditions.push(`(a.CUSTNMBR LIKE '${search}%' OR a.CUSTNAME LIKE '%${search}%')`);
+  if (palletFilters.length > 0) filterConditions.push(`(${palletFilters.join(' OR ')})`);
+  if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
+  query += ` ORDER BY ${orderby.replace('name', 'custName')} ${order}`;
+  query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY';
+  return request.input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
+}
+
+export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
+  FROM RM00101 a
+  LEFT JOIN (
+    SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plains
+    FROM SY90000
+    WHERE ObjectType = 'Customer'
+    AND PropertyName = 'PLAINQty'
+    AND PropertyValue != 0
+  ) b ON a.CUSTNMBR = b.CUSTNMBR
+  WHERE a.CUSTNMBR = @custnmbr
+  `;
+  return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {customer: _.recordset[0]}});
+}
+
+export function getCustomerAddresses(custNmbr: string) {
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT rtrim(ADRSCODE) name, rtrim(CNTCPRSN) contact, rtrim(ADDRESS1) line1, rtrim(ADDRESS2) line2, rtrim(ADDRESS3) line3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIP) postcode
+  FROM RM00102
+  WHERE CUSTNMBR = @custnmbr
+  ORDER BY ADRSCODE ASC
+  `;
+  return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
