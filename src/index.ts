@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomer, getCustomerAddresses, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -49,11 +49,6 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Authorization, Origin, X-Requested-With, Content-Type, Accept');
   next();
 });
-
-function onError() {
-  
-}
-
 
 function verifyApiKey(req: Request, res: Response, next: NextFunction) {
   const bearerHeader = req.headers['authorization'];
