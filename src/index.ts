@@ -111,7 +111,7 @@ app.get('/gp/customers/:id/addresses', passport.authenticate('oauth-bearer', {se
 app.get('/gp/pan', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getItems(branch, []).then(
+  getItems(branch, [], '').then(
     result => res.status(200).send(result)
   ).catch(
     err => {
@@ -124,7 +124,8 @@ app.get('/gp/pan', passport.authenticate('oauth-bearer', {session: false}), (req
 app.get('/gp/inventory', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getItems(branch, []).then(
+  const search = params['search'] as string || '';
+  getItems(branch, [], search).then(
     result => res.status(200).send(result)
   ).catch(
     err => {

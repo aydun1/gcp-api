@@ -19,7 +19,7 @@ export function getPurchaseOrderNumbers(from: string, to: string): Promise<{line
   let query =
   `
   SELECT rtrim(a.PONUMBER) PONumber,
-         rtrim(b.ITEMNMBR) ItemNumber,
+         rtrim(b.ITEMNMBR) ItemNmbr,
          rtrim(c.ITEMDESC) ItemDesc,
          b.QTYORDER - b.QTYCANCE OrderQty,
          b.QTYCANCE CancelledQty,
@@ -53,7 +53,7 @@ export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
   const request = new sqlRequest();
   const query =
   `
-  SELECT rtrim(a.ITEMNMBR) ItemNumber,
+  SELECT rtrim(a.ITEMNMBR) ItemNmbr,
   rtrim(b.ITEMDESC) ItemDesc,
   a.QTYORDER OrderQty,
   a.QTYCANCE CancelledQty,
@@ -66,11 +66,12 @@ export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
   return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function getItems(branch: string, itemNumbers: Array<string>) {
+export function getItems(branch: string, itemNumbers: Array<string>, searchTerm: string) {
+  console.log(branch, searchTerm)
   const request = new sqlRequest();
   let query = `
   SELECT a.DEX_ROW_ID Id,
-  RTRIM(a.ITEMNMBR) ItemNumber,
+  RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(a.ITEMDESC) ItemDesc,
   CAST(f.PalletQty AS int) PalletQty,
   CAST(f.PalletQty / COALESCE(NULLIF(f.PackQty, 0), 1) AS int) PackSize,
@@ -171,13 +172,18 @@ export function getItems(branch: string, itemNumbers: Array<string>) {
   WHERE b.LOCNCODE = @branch
   `;
   if (itemNumbers && itemNumbers.length > 0) {
-    query += 'AND a.ITEMNMBR in (@items)'
+    const itemList = itemNumbers.map(_ => `'${_}'`).join(',');
+    request.input('items', VarChar, itemList);
+    query += ' AND a.ITEMNMBR in (@items)';
+  } else if (searchTerm) {
+    request.input('item', VarChar(15), `${searchTerm}%`);
+    query += ' AND a.ITEMNMBR LIKE @item';
   } else {
-    query += 'AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.ORDRUPTOLVL > 0';
+    query += ' AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.ORDRUPTOLVL > 0';
   }
-  query += 'ORDER BY a.ITEMNMBR ASC';
-  const itemList = itemNumbers.map(_ => `'${_}'`).join(',');
-  return request.input('branch', VarChar(15), branch).input('items', VarChar, itemList).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
+  query += ' ORDER BY a.ITEMNMBR ASC';
+
+  return request.input('branch', VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
 export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {
