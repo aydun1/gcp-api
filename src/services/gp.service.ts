@@ -94,9 +94,9 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   CAST(COALESCE(m.ATYALLOC, 0) AS int) QtyOnOrderAll,
   CAST(COALESCE(m.week, 0) AS int) QtyOnOrderWeek,
   CAST(COALESCE(m.month, 0) AS int) QtyOnOrderMonth,
-  CAST(b.QTYONHND + COALESCE(c.QTYONHND, 0) - b.ATYALLOC - b.QTYBKORD AS int) QtyAvailable,
   CAST(COALESCE(c.QTYONHND, 0) AS int) InTransit,
-  CAST(COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) AS int) QtyRequired
+  CAST(b.QTYONHND + COALESCE(c.QTYONHND, 0) - b.ATYALLOC - b.QTYBKORD AS int) QtyAvailable,
+  CAST(b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) AS int) QtyRequired
   FROM IV00101 a
   
   -- Get quantities and shiz
@@ -179,7 +179,10 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     request.input('item', VarChar(15), `${searchTerm}%`);
     query += ' AND a.ITEMNMBR LIKE @item';
   } else {
-    query += ' AND COALESCE(b.ATYALLOC, 0) + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.ORDRUPTOLVL > 0';
+    query += ` AND (
+      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.MXMMORDRQTY > 0 OR
+      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.ORDRUPTOLVL > 0
+    )`
   }
   query += ' ORDER BY a.ITEMNMBR ASC';
 
