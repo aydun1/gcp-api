@@ -189,7 +189,7 @@ app.patch('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}),
 
 app.post('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
   const body = req.body as Transfer;
-  const writeStream = writeInTransitTransferFile(body.fromSite, body.toSite, body)
+  const writeStream = writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body)
   writeStream.on('error', e => res.status(500).send({e}));
   writeStream.on('close', () => res.status(200).send({'status': 'Success!!!'}));
 });

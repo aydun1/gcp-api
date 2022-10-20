@@ -313,16 +313,9 @@ export function writeTransferFile(fromSite: string, toSite: string, body: Transf
   return writeStream;
 }
 
-export function writeInTransitTransferFile(fromSite: string, toSite: string, body: Transfer): WriteStream {
+export function writeInTransitTransferFile(id: string, fromSite: string, toSite: string, body: Transfer): WriteStream {
   let i = 0;
   const d = new Date();
-  const yy = d.getFullYear().toString().substring(2);
-  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-  const dd = d.getDate().toString().padStart(2, '0');
-  const h = d.getHours().toString().padStart(2, '0');
-  const m = d.getHours().toString().padStart(2, '0');
-  const s = d.getSeconds().toString().padStart(2, '0').substring(0, 1);
-  const id = `ITT${toSite[0]}${yy}${mm}${dd}${h}${m}${s}`;
   const fileName = `${targetDir}/PICKS/ITT Between SITES/itt_transfer_from_${fromSite}_to_${toSite}.csv`
   const header = ['Id', 'Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
   const date = d.toISOString().split('T')[0];

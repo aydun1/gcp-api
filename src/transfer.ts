@@ -1,6 +1,7 @@
 export interface Transfer {
+  id: string;
   fromSite: string;
-  toSite: string,
+  toSite: string;
   lines: {
     id: number;
     poNumber: string;
