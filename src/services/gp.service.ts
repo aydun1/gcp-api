@@ -45,7 +45,6 @@ export function getPurchaseOrderNumbers(from: string, to: string): Promise<{line
   if (from) query += ' AND a.PURCHSTATE = @from_state';
   if (to) query += ' AND b.LOCNCODE = @to_state';
   query +=' ORDER BY Date DESC';
-  console.log(to)
   return request.input('from_state', VarChar(15), from).input('to_state', VarChar(15), to).query(query).then((_: IResult<gpRes>) =>  {return {lines: _.recordset}});
 }
 
@@ -67,10 +66,9 @@ export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
 }
 
 export function getItems(branch: string, itemNumbers: Array<string>, searchTerm: string) {
-  console.log(branch, searchTerm)
   const request = new sqlRequest();
   let query = `
-  SELECT a.DEX_ROW_ID Id,
+  SELECT ${searchTerm ? 'TOP(50)' : ''} a.DEX_ROW_ID Id,
   RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(a.ITEMDESC) ItemDesc,
   CAST(f.PalletQty AS int) PalletQty,
@@ -176,7 +174,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     request.input('items', VarChar, itemList);
     query += ' AND a.ITEMNMBR in (@items)';
   } else if (searchTerm) {
-    request.input('item', VarChar(15), `${searchTerm}%`);
+    request.input('item', VarChar(32), `${searchTerm}%`);
     query += ' AND a.ITEMNMBR LIKE @item';
   } else {
     query += ` AND (
@@ -185,8 +183,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     )`
   }
   query += ' ORDER BY a.ITEMNMBR ASC';
-
-  return request.input('branch', VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
+  return request.input('branch', VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {console.log(query);return {lines: _.recordset}});
 }
 
 export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {
@@ -274,6 +271,21 @@ export function getCustomerAddresses(custNmbr: string) {
   return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
 }
 
+export function getHistory(branch: string, itemNmbr: string) {
+  const request = new sqlRequest();
+  const query =
+  `
+  Select TOP(100) a.SOPTYPE, a.SOPNUMBE, b.ITEMNMBR, a.DOCDATE, a.LOCNCODE
+  FROM SOP30200 a
+  LEFT JOIN SOP30300 b
+  ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
+  WHERE b.ITEMNMBR = @itemnmbr
+  AND a.LOCNCODE = 'QLD'
+  ORDER BY a.DOCDATE DESC
+  `;
+  return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+}
+
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw {code: 400, message: 'Missing info'};
@@ -303,10 +315,18 @@ export function writeTransferFile(fromSite: string, toSite: string, body: Transf
 
 export function writeInTransitTransferFile(fromSite: string, toSite: string, body: Transfer): WriteStream {
   let i = 0;
+  const d = new Date();
+  const yy = d.getFullYear().toString().substring(2);
+  const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+  const dd = d.getDate().toString().padStart(2, '0');
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getHours().toString().padStart(2, '0');
+  const s = d.getSeconds().toString().padStart(2, '0').substring(0, 1);
+  const id = `ITT${toSite[0]}${yy}${mm}${dd}${h}${m}${s}`;
   const fileName = `${targetDir}/PICKS/ITT Between SITES/itt_transfer_from_${fromSite}_to_${toSite}.csv`
-  const header = ['Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
-  const date = new Date().toISOString().split('T')[0];
-  const lines = body.lines.map(_ => [i += 1, date, body.fromSite, body.toSite, _.itemNumber, _.toTransfer]);
+  const header = ['Id', 'Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
+  const date = d.toISOString().split('T')[0];
+  const lines = body.lines.map(_ => [id, i += 1, date, body.fromSite, body.toSite, _.itemNumber, _.toTransfer]);
   const data = lines.map(_ => _.join(',')).join('\r\n');
   const writeStream = fs.createWriteStream(fileName);
   writeStream.write(header.join(','));
