@@ -293,14 +293,14 @@ export function getOrders(branch: string, itemNmbr: string) {
   const request = new sqlRequest();
   const query =
   `
-  Select TOP(100) a.DOCDATE date, a.ReqShipDate, a.SOPTYPE sopType, a.SOPNUMBE sopNmbr, b.ITEMNMBR itemNmbr, a.LOCNCODE, b.QUANTITY * b.QTYBSUOM quantity, c.CUSTNAME customer, d.TXTFIELD notes
+  Select a.DOCDATE date, a.ReqShipDate, a.SOPTYPE sopType, a.SOPNUMBE sopNmbr, b.ITEMNMBR itemNmbr, a.LOCNCODE, b.QUANTITY * b.QTYBSUOM quantity, c.CUSTNAME customer, d.CMMTTEXT notes
   FROM SOP10100 a
   LEFT JOIN SOP10200 b
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
   LEFT JOIN RM00101 c
   ON a.CUSTNMBR = c.CUSTNMBR
-  LEFT JOIN SY03900 d
-  ON a.NOTEINDX = d.NOTEINDX
+  LEFT JOIN SOP10106 d
+  ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
   WHERE b.ITEMNMBR = @itemnmbr
   AND a.SOPTYPE IN (2, 3, 5)
   AND SOPSTATUS IN (0, 1)
