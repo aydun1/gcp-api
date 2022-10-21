@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getItems, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -141,6 +141,19 @@ app.get('/gp/inventory/:id/history', passport.authenticate('oauth-bearer', {sess
   const params = req.query;
   const branch = params['branch'] as string || '';
   getHistory(branch, req.params.id).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
+  );
+});
+
+app.get('/gp/inventory/:id/current', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  getOrders(branch, req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {

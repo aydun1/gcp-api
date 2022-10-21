@@ -275,11 +275,35 @@ export function getHistory(branch: string, itemNmbr: string) {
   const request = new sqlRequest();
   const query =
   `
-  Select TOP(100) a.SOPTYPE, a.SOPNUMBE, b.ITEMNMBR, a.DOCDATE, a.LOCNCODE
+  Select TOP(100) a.DOCDATE date, a.SOPTYPE sopType, a.SOPNUMBE sopNmbr, b.ITEMNMBR itemNmbr, a.LOCNCODE, b.QUANTITY quantity, c.CUSTNAME customer
   FROM SOP30200 a
   LEFT JOIN SOP30300 b
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
+  LEFT JOIN RM00101 c
+  ON a.CUSTNMBR = c.CUSTNMBR
   WHERE b.ITEMNMBR = @itemnmbr
+  AND a.LOCNCODE = 'QLD'
+  AND a.SOPTYPE = 3
+  ORDER BY a.DOCDATE DESC
+  `;
+  return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+}
+
+export function getOrders(branch: string, itemNmbr: string) {
+  const request = new sqlRequest();
+  const query =
+  `
+  Select TOP(100) a.DOCDATE date, a.ReqShipDate, a.SOPTYPE sopType, a.SOPNUMBE sopNmbr, b.ITEMNMBR itemNmbr, a.LOCNCODE, b.QUANTITY * b.QTYBSUOM quantity, c.CUSTNAME customer, d.TXTFIELD notes
+  FROM SOP10100 a
+  LEFT JOIN SOP10200 b
+  ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
+  LEFT JOIN RM00101 c
+  ON a.CUSTNMBR = c.CUSTNMBR
+  LEFT JOIN SY03900 d
+  ON a.NOTEINDX = d.NOTEINDX
+  WHERE b.ITEMNMBR = @itemnmbr
+  AND a.SOPTYPE IN (2, 3, 5)
+  AND SOPSTATUS IN (0, 1)
   AND a.LOCNCODE = 'QLD'
   ORDER BY a.DOCDATE DESC
   `;
