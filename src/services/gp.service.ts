@@ -82,6 +82,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   CAST(b.MNMMORDRQTY AS int) MinOrderQty,
   CAST(b.MXMMORDRQTY AS int) MaxOrderQty,
   CAST(vic.OnHand AS int) OnHandVIC,
+  CAST(e.HEA AS int) OnHandHEA,
   CAST(e.QLD AS int) OnHandQLD,
   CAST(e.NSW AS int) OnHandNSW,
   CAST(e.SA AS int) OnHandSA,
@@ -162,7 +163,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     ) a
     PIVOT (
       SUM(QTYONHND)
-      FOR LOCNCODE IN (NSW, QLD, WA, SA)
+      FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA)
     ) Pivot_table
   ) e
   ON a.ITEMNMBR = e.ITEMNMBR
