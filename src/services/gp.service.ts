@@ -94,14 +94,23 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   CAST(COALESCE(m.week, 0) AS int) QtyOnOrderWeek,
   CAST(COALESCE(m.month, 0) AS int) QtyOnOrderMonth,
   CAST(COALESCE(c.QTYONHND, 0) AS int) InTransit,
-  CAST(b.QTYONHND + COALESCE(c.QTYONHND, 0) - b.ATYALLOC - b.QTYBKORD AS int) QtyAvailable,
-  CAST(b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) AS int) QtyRequired
+  CAST(COALESCE(h.QTYFULFI, 0) AS int) PreTransit,
+  CAST(b.QTYONHND + COALESCE(c.QTYONHND, 0) + COALESCE(h.QTYFULFI, 0) - b.ATYALLOC - b.QTYBKORD AS int) QtyAvailable,
+  CAST(b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.QTYFULFI, 0) AS int) QtyRequired
   FROM IV00101 a
   
   -- Get quantities and shiz
   INNER JOIN IV00102 b
   ON a.ITEMNMBR = b.ITEMNMBR
   
+  -- get ITTs
+  LEFT JOIN (
+    SELECT ITEMNMBR, TRNSTLOC, SUM(QTYFULFI) QTYFULFI
+    FROM SVC00701
+    GROUP BY ITEMNMBR, TRNSTLOC
+  ) h
+  ON a.ITEMNMBR = h.ITEMNMBR AND b.LOCNCODE = h.TRNSTLOC
+
   -- Get in transits
   LEFT JOIN (
     SELECT ITEMNMBR,
@@ -179,12 +188,12 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     query += ' AND a.ITEMNMBR LIKE @item';
   } else {
     query += ` AND (
-      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.MXMMORDRQTY > 0 OR
-      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) + b.ORDRUPTOLVL > 0
+      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.QTYFULFI, 0) + b.MXMMORDRQTY > 0 OR
+      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.QTYFULFI, 0) + b.ORDRUPTOLVL > 0
     )`
   }
   query += ' ORDER BY a.ITEMNMBR ASC';
-  return request.input('branch', VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {console.log(query);return {lines: _.recordset}});
+  return request.input('branch', VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
 export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {
