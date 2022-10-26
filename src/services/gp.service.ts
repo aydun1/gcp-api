@@ -14,6 +14,38 @@ interface gpRes {
   returnValue: number;
 }
 
+export function getInTransitTransfers(from: string, to: string): Promise<{lines: object[]}> {
+  const request = new sqlRequest();
+  let query =
+  `
+  SELECT rtrim(a.ORDDOCID) DocId,
+         rtrim(b.ITEMNMBR) ItemNmbr,
+         rtrim(c.ITEMDESC) ItemDesc,
+         b.TRFQTYTY TransferQty,
+         b.QTYFULFI QtyFulfilled,
+         b.QTYSHPPD QtyShipped,
+         a.ORDRDATE OrderDate,
+         a.ETADTE EtaDate,
+         rtrim(b.TRNSFLOC) FromSite,
+         rtrim(b.TRNSTLOC) ToSite,
+         b.LNITMSEQ,
+         b.DEX_ROW_ID Id,
+         d.QTYONHND QtyOnHand,
+         d.QTYONHND - d.ATYALLOC QtyAvailable
+  FROM SVC00700 a
+  INNER JOIN SVC00701 b
+  ON a.ORDDOCID = b.ORDDOCID
+  INNER JOIN IV00101 c
+  ON b.ITEMNMBR = c.ITEMNMBR
+  LEFT JOIN IV00102 d
+  ON b.ITEMNMBR = d.ITEMNMBR AND d.LOCNCODE = @from_state
+  WHERE b.TRNSFLOC = @from_state
+  `;
+  if (to) query += ' AND b.TRNSTLOC = @to_state';
+  query +=' ORDER BY a.ORDRDATE DESC';
+  return request.input('from_state', VarChar(15), from).input('to_state', VarChar(15), to).query(query).then((_: IResult<gpRes>) =>  {return {lines: _.recordset}});
+}
+
 export function getPurchaseOrderNumbers(from: string, to: string): Promise<{lines: object[]}> {
   const request = new sqlRequest();
   let query =

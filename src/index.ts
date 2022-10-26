@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -197,6 +197,20 @@ app.patch('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}),
     result => res.status(200).send(result)
   ).catch(
     err => res.status(500).send(err)
+  );
+});
+
+app.get('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  const params = req.query;
+  const from = params['from'] as string || '';
+  const to = params['to'] as string || '';
+  getInTransitTransfers(from, to).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err)
+    }
   );
 });
 
