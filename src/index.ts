@@ -204,13 +204,24 @@ app.get('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req
   const params = req.query;
   const from = params['from'] as string || '';
   const to = params['to'] as string || '';
-  getInTransitTransfers(from, to).then(
-    result => res.status(200).send(result)
+  getInTransitTransfers('', from, to).then(result => 
+    res.status(200).send(result)
   ).catch(
-    err => {
-      console.log(err);
-      res.status(500).send(err)
-    }
+    err => res.status(500).send(err)    
+  );
+});
+
+app.get('/gp/itt/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+  getInTransitTransfers(req.params.id, '', '').then((result) => {
+      const line = result.lines[0] || {};
+      const orderDate = line['OrderDate'];
+      const fromSite = line['FromSite'];
+      const toSite = line['ToSite'];
+      const docId = line['DocId'];
+      console.log(result.lines[0])
+    res.status(200).send({...result, orderDate, fromSite, toSite, docId});
+  }).catch(
+    err => res.status(500).send(err)    
   );
 });
 

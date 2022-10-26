@@ -4,6 +4,7 @@ import fs, { WriteStream } from 'fs';
 import { allowedPallets } from '../../config.json';
 import { targetDir } from '../config';
 import { Transfer } from '../transfer';
+import { InTransitTransferLine } from '../in-transit-transfer-line';
 
 const storedProcedure = 'usp_PalletUpdate';
 
@@ -14,14 +15,15 @@ interface gpRes {
   returnValue: number;
 }
 
-export function getInTransitTransfers(from: string, to: string): Promise<{lines: object[]}> {
+export function getInTransitTransfers(id: string, from: string, to: string): Promise<{lines: InTransitTransferLine[]}> {
   const request = new sqlRequest();
   let query =
   `
   SELECT rtrim(a.ORDDOCID) DocId,
          rtrim(b.ITEMNMBR) ItemNmbr,
          rtrim(c.ITEMDESC) ItemDesc,
-         b.TRFQTYTY TransferQty,
+         rtrim(d.BINNMBR) Bin,
+         b.TRNSFQTY TransferQty,
          b.QTYFULFI QtyFulfilled,
          b.QTYSHPPD QtyShipped,
          a.ORDRDATE OrderDate,
@@ -39,11 +41,13 @@ export function getInTransitTransfers(from: string, to: string): Promise<{lines:
   ON b.ITEMNMBR = c.ITEMNMBR
   LEFT JOIN IV00102 d
   ON b.ITEMNMBR = d.ITEMNMBR AND d.LOCNCODE = @from_state
-  WHERE b.TRNSFLOC = @from_state
+  WHERE b.TRNSFQTY > 0
   `;
+  if (id) query += ' AND a.ORDDOCID = @doc_id';
+  if (from) query += ' AND b.TRNSFLOC = @from_state';
   if (to) query += ' AND b.TRNSTLOC = @to_state';
   query +=' ORDER BY a.ORDRDATE DESC';
-  return request.input('from_state', VarChar(15), from).input('to_state', VarChar(15), to).query(query).then((_: IResult<gpRes>) =>  {return {lines: _.recordset}});
+  return request.input('doc_id', VarChar(15), id).input('from_state', VarChar(15), from).input('to_state', VarChar(15), to).query(query).then((_: IResult<InTransitTransferLine>) =>  {return {lines: _.recordset}});
 }
 
 export function getPurchaseOrderNumbers(from: string, to: string): Promise<{lines: object[]}> {
