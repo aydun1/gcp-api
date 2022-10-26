@@ -72,6 +72,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(a.ITEMDESC) ItemDesc,
   CAST(f.PalletQty AS int) PalletQty,
+  CAST(vic.Height AS int) PalletHeight,
   CAST(f.PalletQty / COALESCE(NULLIF(f.PackQty, 0), 1) AS int) PackSize,
   RTRIM(b.LOCNCODE) Location,
   RTRIM(d.BIN) Bin,
@@ -142,14 +143,15 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
 
   -- Get Vic stock from Paperless
   LEFT JOIN (
-    SELECT a.[PROD.NO] ITEMNMBR,
-    SUM(b.[PAL.TOT.QTY]) OnHand
+    SELECT a.[PROD.NO] ITEMNMBR, b.Quantity OnHand, a.[PROD.HEIGHT] Height
     FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a       
-    LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW b      
+    LEFT JOIN (
+      SELECT [PROD.NO], SUM([PAL.TOT.QTY]) as Quantity
+      FROM [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW
+      WHERE [PAL.STATUS] = '02'
+      GROUP BY [PROD.NO]
+    ) b      
     ON a.[PROD.NO] = b.[PROD.NO]
-    WHERE a.[PROD.GROUP] NOT IN ('DIES')
-    AND b.[PAL.STATUS] = '02'
-    GROUP BY a.[PROD.NO]
   ) vic
   ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = vic.ITEMNMBR COLLATE DATABASE_DEFAULT
 
