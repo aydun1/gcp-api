@@ -150,7 +150,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   CAST(COALESCE(m.week, 0) AS int) QtyOnOrderWeek,
   CAST(COALESCE(m.month, 0) AS int) QtyOnOrderMonth,
   CAST(COALESCE(c.QTYONHND, 0) AS int) InTransit,
-  CAST(COALESCE(h.QTYFULFI, 0) AS int) PreTransit,
+  CAST(COALESCE(h.TRNSFQTY - h.QTYSHPPD, 0) AS int) PreTransit,
   CAST(b.QTYONHND + COALESCE(c.QTYONHND, 0) + COALESCE(h.QTYFULFI, 0) - b.ATYALLOC - b.QTYBKORD AS int) QtyAvailable,
   CAST(b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.QTYFULFI, 0) AS int) QtyRequired
   FROM IV00101 a
@@ -161,7 +161,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   
   -- get ITTs
   LEFT JOIN (
-    SELECT ITEMNMBR, TRNSTLOC, SUM(QTYFULFI) QTYFULFI
+    SELECT ITEMNMBR, TRNSTLOC, SUM(QTYFULFI) QTYFULFI, SUM(TRNSFQTY) TRNSFQTY, SUM(QTYSHPPD) QTYSHPPD
     FROM SVC00701
     GROUP BY ITEMNMBR, TRNSTLOC
   ) h
