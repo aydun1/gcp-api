@@ -33,7 +33,8 @@ export function getInTransitTransfers(id: string, from: string, to: string): Pro
          b.LNITMSEQ,
          b.DEX_ROW_ID Id,
          d.QTYONHND QtyOnHand,
-         d.QTYONHND - d.ATYALLOC QtyAvailable
+         d.QTYONHND - d.ATYALLOC QtyAvailable,
+         b.UOFM UOFM
   FROM SVC00700 a
   INNER JOIN SVC00701 b
   ON a.ORDDOCID = b.ORDDOCID
