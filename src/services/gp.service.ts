@@ -42,6 +42,7 @@ export function getInTransitTransfers(id: string, from: string, to: string): Pro
          b.TRNSFQTY TransferQty,
          b.QTYFULFI QtyFulfilled,
          b.QTYSHPPD QtyShipped,
+         b.TRNSFQTY - b.QTYSHPPD QtyRemaining,
          a.ORDRDATE OrderDate,
          a.ETADTE EtaDate,
          rtrim(b.TRNSFLOC) FromSite,
@@ -59,6 +60,7 @@ export function getInTransitTransfers(id: string, from: string, to: string): Pro
   LEFT JOIN IV00102 d
   ON b.ITEMNMBR = d.ITEMNMBR AND d.LOCNCODE = @from_state
   WHERE b.TRNSFQTY > 0
+  AND b.TRNSFQTY - b.QTYSHPPD > 0
   `;
   if (id) query += ' AND a.ORDDOCID = @doc_id';
   if (from) query += ' AND b.TRNSFLOC = @from_state';
