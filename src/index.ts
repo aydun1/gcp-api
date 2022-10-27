@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -212,17 +212,12 @@ app.get('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req
 });
 
 app.get('/gp/itt/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
-  getInTransitTransfers(req.params.id, '', '').then((result) => {
-      const line = result.lines[0] || {};
-      const orderDate = line['OrderDate'];
-      const fromSite = line['FromSite'];
-      const toSite = line['ToSite'];
-      const docId = line['DocId'];
-      console.log(result.lines[0])
-    res.status(200).send({...result, orderDate, fromSite, toSite, docId});
-  }).catch(
-    err => res.status(500).send(err)    
-  );
+  getInTransitTransfer(req.params.id).then(itt =>{
+    return getInTransitTransfers(req.params.id, itt.fromSite, '').then(_ => {
+      const payload = {..._, orderDate: itt.orderDate, fromSite: itt.fromSite, toSite: itt.toSite, docId: itt.docId };
+      res.status(200).send(payload)
+    })
+  }).catch(err => res.status(500).send(err));
 });
 
 app.post('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {

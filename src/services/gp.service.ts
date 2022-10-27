@@ -5,6 +5,7 @@ import { allowedPallets } from '../../config.json';
 import { targetDir } from '../config';
 import { Transfer } from '../transfer';
 import { InTransitTransferLine } from '../in-transit-transfer-line';
+import { InTransitTransfer } from '../in-transit-transfer';
 
 const storedProcedure = 'usp_PalletUpdate';
 
@@ -13,6 +14,21 @@ interface gpRes {
   output: object;
   rowsAffected: Array<number>;
   returnValue: number;
+}
+
+export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT rtrim(ORDDOCID) docId,
+         ORDRDATE orderDate,
+         ETADTE EtaDate,
+         rtrim(TRNSFLOC) fromSite,
+         rtrim(LOCNCODE) toSite
+  FROM SVC00700
+  WHERE ORDDOCID = @doc_id
+  `;
+  return request.input('doc_id', VarChar(15), id).query(query).then((_: IResult<InTransitTransfer>) =>  {return _.recordset[0]});
 }
 
 export function getInTransitTransfers(id: string, from: string, to: string): Promise<{lines: InTransitTransferLine[]}> {

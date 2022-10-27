@@ -1,8 +1,9 @@
 import { InTransitTransferLine } from "./in-transit-transfer-line";
 
 export interface InTransitTransfer {
-  id: string;
+  docId: string;
   fromSite: string;
   toSite: string;
+  orderDate: string;
   lines: InTransitTransferLine[];
 }
