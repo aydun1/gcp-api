@@ -126,9 +126,9 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   SELECT ${searchTerm ? 'TOP(50)' : ''} a.DEX_ROW_ID Id,
   RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(a.ITEMDESC) ItemDesc,
-  f.PalletQty PalletQty,
-  vic.Height PalletHeight,
-  f.PalletQty / COALESCE(NULLIF(f.PackQty, 0), 1) PackSize,
+  pw.PalletQuantity PalletQty,
+  pw.Height PalletHeight,
+  pw.CartonQuantity PackSize,
   RTRIM(b.LOCNCODE) Location,
   RTRIM(d.BIN) Bin,
   RTRIM(b.PRIMVNDR) Vendor,
@@ -137,7 +137,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   b.ORDRUPTOLVL OrderUpToLvl,
   b.MNMMORDRQTY MinOrderQty,
   b.MXMMORDRQTY MaxOrderQty,
-  vic.OnHand OnHandVIC,
+  pw.OnHand OnHandVIC,
   e.HEA OnHandHEA,
   e.QLD OnHandQLD,
   e.NSW OnHandNSW,
@@ -178,7 +178,6 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ) c
   ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.lcn
 
-
   -- Exclude allocs after specified date
   LEFT JOIN (
     SELECT b.ITEMNMBR,
@@ -195,10 +194,9 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ) m
   ON b.ITEMNMBR = m.ITEMNMBR AND b.LOCNCODE = m.LOCNCODE
 
-
   -- Get Vic stock from Paperless
   LEFT JOIN (
-    SELECT a.[PROD.NO] ITEMNMBR, b.Quantity OnHand, a.[PROD.HEIGHT] Height
+    SELECT a.[PROD.NO] ITEMNMBR, b.Quantity OnHand, a.[PROD.HEIGHT] Height, [PAL.QTY] PalletQuantity, [CARTON.QTY] CartonQuantity
     FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a       
     LEFT JOIN (
       SELECT [PROD.NO], SUM([PAL.TOT.QTY]) as Quantity
@@ -207,18 +205,12 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
       GROUP BY [PROD.NO]
     ) b      
     ON a.[PROD.NO] = b.[PROD.NO]
-  ) vic
-  ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = vic.ITEMNMBR COLLATE DATABASE_DEFAULT
-
+  ) pw
+  ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = pw.ITEMNMBR COLLATE DATABASE_DEFAULT
 
   -- Get bin allocations
   LEFT JOIN IV00117 d
   ON a.ITEMNMBR = d.ITEMNMBR AND b.LOCNCODE = d.LOCNCODE
-
-
-  -- Get item specs
-  LEFT JOIN GPLIVE.[labels].dbo.gcp_lbls f
-  ON a.ITEMNMBR = f.ItemNumber
 
   -- Get branch SOHs
   LEFT JOIN (
