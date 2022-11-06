@@ -297,7 +297,6 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
   query += ` ORDER BY ${orderby.replace('name', 'custName') || 'custName'} ${order}`;
   query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY';
-  console.log(query)
   return request.input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
