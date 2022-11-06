@@ -1,7 +1,7 @@
 import { connect } from 'mssql';
 import { compare } from 'bcrypt';
 import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 'passport-azure-ad';
-import express, { NextFunction, Request, Response } from 'express';
+import express, { NextFunction, Request, RequestHandler, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import helmet from 'helmet';
@@ -21,6 +21,7 @@ interface Body {
 }
 
 const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' });
+const auth = passport.authenticate('oauth-bearer', {session: false}) as RequestHandler;
 
 const options: IBearerStrategyOptionWithRequest = {
   identityMetadata: `https://${config.metadata.authority}/${config.credentials.tenantID}/${config.metadata.version}/${config.metadata.discovery}`,
@@ -64,18 +65,18 @@ app.get( '/', ( req, res ) => {
   return res.send('');
 });
 
-app.get('/gp', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp', auth, (req: Request, res: Response) => {
   return res.send('');
 });
 
-app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/customers', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branches = (Array.isArray(params['branch']) ? params['branch'] : [params['branch']].filter(_ => _)) as Array<string>;
   const sort = params['order'] as string || '';
   const order = params['orderby'] as string || '';
   const filters = (Array.isArray(params['filter']) ? params['filter'] : [params['filter']].filter(_ => _)) as Array<string>;
   const search = params['search'] as string || '';
-  const page = parseInt(params['page'] as string) || 0;
+  const page = parseInt(params['page'] as string) || 1;
   getCustomers(branches, sort, order, filters, search, page).then(
     result => res.status(200).send(result)
   ).catch(
@@ -86,7 +87,7 @@ app.get('/gp/customers', passport.authenticate('oauth-bearer', {session: false})
   );
 });
 
-app.get('/gp/customers/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/customers/:id', auth, (req: Request, res: Response) => {
   getCustomer(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
@@ -97,7 +98,7 @@ app.get('/gp/customers/:id', passport.authenticate('oauth-bearer', {session: fal
   );
 });
 
-app.get('/gp/customers/:id/addresses', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/customers/:id/addresses', auth, (req: Request, res: Response) => {
   getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
@@ -108,7 +109,7 @@ app.get('/gp/customers/:id/addresses', passport.authenticate('oauth-bearer', {se
   );
 });
 
-app.get('/gp/pan', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/pan', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getItems(branch, [], '').then(
@@ -121,7 +122,7 @@ app.get('/gp/pan', passport.authenticate('oauth-bearer', {session: false}), (req
   );
 });
 
-app.get('/gp/inventory', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/inventory', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const search = params['search'] as string || '';
@@ -137,7 +138,7 @@ app.get('/gp/inventory', passport.authenticate('oauth-bearer', {session: false})
   );
 });
 
-app.get('/gp/inventory/:id/history', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getHistory(branch, req.params.id).then(
@@ -150,7 +151,7 @@ app.get('/gp/inventory/:id/history', passport.authenticate('oauth-bearer', {sess
   );
 });
 
-app.get('/gp/inventory/:id/current', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getOrders(branch, req.params.id).then(
@@ -163,7 +164,7 @@ app.get('/gp/inventory/:id/current', passport.authenticate('oauth-bearer', {sess
   );
 });
 
-app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/po', auth, (req: Request, res: Response) => {
   const params = req.query;
   const from = params['from'] as string || '';
   const to = params['to'] as string || '';
@@ -177,14 +178,14 @@ app.get('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req:
   );
 });
 
-app.post('/gp/po', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.post('/gp/po', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
   const writeStream = writeTransferFile(body.fromSite, body.toSite, body);
   writeStream.on('error', e => res.status(500).send({e}));
   writeStream.on('close', () => res.status(200).send({'status': 'Success!!!'}));
 });
 
-app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/po/:id', auth, (req: Request, res: Response) => {
   getPurchaseOrder(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
@@ -192,7 +193,7 @@ app.get('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (
   );
 });
 
-app.patch('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.patch('/gp/po/:id', auth, (req: Request, res: Response) => {
   getPurchaseOrder(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
@@ -200,7 +201,7 @@ app.patch('/gp/po/:id', passport.authenticate('oauth-bearer', {session: false}),
   );
 });
 
-app.get('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/itt', auth, (req: Request, res: Response) => {
   const params = req.query;
   const from = params['from'] as string || '';
   const to = params['to'] as string || '';
@@ -211,7 +212,7 @@ app.get('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req
   );
 });
 
-app.get('/gp/itt/:id', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.get('/gp/itt/:id', auth, (req: Request, res: Response) => {
   getInTransitTransfer(req.params.id).then(itt =>{
     return getInTransitTransfers(req.params.id, itt.fromSite, '').then(_ => {
       const payload = {..._, orderDate: itt.orderDate, fromSite: itt.fromSite, toSite: itt.toSite, docId: itt.docId };
@@ -219,8 +220,7 @@ app.get('/gp/itt/:id', passport.authenticate('oauth-bearer', {session: false}), 
     })
   }).catch(err => res.status(500).send(err));
 });
-
-app.post('/gp/itt', passport.authenticate('oauth-bearer', {session: false}), (req: Request, res: Response) => {
+app.post('/gp/itt', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
   const writeStream = writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body)
   writeStream.on('error', e => res.status(500).send({e}));

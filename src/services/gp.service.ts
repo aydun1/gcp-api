@@ -271,8 +271,8 @@ export function cancelLines(transfer: Transfer): Promise<{lines: object[]}> {
 
 export function getCustomers(branches: Array<string>, sort: string, orderby: string, filters: Array<string>, search: string, page: number): Promise<{customers: gpRes[]}> {
   const request = new sqlRequest();
-  const offset = (page - 1) * 50;
-  const order = sort === 'asc' ? 'ASC' : 'DESC';
+  const offset = Math.max(0, (page - 1) * 50);
+  const order = sort === 'desc' ? 'DESC' : 'ASC';
   let query =
   `
   SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
@@ -295,8 +295,9 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   if (search) filterConditions.push(`(a.CUSTNMBR LIKE '${search}%' OR a.CUSTNAME LIKE '%${search}%')`);
   if (palletFilters.length > 0) filterConditions.push(`(${palletFilters.join(' OR ')})`);
   if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
-  query += ` ORDER BY ${orderby.replace('name', 'custName')} ${order}`;
+  query += ` ORDER BY ${orderby.replace('name', 'custName') || 'custName'} ${order}`;
   query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY';
+  console.log(query)
   return request.input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
