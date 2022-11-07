@@ -150,9 +150,8 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   COALESCE(m.week, 0) QtyOnOrderWeek,
   COALESCE(m.month, 0) QtyOnOrderMonth,
   COALESCE(c.QTYONHND, 0) InTransit,
-  COALESCE(h.TRNSFQTY - h.QTYSHPPD, 0) PreTransit,
-  b.QTYONHND + COALESCE(c.QTYONHND, 0) + COALESCE(h.QTYFULFI, 0) - b.ATYALLOC - b.QTYBKORD QtyAvailable,
-  b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.QTYFULFI, 0) QtyRequired
+  COALESCE(h.IttRemaining, 0) PreTransit,
+  b.QTYONHND + COALESCE(c.QTYONHND, 0) + COALESCE(h.IttRemaining, 0) - b.ATYALLOC - b.QTYBKORD QtyAvailable
   FROM IV00101 a
   
   -- Get quantities and shiz
@@ -161,7 +160,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   
   -- get ITTs
   LEFT JOIN (
-    SELECT ITEMNMBR, TRNSTLOC, SUM(QTYFULFI) QTYFULFI, SUM(TRNSFQTY) TRNSFQTY, SUM(QTYSHPPD) QTYSHPPD
+    SELECT ITEMNMBR, TRNSTLOC, SUM(TRNSFQTY) - SUM(QTYSHPPD) IttRemaining
     FROM SVC00701
     GROUP BY ITEMNMBR, TRNSTLOC
   ) h
@@ -237,8 +236,8 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     query += ' AND a.ITEMNMBR LIKE @item';
   } else {
     query += ` AND (
-      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.QTYFULFI, 0) + b.MXMMORDRQTY > 0 OR
-      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.QTYFULFI, 0) + b.ORDRUPTOLVL > 0
+      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.IttRemaining, 0) + b.MXMMORDRQTY > 0 OR
+      b.ATYALLOC + b.QTYBKORD - b.QTYONHND - COALESCE(c.QTYONHND, 0) - COALESCE(h.IttRemaining, 0) + b.ORDRUPTOLVL > 0
     )`
   }
   query += ' ORDER BY a.ITEMNMBR ASC';
