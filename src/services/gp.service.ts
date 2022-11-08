@@ -126,6 +126,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   SELECT ${searchTerm ? 'TOP(50)' : ''} a.DEX_ROW_ID Id,
   RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(a.ITEMDESC) ItemDesc,
+  RTRIM(u.BASEUOFM) BaseUom,
   pw.PalletQuantity PalletQty,
   pw.Height PalletHeight,
   pw.CartonQuantity PackSize,
@@ -153,11 +154,15 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   COALESCE(h.IttRemaining, 0) PreTransit,
   b.QTYONHND + COALESCE(c.QTYONHND, 0) + COALESCE(h.IttRemaining, 0) - b.ATYALLOC - b.QTYBKORD QtyAvailable
   FROM IV00101 a
-  
+
   -- Get quantities and shiz
   INNER JOIN IV00102 b
   ON a.ITEMNMBR = b.ITEMNMBR
-  
+
+  -- Get UofM
+  LEFT JOIN IV40201 u
+  ON a.UOMSCHDL = u.UOMSCHDL
+
   -- get ITTs
   LEFT JOIN (
     SELECT ITEMNMBR, TRNSTLOC, SUM(TRNSFQTY) - SUM(QTYSHPPD) IttRemaining
