@@ -214,12 +214,17 @@ app.get('/gp/itt', auth, (req: Request, res: Response) => {
 
 app.get('/gp/itt/:id', auth, (req: Request, res: Response) => {
   getInTransitTransfer(req.params.id).then(itt =>{
+    if (!itt) {
+      res.status(404).send({});
+      return;
+    }
     return getInTransitTransfers(req.params.id, itt.fromSite, '').then(_ => {
       const payload = {..._, orderDate: itt.orderDate, fromSite: itt.fromSite, toSite: itt.toSite, docId: itt.docId };
       res.status(200).send(payload)
     })
-  }).catch(err => res.status(500).send(err));
+  }).catch(err => {res.status(500).send(err)});
 });
+
 app.post('/gp/itt', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
   const writeStream = writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines)
