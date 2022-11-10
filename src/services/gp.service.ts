@@ -421,7 +421,7 @@ export function writeInTransitTransferFile(id: string, fromSite: string, toSite:
   const d = new Date();
   const fileName = `${targetDir}/PICKS/ITT Between SITES/itt_transfer_from_${fromSite}_to_${toSite}.csv`
   const header = ['Id', 'Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
-  const date = d.toISOString().split('T')[0];
+  const date = d.toLocaleDateString('fr-CA');
   const lines = body.map(_ => [id, i += 1, date, fromSite, toSite, _.itemNumber, _.toTransfer]).map(_ => _.join(','));
   const writeStream = fs.createWriteStream(fileName);
   writeStream.write(header.join(','));
