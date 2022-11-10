@@ -44,7 +44,7 @@ export function getInTransitTransfers(id: string, from: string, to: string): Pro
   SELECT rtrim(a.ORDDOCID) DocId,
          rtrim(b.ITEMNMBR) ItemNmbr,
          rtrim(c.ITEMDESC) ItemDesc,
-         rtrim(d.BINNMBR) Bin,
+         rtrim(e.BIN) Bin,
          b.TRNSFQTY TransferQty,
          b.QTYFULFI QtyFulfilled,
          b.QTYSHPPD QtyShipped,
@@ -64,7 +64,9 @@ export function getInTransitTransfers(id: string, from: string, to: string): Pro
   INNER JOIN IV00101 c
   ON b.ITEMNMBR = c.ITEMNMBR
   LEFT JOIN IV00102 d
-  ON b.ITEMNMBR = d.ITEMNMBR AND d.LOCNCODE = @from_state
+  ON b.ITEMNMBR = d.ITEMNMBR AND b.TRNSFLOC = d.LOCNCODE
+  LEFT JOIN IV00117 e
+  ON b.ITEMNMBR = e.ITEMNMBR AND b.TRNSFLOC = e.LOCNCODE
   WHERE b.TRNSFQTY > 0
   AND b.TRNSFQTY - b.QTYSHPPD > 0
   `;
