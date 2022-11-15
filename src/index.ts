@@ -87,8 +87,8 @@ app.get('/gp/customers', auth, (req: Request, res: Response) => {
   );
 });
 
-app.get('/gp/customers/:id', auth, (req: Request, res: Response) => {
-  getCustomer(req.params.id).then(
+app.get('/gp/customers/:id/addresses', auth, (req: Request, res: Response) => {
+  getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {
@@ -98,8 +98,8 @@ app.get('/gp/customers/:id', auth, (req: Request, res: Response) => {
   );
 });
 
-app.get('/gp/customers/:id/addresses', auth, (req: Request, res: Response) => {
-  getCustomerAddresses(req.params.id).then(
+app.get('/gp/customers/:id(*)', auth, (req: Request, res: Response) => {
+  getCustomer(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {
