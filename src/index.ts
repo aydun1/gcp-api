@@ -8,10 +8,11 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
+import { getMaterialsInFolder } from './services/cw.service';
 
 interface Body {
   customer: string;
@@ -236,6 +237,24 @@ app.post('/pallets', verifyApiKey, (req, res) => {
   const body = req.body as Body;
   updatePallets(body.customer, body.palletType, body.palletQty).then(
     result => res.status(200).json({result})
+  ).catch((err: {code: number, message: string}) => 
+    res.status(err.code || 500).json({'result': err?.message || err})
+  );
+});
+
+app.get('/cw/chemials', auth, (req, res) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  getChemicals(branch).then(
+    _ => res.status(200).json(_)
+  ).catch((err: {code: number, message: string}) => 
+    res.status(err.code || 500).json({'result': err?.message || err})
+  );
+});
+
+app.get('/cw/materials', auth, (req, res) => {
+  getMaterialsInFolder().then(
+    _ => res.status(200).json(_)
   ).catch((err: {code: number, message: string}) => 
     res.status(err.code || 500).json({'result': err?.message || err})
   );

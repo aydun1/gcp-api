@@ -211,15 +211,12 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
 
   -- Get Vic stock from Paperless
   LEFT JOIN (
-    SELECT a.[PROD.NO] ITEMNMBR, b.Quantity OnHand, a.[PROD.HEIGHT] Height, [PAL.QTY] PalletQuantity, [CARTON.QTY] CartonQuantity
+    SELECT a.[PROD.NO] ITEMNMBR, SUM([PAL.TOT.QTY]) OnHand, MAX(a.[PROD.HEIGHT]) Height, MAX([PAL.QTY]) PalletQuantity, MAX([CARTON.QTY]) CartonQuantity
     FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a       
-    LEFT JOIN (
-      SELECT [PROD.NO], SUM([PAL.TOT.QTY]) as Quantity
-      FROM [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW
-      WHERE [PAL.STATUS] = '02'
-      GROUP BY [PROD.NO]
-    ) b      
+    LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW b
     ON a.[PROD.NO] = b.[PROD.NO]
+    WHERE b.[PAL.STATUS] = '02'
+    GROUP BY a.[PROD.NO]
   ) pw
   ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = pw.ITEMNMBR COLLATE DATABASE_DEFAULT
 
@@ -357,7 +354,7 @@ export function getHistory(branch: string, itemNmbr: string) {
   LEFT JOIN RM00101 c
   ON a.CUSTNMBR = c.CUSTNMBR
   WHERE b.ITEMNMBR = @itemnmbr
-  AND a.LOCNCODE = 'QLD'
+  AND a.LOCNCODE = @locnCode
   AND a.SOPTYPE = 3
   ORDER BY a.DOCDATE DESC
   `;
@@ -380,12 +377,32 @@ export function getOrders(branch: string, itemNmbr: string) {
   WHERE b.ITEMNMBR = @itemnmbr
   AND a.SOPTYPE IN (2, 3, 5)
   AND SOPSTATUS IN (0, 1)
-  AND a.LOCNCODE = 'QLD'
+  AND a.LOCNCODE = @locnCode
   ORDER BY a.DOCDATE DESC
   `;
   return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
 }
 
+export function getChemicals(branch: string) {
+  branch = parseBranch(branch);
+  const request = new sqlRequest();
+  const query = 
+  `
+  SELECT RTRIM(a.ITEMNMBR) ITEMNMBR,
+  RTRIM(ITEMDESC) ITEMDESC,
+  b.QTYONHND,
+  FROM IV00101 a
+  LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.SDS_Data c ON a.ITEMNMBR = c.GP_Itemnmbr
+  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') d ON a.ITEMNMBR = d.ObjectID
+  WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZERS', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
+  AND b.LOCNCODE = @locnCode
+  AND b.QTYONHND > 0
+  AND d.PropertyValue != 'Hardware & Accessories'
+  `;
+  return request.input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+
+}
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw {code: 400, message: 'Missing info'};

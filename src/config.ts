@@ -18,6 +18,12 @@ export const sqlConfig = {
   }
 };
 
+export const cwConfig = {
+  domain: process.env.CW_DOMAIN,
+  username: process.env.CW_USERNAME,
+  password: process.env.CW_PASSWORD,
+}
+
 export const webConfig = {
   ip: '0.0.0.0',
   port: process.env.PORT || '3000',
