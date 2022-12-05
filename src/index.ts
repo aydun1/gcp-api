@@ -12,7 +12,7 @@ import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHisto
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
-import { getMaterialsInFolder } from './services/cw.service';
+import { getMaterial, getMaterialsInFolder } from './services/cw.service';
 
 interface Body {
   customer: string;
@@ -242,19 +242,29 @@ app.post('/pallets', verifyApiKey, (req, res) => {
   );
 });
 
-app.get('/cw/chemials', auth, (req, res) => {
+app.get('/gp/chemicals', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getChemicals(branch).then(
+    _ => res.status(200).json(_)
+  ).catch((err: {code: number, message: string}) => {console.log(err)
+    res.status(err.code || 500).json({'result': err?.message || err})
+});
+});
+
+app.get('/gp/saved-materials', auth, (req, res) => {
+  getMaterialsInFolder().then(
     _ => res.status(200).json(_)
   ).catch((err: {code: number, message: string}) => 
     res.status(err.code || 500).json({'result': err?.message || err})
   );
 });
 
-app.get('/cw/materials', auth, (req, res) => {
-  getMaterialsInFolder().then(
-    _ => res.status(200).json(_)
+app.get('/gp/update-sds', auth, (req, res) => {
+  const params = req.query;
+  const cwId = params['cwId'] as string || '';
+  getMaterial(cwId).then(
+    _ => _
   ).catch((err: {code: number, message: string}) => 
     res.status(err.code || 500).json({'result': err?.message || err})
   );

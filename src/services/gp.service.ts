@@ -6,6 +6,7 @@ import { targetDir } from '../config';
 import { Line } from '../line';
 import { InTransitTransferLine } from '../in-transit-transfer-line';
 import { InTransitTransfer } from '../in-transit-transfer';
+import { CwRow } from '../CwRow';
 
 const storedProcedure = 'usp_PalletUpdate';
 
@@ -388,21 +389,25 @@ export function getChemicals(branch: string) {
   const request = new sqlRequest();
   const query = 
   `
-  SELECT RTRIM(a.ITEMNMBR) ITEMNMBR,
-  RTRIM(ITEMDESC) ITEMDESC,
-  b.QTYONHND,
+  SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
+  RTRIM(ITEMDESC) ItemDesc,
+  b.QTYONHND QtyOnHand,
+  rtrim(c.BIN) Bin
   FROM IV00101 a
   LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.SDS_Data c ON a.ITEMNMBR = c.GP_Itemnmbr
-  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') d ON a.ITEMNMBR = d.ObjectID
+  LEFT JOIN IV00117 c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
+  LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ITEMNMBR = d.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
+  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
   WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZERS', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
   AND b.LOCNCODE = @locnCode
   AND b.QTYONHND > 0
-  AND d.PropertyValue != 'Hardware & Accessories'
+  AND f.PropertyValue != 'Hardware & Accessories'
+  ORDER BY a.ITEMNMBR
   `;
-  return request.input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
-
+  return request.input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {chemicals: _.recordset}});
 }
+
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw {code: 400, message: 'Missing info'};
@@ -446,4 +451,21 @@ export function writeInTransitTransferFile(id: string, fromSite: string, toSite:
   writeStream.write(lines.join('\r\n'));
   writeStream.close();
   return writeStream;
+}
+
+export function updateSDS(material: CwRow) {
+  const request = new sqlRequest();
+  const query = 
+  `
+  UPDATE [MSDS].dbo.Materials
+  SET CwNo = @cwNo,
+      Name = @,
+      PackingGroup = @,
+      HazardRating = @,
+      IssueDate = @,
+      ExtractionDate = @
+  WHERE CwNo = @cwNo
+  `;
+  return request.input('cwNo', VarChar(12), material.CwNo).query(query).then((_: IResult<gpRes>) => {return {chemicals: _.recordset}});
+
 }
