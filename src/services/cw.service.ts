@@ -44,7 +44,10 @@ function parseMaterialData(data: CwSearchResponse): Array<CwRow> {
       Name: row.Name,
       VendorName: row.MaterialData.find(_ => _.Name === 'VENDOR_NAME')?.Value || '',
       Pkg: row.MaterialData.find(_ => _.Name === 'PG')?.Value || '',
-      Dgc: row.MaterialData.find(_ => _.Name === 'DGC')?.Value || ''
+      Dgc: row.MaterialData.find(_ => _.Name === 'DGC')?.Value || '',
+      IssueDate: new Date(),
+      ExtractionDate: new Date()
+
     }
   })
 }
@@ -70,11 +73,20 @@ async function initChemwatch(): Promise<void> {
   isLoggedOn = true;
 }
 
-export async function getMaterialsInFolder(): Promise<CwFolderRes> {
+export async function getMaterialsInFolder(page = 1): Promise<CwFolderRes> {
   await initChemwatch();
-  return instance.get<CwFolderRes>(`materialsInFolder?folderId=${folderId}`).then(
-    res => res.data
-  ).catch((e: AxiosError) => onError(e) as CwFolderRes);
+  return instance.get<CwFolderRes>(`materialsInFolder?folderId=${folderId}&page=${page}`).then(
+    async res => {
+      const rows = res.data.Rows;
+      rows.map(row => {
+        row['IssueDate'] = new Date(row['IssueDate']);
+        row['ExtractionDate'] = new Date(row['ExtractionDate']);
+        return row;
+      })
+      const nextPage = res.data.PageNumber < res.data.PageCount ? (await getMaterialsInFolder(res.data.PageNumber + 1)).Rows : [];
+      res.data.Rows = [...rows, ...nextPage];
+      return res.data;
+    }).catch((e: AxiosError) => onError(e) as CwFolderRes);
 }
 
 export async function getMaterial(cwNo: string): Promise<CwRow> {
@@ -96,7 +108,7 @@ export async function search(term: string): Promise<CwFolderRes> {
   ).catch((e: AxiosError) => onError(e) as CwFolderRes);
 }
 
-function onError(e: AxiosError) {
+function onError(e: AxiosError): unknown {
   if (e.response?.status === 401) cookieValue = '';
   return  e.response?.data;
 }
