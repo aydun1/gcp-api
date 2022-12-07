@@ -8,11 +8,11 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, updatePallets, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSyncedChemicals, linkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
-import { getMaterialsInFolder } from './services/cw.service';
+import { getMaterial, getMaterialsInFolder } from './services/cw.service';
 
 interface Body {
   customer: string;
@@ -242,22 +242,59 @@ app.post('/pallets', verifyApiKey, (req, res) => {
   );
 });
 
-app.get('/cw/chemials', auth, (req, res) => {
+app.get('/gp/chemicals', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getChemicals(branch).then(
+    _ => res.status(200).json(_)
+  ).catch((err: {code: number, message: string}) => {console.log(err)
+    res.status(err.code || 500).json({'result': err?.message || err})
+});
+});
+
+app.get('/gp/saved-materials', auth, (req, res) => {
+  getMaterialsInFolder().then(
     _ => res.status(200).json(_)
   ).catch((err: {code: number, message: string}) => 
     res.status(err.code || 500).json({'result': err?.message || err})
   );
 });
 
-app.get('/cw/materials', auth, (req, res) => {
-  getMaterialsInFolder().then(
-    _ => res.status(200).json(_)
+app.get('/gp/update-sds', auth, (req, res) => {
+  const params = req.query;
+  const cwId = params['cwId'] as string || '';
+  getMaterial(cwId).then(
+    _ => _
   ).catch((err: {code: number, message: string}) => 
     res.status(err.code || 500).json({'result': err?.message || err})
   );
+});
+
+app.get('/gp/sync-from-cw', auth, (req, res) => {
+  getMaterialsInFolder().then(
+    _ => {
+      return updateSDS(_.Rows);
+    }).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+      console.log(err)
+      return res.status(err.code || 500).json({'result': err?.message || err})
+  });
+});
+
+app.get('/gp/synced-materials', auth, (req, res) => {
+  getSyncedChemicals().then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    console.log(err)
+    return res.status(err.code || 500).json({'result': err?.message || err})
+  });
+});
+
+app.get('/gp/link-material', auth, (req, res) => {
+  const params = req.query;
+  const itemNmbr = params['itemNmbr'] as string || '';
+  const cwNo = params['cwNo'] as string || '';
+  linkChemical(itemNmbr, cwNo).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err})
+  });
 });
 
 connect(sqlConfig, err => {

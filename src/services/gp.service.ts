@@ -1,4 +1,4 @@
-import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt } from 'mssql';
+import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX } from 'mssql';
 import fs, { WriteStream } from 'fs';
 
 import { allowedPallets } from '../../config.json';
@@ -6,6 +6,7 @@ import { targetDir } from '../config';
 import { Line } from '../line';
 import { InTransitTransferLine } from '../in-transit-transfer-line';
 import { InTransitTransfer } from '../in-transit-transfer';
+import { CwRow } from '../CwRow';
 
 const storedProcedure = 'usp_PalletUpdate';
 
@@ -388,21 +389,26 @@ export function getChemicals(branch: string) {
   const request = new sqlRequest();
   const query = 
   `
-  SELECT RTRIM(a.ITEMNMBR) ITEMNMBR,
-  RTRIM(ITEMDESC) ITEMDESC,
-  b.QTYONHND,
+  SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
+  RTRIM(ITEMDESC) ItemDesc,
+  b.QTYONHND QtyOnHand,
+  rtrim(c.BIN) Bin,
+  Pkg packingGroup, Name, HazardRating hazardRating, IssueDate, ExtractionDate, VendorName, Country, Language
   FROM IV00101 a
   LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.SDS_Data c ON a.ITEMNMBR = c.GP_Itemnmbr
-  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') d ON a.ITEMNMBR = d.ObjectID
+  LEFT JOIN IV00117 c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
+  LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ITEMNMBR = d.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
+  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
   WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZERS', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
   AND b.LOCNCODE = @locnCode
   AND b.QTYONHND > 0
-  AND d.PropertyValue != 'Hardware & Accessories'
+  AND f.PropertyValue != 'Hardware & Accessories'
+  ORDER BY a.ITEMNMBR
   `;
-  return request.input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
-
+  return request.input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {chemicals: _.recordset}});
 }
+
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw {code: 400, message: 'Missing info'};
@@ -428,6 +434,7 @@ export function writeTransferFile(fromSite: string, toSite: string, lines: Array
   writeStream.write('\r\n');
   writeStream.write(linesCsv.join('\r\n'));
   writeStream.close();
+  fs.writeFileSync(`${targetDir}/Transfers/trigger.txt`, ''); 
   return writeStream;
 }
 
@@ -446,4 +453,58 @@ export function writeInTransitTransferFile(id: string, fromSite: string, toSite:
   writeStream.write(lines.join('\r\n'));
   writeStream.close();
   return writeStream;
+}
+
+export async function linkChemical(itemNmbr: string, cwNo: string): Promise<number> {
+  const request = new sqlRequest();
+  const query = 'SELECT ITEMNMBR, CwNo FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr';
+  const currentCount = await request.input('itemNmbr', VarChar(31), itemNmbr).query(query).then((_: IResult<gpRes>) => _.recordset.length);
+  if (currentCount === 0) {
+    const query = `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)`;
+    return new sqlRequest().input('cwNo', VarChar(31), itemNmbr).input('cwNo', VarChar(50), cwNo).query(query).then(() => 1);
+  } else {
+    const query = `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
+    return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(query).then(() => 1);
+  }
+}
+
+export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
+  const request = new sqlRequest();
+  const query = 'SELECT CwNo, Name FROM [MSDS].dbo.Materials ORDER BY Name ASC';
+  return request.query(query).then((_: IResult<CwRow>) => {return {chemicals: _.recordset}});
+}
+
+export async function updateSDS(materials: Array<CwRow>) {
+  const current = await new sqlRequest().query('SELECT CwNo, ExtractionDate FROM [MSDS].dbo.Materials').then(_ => _.recordset as IRecordSet<{CwNo: string}>);
+  const missing = materials.filter(m => !current.find(_ => _.CwNo === m.CwNo)).map(c => {
+    const query = `INSERT INTO [MSDS].dbo.Materials (CwNo) VALUES (@cwNo)`;
+    return new sqlRequest().input('cwNo', VarChar(50), c.CwNo).query(query);
+  });
+  await Promise.all(missing);
+  const updates = materials.map(c => {
+    const request = new sqlRequest();
+    const sets = [];
+    const parameters = [
+      {name: 'CwNo', type: VarChar(50)},
+      {name: 'Name', type: VarChar(MAX)},
+      {name: 'VendorName', type: VarChar(MAX)},
+      {name: 'HazardRating', type: SmallInt},
+      {name: 'Pkg', type: VarChar(50)},
+      {name: 'Language', type: VarChar(50)},
+      {name: 'Country', type: VarChar(50)},
+
+    ]
+    parameters.forEach(_ => {
+      request.input(_.name, _.type, c[_.name]);
+      sets.push(`${_.name} = @${_.name}`)
+    })
+    if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('IssueDate = @issueDate');
+    if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('issueDate', sqlDate, c.IssueDate);
+    if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('ExtractionDate = @extractionDate');
+    if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('extractionDate', sqlDate, c.ExtractionDate);
+    const query = `UPDATE [MSDS].dbo.Materials SET ${sets.join(', ')} WHERE CwNo = @cwNo`;
+    return request.query(query);
+  })
+  await Promise.all(updates);
+  return 1;
 }
