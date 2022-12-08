@@ -384,16 +384,17 @@ export function getOrders(branch: string, itemNmbr: string) {
   return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
 }
 
-export function getChemicals(branch: string) {
+export function getChemicals(branch: string, itemNumber: string) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
-  const query = 
+  let query = 
   `
   SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(ITEMDESC) ItemDesc,
   b.QTYONHND QtyOnHand,
   rtrim(c.BIN) Bin,
-  Pkg packingGroup, Name, HazardRating hazardRating, IssueDate, ExtractionDate, VendorName, Country, Language
+  Pkg packingGroup, Name, HazardRating hazardRating, IssueDate, ExtractionDate, VendorName, Country, Language,
+  CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END as sdsExists
   FROM IV00101 a
   LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
   LEFT JOIN IV00117 c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
@@ -401,12 +402,17 @@ export function getChemicals(branch: string) {
   LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
   LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
   WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZERS', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
+  `;
+  if (itemNumber) query += `
+  AND a.ITEMNMBR = @itemNumber
+  `;
+  query += `
   AND b.LOCNCODE = @locnCode
   AND b.QTYONHND > 0
   AND f.PropertyValue != 'Hardware & Accessories'
   ORDER BY a.ITEMNMBR
   `;
-  return request.input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {chemicals: _.recordset}});
+  return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<gpRes>) => {return {chemicals: _.recordset}});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string) {

@@ -245,7 +245,9 @@ app.post('/pallets', verifyApiKey, (req, res) => {
 app.get('/gp/chemicals', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getChemicals(branch).then(
+  const itemNumber = params['itemNmbr'] as string || '';
+
+  getChemicals(branch, itemNumber).then(
     _ => res.status(200).json(_)
   ).catch((err: {code: number, message: string}) => {console.log(err)
     res.status(err.code || 500).json({'result': err?.message || err})
