@@ -181,9 +181,12 @@ app.get('/gp/po', auth, (req: Request, res: Response) => {
 
 app.post('/gp/po', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
-  const writeStream = writeTransferFile(body.fromSite, body.toSite, body.lines);
-  writeStream.on('error', e => res.status(500).send({e}));
-  writeStream.on('close', () => res.status(200).send({'status': 'Success!!!'}));
+  try {
+    writeTransferFile(body.fromSite, body.toSite, body.lines);
+  } catch(err) {
+    res.status(500).send({err});
+  }
+  res.status(200).send({'status': 'Successfully added PO.'});
 });
 
 app.get('/gp/po/:id', auth, (req: Request, res: Response) => {
@@ -228,9 +231,12 @@ app.get('/gp/itt/:id', auth, (req: Request, res: Response) => {
 
 app.post('/gp/itt', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
-  const writeStream = writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines)
-  writeStream.on('error', e => res.status(500).send({e}));
-  writeStream.on('close', () => res.status(200).send({'status': 'Success!!!'}));
+  try {
+    writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines);
+  } catch(err) {
+    res.status(500).send({err});
+  }
+  res.status(200).send({'status': 'Successfully added ITT.'});
 });
 
 app.post('/pallets', verifyApiKey, (req, res) => {

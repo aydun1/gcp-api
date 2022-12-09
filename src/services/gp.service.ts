@@ -429,36 +429,27 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   return request.execute(storedProcedure);
 }
 
-export function writeTransferFile(fromSite: string, toSite: string, lines: Array<Line>): WriteStream {
+export function writeTransferFile(fromSite: string, toSite: string, lines: Array<Line>): void {
   fromSite = parseBranch(fromSite);
   toSite = parseBranch(toSite);
   const header = ['Transfer Date', 'PO Number', 'From Site', 'Item Number', 'Item Desc', 'To Site', 'Order Qty', 'Qty Shipped', 'Cancelled Qty'];
   const date = new Date().toISOString().split('T')[0];
   const linesCsv = lines.map(_ => [date, _.poNumber, fromSite, _.itemNumber, _.itemDesc, toSite, _.toTransfer, _.toTransfer, 0].join(','));
-  const writeStream = fs.createWriteStream(`${targetDir}/Transfers/transfer_from_${fromSite}_to_${toSite}.csv`);
-  writeStream.write(header.join(','));
-  writeStream.write('\r\n');
-  writeStream.write(linesCsv.join('\r\n'));
-  writeStream.close();
-  fs.writeFileSync(`${targetDir}/Transfers/trigger.txt`, ''); 
-  return writeStream;
+  const fileName = `${targetDir}/Transfers/transfer_from_${fromSite}_to_${toSite}.csv`;
+  const fileContents = `${header.join(',')}\r\n${linesCsv.join('\r\n')}`;
+  fs.writeFileSync(fileName, fileContents);
 }
 
-export function writeInTransitTransferFile(id: string, fromSite: string, toSite: string, body: Array<Line>): WriteStream {
+export function writeInTransitTransferFile(id: string, fromSite: string, toSite: string, body: Array<Line>): void {
   fromSite = parseBranch(fromSite);
   toSite = parseBranch(toSite);
   let i = 0;
-  const d = new Date();
-  const fileName = `${targetDir}/PICKS/ITT Between SITES/itt_transfer_from_${fromSite}_to_${toSite}.csv`
   const header = ['Id', 'Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
-  const date = d.toLocaleDateString('fr-CA');
+  const date = new Date().toLocaleDateString('fr-CA');
   const lines = body.map(_ => [id, i += 1, date, fromSite, toSite, _.itemNumber, _.toTransfer]).map(_ => _.join(','));
-  const writeStream = fs.createWriteStream(fileName);
-  writeStream.write(header.join(','));
-  writeStream.write('\r\n');
-  writeStream.write(lines.join('\r\n'));
-  writeStream.close();
-  return writeStream;
+  const fileName = `${targetDir}/PICKS/ITT Between SITES/itt_transfer_from_${fromSite}_to_${toSite}.csv`;
+  const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
+  return fs.writeFileSync(fileName, fileContents);
 }
 
 export async function linkChemical(itemNmbr: string, cwNo: string): Promise<number> {
