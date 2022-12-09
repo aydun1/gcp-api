@@ -12,7 +12,7 @@ import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHisto
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
-import { getMaterial, getMaterialsInFolder } from './services/cw.service';
+import { getMaterial, getMaterialsInFolder, getPdf } from './services/cw.service';
 
 interface Body {
   customer: string;
@@ -299,7 +299,21 @@ app.get('/gp/link-material', auth, (req, res) => {
   const params = req.query;
   const itemNmbr = params['itemNmbr'] as string || '';
   const cwNo = params['cwNo'] as string || '';
-  linkChemical(itemNmbr, cwNo).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+  linkChemical(itemNmbr, cwNo).then(_ => {
+    res.status(200).json(_);
+  }).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err})
+  });
+});
+
+
+app.get('/gp/get-pdf', auth, (req, res) => {
+  const params = req.query;
+  const docNo = params['docNo'] as string || '';
+  getPdf(docNo).then(_ => {
+    res.status(200).json(_);
+  }).catch((err: {code: number, message: string}) => {
     console.log(err);
     return res.status(err.code || 500).json({'result': err?.message || err})
   });

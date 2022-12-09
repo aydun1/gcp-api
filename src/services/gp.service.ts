@@ -1,5 +1,5 @@
-import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX } from 'mssql';
-import fs, { WriteStream } from 'fs';
+import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX, Int } from 'mssql';
+import fs from 'fs';
 
 import { allowedPallets } from '../../config.json';
 import { targetDir } from '../config';
@@ -393,7 +393,7 @@ export function getChemicals(branch: string, itemNumber: string) {
   RTRIM(ITEMDESC) ItemDesc,
   b.QTYONHND QtyOnHand,
   rtrim(c.BIN) Bin,
-  Pkg packingGroup, Name, HazardRating hazardRating, IssueDate, ExtractionDate, VendorName, Country, Language,
+  Pkg packingGroup, Dgc class, Name, DocNo docNo, HazardRating hazardRating, IssueDate, ExtractionDate, VendorName, Country, Language,
   CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END as sdsExists
   FROM IV00101 a
   LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
@@ -458,7 +458,7 @@ export async function linkChemical(itemNmbr: string, cwNo: string): Promise<numb
   const currentCount = await request.input('itemNmbr', VarChar(31), itemNmbr).query(query).then((_: IResult<gpRes>) => _.recordset.length);
   if (currentCount === 0) {
     const query = `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)`;
-    return new sqlRequest().input('cwNo', VarChar(31), itemNmbr).input('cwNo', VarChar(50), cwNo).query(query).then(() => 1);
+    return new sqlRequest().input('itemNmbr', VarChar(31), itemNmbr).input('cwNo', VarChar(50), cwNo).query(query).then(() => 1);
   } else {
     const query = `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
     return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(query).then(() => 1);
@@ -487,6 +487,8 @@ export async function updateSDS(materials: Array<CwRow>) {
       {name: 'VendorName', type: VarChar(MAX)},
       {name: 'HazardRating', type: SmallInt},
       {name: 'Pkg', type: VarChar(50)},
+      {name: 'Dgc', type: VarChar(50)},
+      {name: 'DocNo', type: VarChar(50)},
       {name: 'Language', type: VarChar(50)},
       {name: 'Country', type: VarChar(50)},
 
