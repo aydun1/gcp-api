@@ -429,15 +429,16 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   return request.execute(storedProcedure);
 }
 
-export function writeTransferFile(fromSite: string, toSite: string, lines: Array<Line>): void {
+export function writeTransferFile(fromSite: string, toSite: string, body: Array<Line>): void {
   fromSite = parseBranch(fromSite);
   toSite = parseBranch(toSite);
   const header = ['Transfer Date', 'PO Number', 'From Site', 'Item Number', 'Item Desc', 'To Site', 'Order Qty', 'Qty Shipped', 'Cancelled Qty'];
   const date = new Date().toISOString().split('T')[0];
-  const linesCsv = lines.map(_ => [date, _.poNumber, fromSite, _.itemNumber, _.itemDesc, toSite, _.toTransfer, _.toTransfer, 0].join(','));
-  const fileName = `${targetDir}/Transfers/transfer_from_${fromSite}_to_${toSite}.csv`;
-  const fileContents = `${header.join(',')}\r\n${linesCsv.join('\r\n')}`;
-  fs.writeFileSync(fileName, fileContents);
+  const lines = body.map(_ => [date, _.poNumber, fromSite, _.itemNumber, _.itemDesc, toSite, _.toTransfer, _.toTransfer, 0].join(','));
+  const path = `${targetDir}/Transfers`
+  const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
+  fs.writeFileSync(`${path}/transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
+  fs.writeFileSync(`${path}/tmpfile.txt`, '');
 }
 
 export function writeInTransitTransferFile(id: string, fromSite: string, toSite: string, body: Array<Line>): void {
@@ -447,9 +448,10 @@ export function writeInTransitTransferFile(id: string, fromSite: string, toSite:
   const header = ['Id', 'Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
   const date = new Date().toLocaleDateString('fr-CA');
   const lines = body.map(_ => [id, i += 1, date, fromSite, toSite, _.itemNumber, _.toTransfer]).map(_ => _.join(','));
-  const fileName = `${targetDir}/PICKS/ITT Between SITES/itt_transfer_from_${fromSite}_to_${toSite}.csv`;
+  const path = `${targetDir}/PICKS/ITT Between SITES`
   const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
-  return fs.writeFileSync(fileName, fileContents);
+  fs.writeFileSync(`${path}/itt_transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
+  fs.writeFileSync(`${path}/tmpfile.txt`, '');
 }
 
 export async function linkChemical(itemNmbr: string, cwNo: string): Promise<number> {
