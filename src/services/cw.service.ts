@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { CwRow } from '../CwRow';
 import { cwConfig } from '../config';
+import fs from 'fs';
 
 const folderId = '4006663';
 
@@ -36,6 +37,8 @@ interface CwFolderRes {
   Rows: CwRow[]
 }
 
+const fileExists = (path: string) => fs.promises.stat(path).then(() => true, () => false);
+
 function parseMaterialData(data: CwSearchResponse): Array<CwRow> {
   return data.Rows.map(row => {
     return {
@@ -64,12 +67,12 @@ async function getCookie(): Promise<string> {
   return (res.headers['set-cookie'] || [''])[0];
 }
 
-async function initChemwatch(): Promise<void> {
+async function initChemwatch(file = false): Promise<void> {
   const isCookieValid = new Date(cookieValue?.split(';')[1]?.split('=')[1]) > new Date();
   if (isLoggedOn && isCookieValid) return;
   cookieValue = isCookieValid ? cookieValue : await getCookie();
   const headers = {'Content-Type': 'application/json', Cookie: cookieValue};
-  instance = axios.create({baseURL, headers});
+  instance = axios.create({baseURL, headers, responseType: file ? 'arraybuffer' : 'json'});
   isLoggedOn = true;
 }
 
@@ -98,14 +101,15 @@ export async function getMaterial(cwNo: string): Promise<CwRow> {
   ).catch((e: AxiosError) => onError(e) as CwRow);
 }
 
-export async function getPdf(docNo: string): Promise<any> {
-  await initChemwatch();
-  console.log(`document?fileName=pd${docNo}.pdf`)
-  return instance.get<CwSearchResponse>(`document?fileName=pd${docNo}.pdf`).then(
-    res => {
-      return res.data;
-    }
-  ).catch((e: AxiosError) => onError(e) as CwRow);
+export async function getPdf(docNo: string): Promise<Buffer> {
+  if (!docNo) throw new Error;
+  await initChemwatch(true);
+  const fileName = `pd${docNo}.pdf`;
+  return await fileExists(`pdfs/${fileName}`) ? fs.readFileSync(`pdfs/${fileName}`) : await instance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).then(res => {
+    const buffer = Buffer.from(res.data);
+    fs.writeFileSync(`pdfs/${fileName}`, buffer);
+    return buffer;
+  });
 }
 
 export async function search(term: string): Promise<CwFolderRes> {

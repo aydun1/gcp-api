@@ -415,6 +415,18 @@ export function getChemicals(branch: string, itemNumber: string) {
   return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<gpRes>) => {return {chemicals: _.recordset}});
 }
 
+export function getDocNo(itemNumber: string) {
+  const request = new sqlRequest();
+  const query = 
+  `
+  SELECT DocNo docNo
+  FROM [MSDS].dbo.ProductLinks d
+  LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
+  WHERE d.ITEMNMBR = @itemNumber
+  `;
+  return request.input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string}[]>) => _.recordset[0] ? _.recordset[0].docNo : '');
+}
+
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw {code: 400, message: 'Missing info'};

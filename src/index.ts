@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSyncedChemicals, linkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getDocNo, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSyncedChemicals, linkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './transfer';
@@ -316,6 +316,18 @@ app.get('/gp/get-pdf', auth, (req, res) => {
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
     return res.status(err.code || 500).json({'result': err?.message || err})
+  });
+});
+
+app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
+  const params = req.params;
+  const itemNmbr = params['itemNmbr'];
+  getDocNo(itemNmbr).then(_ => getPdf(_)).then(_ => {
+    res.contentType('application/pdf');
+    res.status(200).send(_);
+  }).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 404).send();
   });
 });
 
