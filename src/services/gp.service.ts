@@ -462,7 +462,7 @@ export function writeTransferFile(fromSite: string, toSite: string, body: Array<
   const path = `${targetDir}/Transfers`
   const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
   fs.writeFileSync(`${path}/transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
-  fs.writeFileSync(`${path}/tmpfile.txt`, '');
+  setTimeout(() => fs.writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
 }
 
 export function writeInTransitTransferFile(id: string, fromSite: string, toSite: string, body: Array<Line>): void {
@@ -475,7 +475,7 @@ export function writeInTransitTransferFile(id: string, fromSite: string, toSite:
   const path = `${targetDir}/PICKS/ITT Between SITES`
   const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
   fs.writeFileSync(`${path}/itt_transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
-  fs.writeFileSync(`${path}/tmpfile.txt`, '');
+  setTimeout(() => fs.writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
 }
 
 export async function linkChemical(itemNmbr: string, cwNo: string): Promise<number> {
