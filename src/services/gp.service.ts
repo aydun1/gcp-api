@@ -393,7 +393,12 @@ export function getChemicals(branch: string, itemNumber: string) {
   RTRIM(ITEMDESC) ItemDesc,
   b.QTYONHND QtyOnHand,
   rtrim(c.BIN) Bin,
-  Pkg packingGroup, Dgc class, Name, DocNo docNo, HazardRating hazardRating, IssueDate, ExtractionDate, VendorName, Country, Language,
+  Pkg packingGroup,
+  Dgc class,
+  Name, DocNo docNo,
+  HazardRating hazardRating,
+  HCodes,
+  IssueDate, ExtractionDate, VendorName, Country, Language,
   CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END as sdsExists
   FROM IV00101 a
   LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
@@ -412,7 +417,14 @@ export function getChemicals(branch: string, itemNumber: string) {
   AND f.PropertyValue != 'Hardware & Accessories'
   ORDER BY a.ITEMNMBR
   `;
-  return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<gpRes>) => {return {chemicals: _.recordset}});
+  return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
+    _.recordset.map(c => {
+      c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
+      delete c.HCodes;
+  })
+
+    return {chemicals: _.recordset}
+  });
 }
 
 export function getDocNo(itemNumber: string) {
@@ -500,8 +512,10 @@ export async function updateSDS(materials: Array<CwRow>) {
       {name: 'Name', type: VarChar(MAX)},
       {name: 'VendorName', type: VarChar(MAX)},
       {name: 'HazardRating', type: SmallInt},
+      {name: 'HCodes', type: VarChar(MAX)},
       {name: 'Pkg', type: VarChar(50)},
       {name: 'Dgc', type: VarChar(50)},
+      {name: 'Un', type: VarChar(50)},
       {name: 'DocNo', type: VarChar(50)},
       {name: 'Language', type: VarChar(50)},
       {name: 'Country', type: VarChar(50)},

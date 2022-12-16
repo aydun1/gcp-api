@@ -58,7 +58,8 @@ function parseMaterialData(data: CwSearchResponse): Array<CwRow> {
 const baseURL = 'https://jr.chemwatch.net/api/v1';
 
 let cookieValue: string;
-let instance: AxiosInstance;
+let jsonInstance: AxiosInstance;
+let fileInstance: AxiosInstance;
 let isLoggedOn = false;
 
 async function getCookie(): Promise<string> {
@@ -67,18 +68,19 @@ async function getCookie(): Promise<string> {
   return (res.headers['set-cookie'] || [''])[0];
 }
 
-async function initChemwatch(file = false): Promise<void> {
+async function initChemwatch(): Promise<void> {
   const isCookieValid = new Date(cookieValue?.split(';')[1]?.split('=')[1]) > new Date();
   if (isLoggedOn && isCookieValid) return;
   cookieValue = isCookieValid ? cookieValue : await getCookie();
   const headers = {'Content-Type': 'application/json', Cookie: cookieValue};
-  instance = axios.create({baseURL, headers, responseType: file ? 'arraybuffer' : 'json'});
+  fileInstance = axios.create({baseURL, headers, responseType: 'arraybuffer'});
+  jsonInstance = axios.create({baseURL, headers, responseType: 'json'});
   isLoggedOn = true;
 }
 
 export async function getMaterialsInFolder(page = 1): Promise<CwFolderRes> {
   await initChemwatch();
-  return instance.get<CwFolderRes>(`json/materialsInFolder?folderId=${folderId}&page=${page}`).then(
+  return jsonInstance.get<CwFolderRes>(`json/materialsInFolder?folderId=${folderId}&page=${page}`).then(
     async res => {
       const rows = res.data.Rows;
       rows.map(row => {
@@ -89,12 +91,12 @@ export async function getMaterialsInFolder(page = 1): Promise<CwFolderRes> {
       const nextPage = res.data.PageNumber < res.data.PageCount ? (await getMaterialsInFolder(res.data.PageNumber + 1)).Rows : [];
       res.data.Rows = [...rows, ...nextPage];
       return res.data;
-    }).catch((e: AxiosError) => onError(e) as CwFolderRes);
+    });
 }
 
 export async function getMaterial(cwNo: string): Promise<CwRow> {
   await initChemwatch();
-  return instance.get<CwSearchResponse>(`json/materials?cwNo=${cwNo}&own=true`).then(
+  return jsonInstance.get<CwSearchResponse>(`json/materials?cwNo=${cwNo}&own=true`).then(
     res => {
       return parseMaterialData(res.data)[0];
     }
@@ -103,9 +105,9 @@ export async function getMaterial(cwNo: string): Promise<CwRow> {
 
 export async function getPdf(docNo: string): Promise<Buffer> {
   if (!docNo) throw new Error;
-  await initChemwatch(true);
+  await initChemwatch();
   const fileName = `pd${docNo}.pdf`;
-  return await fileExists(`pdfs/${fileName}`) ? fs.readFileSync(`pdfs/${fileName}`) : await instance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).then(res => {
+  return await fileExists(`pdfs/${fileName}`) ? fs.readFileSync(`pdfs/${fileName}`) : await fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).then(res => {
     const buffer = Buffer.from(res.data);
     fs.writeFileSync(`pdfs/${fileName}`, buffer);
     return buffer;
@@ -114,7 +116,7 @@ export async function getPdf(docNo: string): Promise<Buffer> {
 
 export async function search(term: string): Promise<CwFolderRes> {
   await initChemwatch();
-  return instance.get<CwSearchResponse>(`json/materials?name=${term}`).then(
+  return jsonInstance.get<CwSearchResponse>(`json/materials?name=${term}`).then(
     res => {
       const data: CwFolderRes = {...res.data, Rows: parseMaterialData(res.data)}
       return data;
