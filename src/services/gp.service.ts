@@ -454,7 +454,7 @@ export function getDocNo(itemNumber: string) {
   return request.input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string}[]>) => _.recordset[0] ? _.recordset[0].docNo : '');
 }
 
-export function updatePallets(customer: string, palletType: string, palletQty: string) {
+export function updatePallets(customer: string, palletType: string, palletQty: string): Promise<number> {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw 'Missing info';
   if (customer.length > 15) throw 'Bad request';
@@ -464,7 +464,12 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   request.input('Customer', TYPES.Char(15), customer);
   request.input('PalletType', TYPES.Char(15), palletType);
   request.input('Qty', TYPES.Int, qty.toString(10));
-  return request.execute(storedProcedure);
+  return request.execute(storedProcedure).then(() => 200).catch(
+    e => {
+      console.log(e);
+      return 500;
+    }
+  );
 }
 
 export function writeTransferFile(fromSite: string, toSite: string, body: Array<Line>): void {

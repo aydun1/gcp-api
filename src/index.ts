@@ -242,9 +242,9 @@ app.post('/gp/itt', auth, (req: Request, res: Response) => {
 app.post('/pallets', verifyApiKey, (req, res) => {
   const body = req.body as Body;
   updatePallets(body.customer, body.palletType, body.palletQty).then(
-    result => res.status(200).json({result})
+    () => res.status(200).json({result: 'Pallet updated successfully.'})
   ).catch((err: {code: number, message: string}) => {
-    console.log(err)
+    console.log(err);
     res.status(500).json({'result': err?.message || err})
   });
 });
