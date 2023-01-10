@@ -244,7 +244,7 @@ app.post('/pallets', verifyApiKey, (req, res) => {
   updatePallets(body.customer, body.palletType, body.palletQty).then(
     result => res.status(200).json({result})
   ).catch((err: {code: number, message: string}) =>{
-    res.status(err.code || 500).json({'result': err?.message || err})
+    res.status(500).json({'result': err?.message || err})
   });
 });
 
