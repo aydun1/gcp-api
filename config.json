@@ -1,5 +1,5 @@
 {
-  "allowedPallets": ["Loscam", "Chep", "Plain", "Cage"],
+  "allowedPallets": ["Loscam", "Chep", "GCP", "Plain", "Cage"],
   "credentials": {
     "tenantID": "2dcb64e0-c4e4-4c31-af32-9fe0edff2be9",
     "clientID": "117fb891-acba-4e2f-b60a-9f95fc0680ff"

@@ -1,4 +1,4 @@
-import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX, Int } from 'mssql';
+import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX } from 'mssql';
 import fs from 'fs';
 
 import { allowedPallets } from '../../config.json';
