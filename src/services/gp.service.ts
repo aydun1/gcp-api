@@ -441,11 +441,10 @@ export function getDocNo(itemNumber: string) {
 
 export function updatePallets(customer: string, palletType: string, palletQty: string) {
   const qty = parseInt(palletQty, 10);
-  if (!customer || !palletType || !palletQty === undefined) throw {code: 400, message: 'Missing info'};
-  if (customer.length > 15) throw {code: 400, message: 'Bad request'};
-  if (!allowedPallets.includes(palletType)) throw {code: 400, message: 'Bad pallet'};
-  if (qty > 1000 || palletQty !== qty.toString(10)) throw {code: 400, message: 'Bad quantity'};
-
+  if (!customer || !palletType || !palletQty === undefined) throw 'Missing info';
+  if (customer.length > 15) throw 'Bad request';
+  if (!allowedPallets.includes(palletType)) throw 'Bad pallet';
+  if (qty > 1000 || palletQty !== qty.toString(10)) throw 'Bad quantity';
   const request = new sqlRequest();
   request.input('Customer', TYPES.Char(15), customer);
   request.input('PalletType', TYPES.Char(15), palletType);
