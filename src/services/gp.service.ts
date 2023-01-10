@@ -311,7 +311,8 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   if (filters.length === 0) filterConditions.push(`a.INACTIVE = 0`);
   if (filters.includes('loscam')) palletFilters.push('USERDEF2 <> 0');
   if (filters.includes('chep')) palletFilters.push('USERDEF1 <> 0');
-  if (filters.includes('plain')) palletFilters.push('b.plains <> 0');
+  if (filters.includes('plain')) palletFilters.push('b.plain <> 0');
+  if (filters.includes('gcp')) palletFilters.push('c.gcp <> 0');
   if (search) filterConditions.push(`(a.CUSTNMBR LIKE '${search}%' OR a.CUSTNAME LIKE '%${search}%')`);
   if (palletFilters.length > 0) filterConditions.push(`(${palletFilters.join(' OR ')})`);
   if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
@@ -324,15 +325,22 @@ export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
   const request = new sqlRequest();
   const query =
   `
-  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plains, 0) plain
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plain, 0) plain, COALESCE(c.gcp, 0) gcp
   FROM RM00101 a
   LEFT JOIN (
-    SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plains
+    SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plain
     FROM SY90000
     WHERE ObjectType = 'Customer'
     AND PropertyName = 'PLAINQty'
     AND PropertyValue != 0
   ) b ON a.CUSTNMBR = b.CUSTNMBR
+  LEFT JOIN (
+    SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) gcp
+    FROM SY90000
+    WHERE ObjectType = 'Customer'
+    AND PropertyName = 'GCPQty'
+    AND PropertyValue != 0
+  ) c ON a.CUSTNMBR = c.CUSTNMBR
   WHERE a.CUSTNMBR = @custnmbr
   `;
   return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {customer: _.recordset[0]}});
