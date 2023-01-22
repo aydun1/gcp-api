@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { CwRow } from '../CwRow';
+import { CwRow } from '../types/CwRow';
 import { cwConfig } from '../config';
 import fs from 'fs';
 

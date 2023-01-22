@@ -3,10 +3,10 @@ import fs from 'fs';
 
 import { allowedPallets } from '../../config.json';
 import { targetDir } from '../config';
-import { Line } from '../line';
-import { InTransitTransferLine } from '../in-transit-transfer-line';
-import { InTransitTransfer } from '../in-transit-transfer';
-import { CwRow } from '../CwRow';
+import { Line } from '../types/line';
+import { InTransitTransferLine } from '../types/in-transit-transfer-line';
+import { InTransitTransfer } from '../types/in-transit-transfer';
+import { CwRow } from '../types/CwRow';
 
 const storedProcedure = 'usp_PalletUpdate';
 

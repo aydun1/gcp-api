@@ -11,7 +11,7 @@ import passport from 'passport';
 import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getDocNo, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSyncedChemicals, linkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
-import { Transfer } from './transfer';
+import { Transfer } from './types/transfer';
 import { getMaterial, getMaterialsInFolder, getPdf } from './services/cw.service';
 
 interface Body {
