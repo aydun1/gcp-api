@@ -402,7 +402,7 @@ export function getOrders(branch: string, itemNmbr: string) {
 export function getChemicals(branch: string, itemNumber: string) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
-  let query = 
+  let query =
   `
   SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(ITEMDESC) ItemDesc,
@@ -436,8 +436,7 @@ export function getChemicals(branch: string, itemNumber: string) {
     _.recordset.map(c => {
       c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
       delete c.HCodes;
-  })
-
+    })
     return {chemicals: _.recordset}
   });
 }
@@ -497,17 +496,15 @@ export function writeInTransitTransferFile(id: string, fromSite: string, toSite:
   setTimeout(() => fs.writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
 }
 
-export async function linkChemical(itemNmbr: string, cwNo: string): Promise<number> {
-  const request = new sqlRequest();
-  const query = 'SELECT ITEMNMBR, CwNo FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr';
-  const currentCount = await request.input('itemNmbr', VarChar(31), itemNmbr).query(query).then((_: IResult<gpRes>) => _.recordset.length);
-  if (currentCount === 0) {
-    const query = `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)`;
-    return new sqlRequest().input('itemNmbr', VarChar(31), itemNmbr).input('cwNo', VarChar(50), cwNo).query(query).then(() => 1);
-  } else {
-    const query = `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
-    return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(query).then(() => 1);
-  }
+export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRow> {
+  const getQuery = 'SELECT ITEMNMBR, CwNo FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr';
+  const currentCount = await new sqlRequest().input('itemNmbr', VarChar(31), itemNmbr).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
+  const updateQuery = currentCount === 0 ?
+  `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)` :
+  `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
+  return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('cwNo', VarChar(50), cwNo).query(updateQuery).then(() =>
+    getChemicals('', itemNmbr).then(c => c['chemicals'][0])
+  )
 }
 
 export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
