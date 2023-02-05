@@ -9,6 +9,20 @@ import { InTransitTransfer } from '../types/in-transit-transfer';
 import { CwRow } from '../types/CwRow';
 
 const storedProcedure = 'usp_PalletUpdate';
+const dct: {[key: string]: {uom: string, divisor: number}} = {
+  millilitre: {divisor: 1000, uom: 'L'},
+  milliliter: {divisor: 1000, uom: 'L'},
+  ml: {divisor: 1000, uom: 'L'},
+  litre: {divisor: 1, uom: 'L'},
+  liter: {divisor: 1, uom: 'L'},
+  l: {divisor: 1, uom: 'L'},
+  kilogram: {divisor: 1, uom: 'kg'},
+  kg: {divisor: 1, uom: 'kg'},
+  gram: {divisor: 1000, uom: 'kg'},
+  g: {divisor: 1000, uom: 'kg'}
+};
+
+const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`, 'i');
 
 interface gpRes {
   recordsets: Array<object>;
@@ -413,6 +427,7 @@ export function getChemicals(branch: string, itemNumber: string) {
   Name, DocNo docNo,
   HazardRating hazardRating,
   HCodes,
+  OnChemwatch,
   IssueDate, ExtractionDate, VendorName, Country, Language,
   CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END as sdsExists
   FROM IV00101 a
@@ -437,7 +452,15 @@ export function getChemicals(branch: string, itemNumber: string) {
       c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
       delete c.HCodes;
     })
-    return {chemicals: _.recordset}
+
+    return {chemicals: _.recordset.map(c => {
+      const match = (c.ItemDesc as string).replace('4G', '').replace('g/l', '').match(sizeRegexp);
+      if (match) {
+        c['size'] = Number(match[1]) / dct[match[2].toLocaleLowerCase()]['divisor'];
+        c['uofm'] = dct[match[2].toLocaleLowerCase()]['uom'];
+      }
+      return c
+    })}
   });
 }
 
@@ -520,6 +543,13 @@ export async function updateSDS(materials: Array<CwRow>) {
     return new sqlRequest().input('cwNo', VarChar(50), c.CwNo).query(query);
   });
   await Promise.all(missing);
+
+  const removed = current.filter(c => !materials.find(_ => _.CwNo === c.CwNo)).map(m => {
+    const query = `UPDATE [MSDS].dbo.Materials SET OnChemwatch = 0 WHERE CwNo = @cwNo`;
+    return new sqlRequest().input('cwNo', VarChar(50), m.CwNo).query(query);
+  });
+  await Promise.all(removed);
+
   const updates = materials.map(c => {
     const request = new sqlRequest();
     const sets = [];
@@ -539,8 +569,9 @@ export async function updateSDS(materials: Array<CwRow>) {
     ]
     parameters.forEach(_ => {
       request.input(_.name, _.type, c[_.name]);
-      sets.push(`${_.name} = @${_.name}`)
+      sets.push(`${_.name} = @${_.name}`);
     })
+    sets.push('OnChemwatch = 1');
     if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('IssueDate = @issueDate');
     if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('issueDate', sqlDate, c.IssueDate);
     if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('ExtractionDate = @extractionDate');
