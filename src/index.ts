@@ -40,6 +40,7 @@ const bearerStrategy = new BearerStrategy(options, (token: ITokenPayload, done: 
 });
 
 const app = express();
+app.use('/enews', express.static('enews'));
 app.use(express.json());
 app.use(helmet());
 app.use(morgan('combined', { stream: accessLogStream }));
