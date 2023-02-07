@@ -22,8 +22,9 @@ const dct: {[key: string]: {uom: string, divisor: number}} = {
   g: {divisor: 1000, uom: 'kg'}
 };
 
-const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`, 'i');
-
+const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`);
+const ignoreRegexp = /2g|4g|80g|g\/l|g\/kg/;
+const cartonRegexp = /\[ctn([0-9]+)\]/;
 interface gpRes {
   recordsets: Array<object>;
   output: object;
@@ -452,14 +453,15 @@ export function getChemicals(branch: string, itemNumber: string) {
       c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
       delete c.HCodes;
     })
-
     return {chemicals: _.recordset.map(c => {
-      const match = (c.ItemDesc as string).replace('4G', '').replace('g/l', '').match(sizeRegexp);
+      const carton = (c.ItemDesc as string).toLocaleLowerCase().match(cartonRegexp);
+      const cartonMulti = carton ? parseInt(carton[1], 10) : 1
+      const match = (c.ItemDesc as string).toLocaleLowerCase().replace(ignoreRegexp, '').match(sizeRegexp);
       if (match) {
-        c['size'] = Number(match[1]) / dct[match[2].toLocaleLowerCase()]['divisor'];
+        c['size'] = (Number(match[1]) * cartonMulti) / dct[match[2]]['divisor'];
         c['uofm'] = dct[match[2].toLocaleLowerCase()]['uom'];
       }
-      return c
+      return c;
     })}
   });
 }
