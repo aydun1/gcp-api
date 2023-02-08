@@ -447,7 +447,7 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   AND b.QTYONHND > 0
   AND f.PropertyValue != 'Hardware & Accessories'
   `;
-  query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order}`;
+  if (orderby) query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order || 'ASC'}`;
   return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
     _.recordset.map(c => {
       c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
@@ -528,7 +528,7 @@ export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRo
   `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)` :
   `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
   return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('cwNo', VarChar(50), cwNo).query(updateQuery).then(() =>
-    getChemicals('', itemNmbr).then(c => c['chemicals'][0])
+    getChemicals('', itemNmbr, '', '').then(c => c['chemicals'][0])
   )
 }
 
