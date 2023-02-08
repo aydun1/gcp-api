@@ -414,14 +414,14 @@ export function getOrders(branch: string, itemNmbr: string) {
   return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
 }
 
-export function getChemicals(branch: string, itemNumber: string) {
+export function getChemicals(branch: string, itemNumber: string, order: string, orderby: string) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
   let query =
   `
   SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(ITEMDESC) ItemDesc,
-  b.QTYONHND QtyOnHand,
+  b.QTYONHND onHand,
   rtrim(c.BIN) Bin,
   Pkg packingGroup,
   Dgc class,
@@ -446,8 +446,8 @@ export function getChemicals(branch: string, itemNumber: string) {
   AND b.LOCNCODE = @locnCode
   AND b.QTYONHND > 0
   AND f.PropertyValue != 'Hardware & Accessories'
-  ORDER BY a.ITEMNMBR
   `;
+  query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order}`;
   return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
     _.recordset.map(c => {
       c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
