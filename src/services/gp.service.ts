@@ -423,10 +423,10 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   RTRIM(ITEMDESC) ItemDesc,
   b.QTYONHND onHand,
   rtrim(c.BIN) Bin,
-  Pkg packingGroup,
-  Dgc class,
+  Coalesce(Pkg, '') packingGroup,
+  Coalesce(Dgc, '') class,
   Name, DocNo docNo,
-  HazardRating hazardRating,
+  Coalesce(Replace(HazardRating, -1, ''), '') hazardRating,
   HCodes,
   OnChemwatch,
   IssueDate, ExtractionDate, VendorName, Country, Language,
@@ -447,22 +447,28 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   AND b.QTYONHND > 0
   AND f.PropertyValue != 'Hardware & Accessories'
   `;
-  if (orderby) query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order || 'ASC'}`;
+  if (orderby && orderby !== 'quantity') query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order || 'ASC'}`;
   return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
     _.recordset.map(c => {
       c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
       delete c.HCodes;
     })
-    return {chemicals: _.recordset.map(c => {
+    const chemicals = _.recordset.map(c => {
       const carton = (c.ItemDesc as string).toLocaleLowerCase().match(cartonRegexp);
       const cartonMulti = carton ? parseInt(carton[1], 10) : 1
       const match = (c.ItemDesc as string).toLocaleLowerCase().replace(ignoreRegexp, '').match(sizeRegexp);
       if (match) {
         c['size'] = (Number(match[1]) * cartonMulti) / dct[match[2]]['divisor'];
         c['uofm'] = dct[match[2].toLocaleLowerCase()]['uom'];
+        c['quantity'] = c['size'] * (c.onHand as number);
       }
       return c;
-    })}
+    });
+    return {chemicals: (orderby === 'quantity') ? order === 'asc' ?
+      chemicals.sort((a, b) => (a.quantity as number || 0) - (b.quantity as number || 0)) :
+      chemicals.sort((a, b) => (b.quantity as number || 0) - (a.quantity as number || 0)) :
+      chemicals
+    }
   });
 }
 
