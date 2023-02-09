@@ -8,11 +8,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getDocNo, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSyncedChemicals, linkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getDocNo, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
-import { getMaterial, getMaterialsInFolder, getPdf } from './services/cw.service';
 
 interface Body {
   customer: string;
@@ -272,23 +271,15 @@ app.get('/gp/saved-materials', auth, (req, res) => {
   );
 });
 
-app.get('/gp/update-sds', auth, (req, res) => {
-  const params = req.query;
-  const cwId = params['cwId'] as string || '';
-  getMaterial(cwId).then(
-    _ => _
-  ).catch((err: {code: number, message: string}) => 
-    res.status(err.code || 500).json({'result': err?.message || err})
-  );
-});
-
 app.get('/gp/sync-from-cw', auth, (req, res) => {
   getMaterialsInFolder().then(
     _ => {
       return updateSDS(_.Rows);
-    }).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-      console.log(err)
-      return res.status(err.code || 500).json({'result': err?.message || err})
+    }).then(_ => {
+      return res.status(200).json(_);
+    }).catch((err: {code: number, message: string}) => {
+      console.log(err);
+      return res.status(err.code || 500).json({'result': err?.message || err});
   });
 });
 
@@ -311,22 +302,10 @@ app.get('/gp/link-material', auth, (req, res) => {
   });
 });
 
-
-app.get('/gp/get-pdf', auth, (req, res) => {
-  const params = req.query;
-  const docNo = params['docNo'] as string || '';
-  getPdf(docNo).then(_ => {
-    res.status(200).json(_);
-  }).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(err.code || 500).json({'result': err?.message || err})
-  });
-});
-
 app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
   const params = req.params;
   const itemNmbr = params['itemNmbr'];
-  getDocNo(itemNmbr).then(_ => getPdf(_)).then(_ => {
+  getDocNo(itemNmbr).then(_ => getSdsPdf(_, itemNmbr)).then(_ => {
     res.contentType('application/pdf');
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {

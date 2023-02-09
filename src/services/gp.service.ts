@@ -6,7 +6,9 @@ import { targetDir } from '../config';
 import { Line } from '../types/line';
 import { InTransitTransferLine } from '../types/in-transit-transfer-line';
 import { InTransitTransfer } from '../types/in-transit-transfer';
+import { CwFolder } from '../types/CwFolder';
 import { CwRow } from '../types/CwRow';
+import { initChemwatch } from './cw.service';
 
 const storedProcedure = 'usp_PalletUpdate';
 const dct: {[key: string]: {uom: string, divisor: number}} = {
@@ -21,10 +23,12 @@ const dct: {[key: string]: {uom: string, divisor: number}} = {
   gram: {divisor: 1000, uom: 'kg'},
   g: {divisor: 1000, uom: 'kg'}
 };
-
+const fileExists = (path: string) => fs.promises.stat(path).then(() => true, () => false);
 const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`);
 const ignoreRegexp = /2g|4g|80g|g\/l|g\/kg/;
 const cartonRegexp = /\[ctn([0-9]+)\]/;
+const cwFolderId = '4006663';
+
 interface gpRes {
   recordsets: Array<object>;
   output: object;
@@ -544,21 +548,21 @@ export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
   return request.query(query).then((_: IResult<CwRow>) => {return {chemicals: _.recordset}});
 }
 
-export async function updateSDS(materials: Array<CwRow>) {
-  const current = await new sqlRequest().query('SELECT CwNo, ExtractionDate FROM [MSDS].dbo.Materials').then(_ => _.recordset as IRecordSet<{CwNo: string}>);
-  const missing = materials.filter(m => !current.find(_ => _.CwNo === m.CwNo)).map(c => {
+export async function updateSDS(cwChemicals: Array<CwRow>) {
+  const currentChemicals = await new sqlRequest()
+    .query('SELECT CwNo, ExtractionDate, DocNo FROM [MSDS].dbo.Materials')
+    .then(_ => _.recordset as IRecordSet<{CwNo: string, DocNo: string, ItemNmbr: string}>);
+  const missingChemicals = cwChemicals.filter(m => !currentChemicals.find(_ => _.CwNo === m.CwNo)).map(c => {
     const query = `INSERT INTO [MSDS].dbo.Materials (CwNo) VALUES (@cwNo)`;
     return new sqlRequest().input('cwNo', VarChar(50), c.CwNo).query(query);
   });
-  await Promise.all(missing);
 
-  const removed = current.filter(c => !materials.find(_ => _.CwNo === c.CwNo)).map(m => {
+  const removedChemicals = currentChemicals.filter(c => !cwChemicals.find(_ => _.CwNo === c.CwNo)).map(m => {
     const query = `UPDATE [MSDS].dbo.Materials SET OnChemwatch = 0 WHERE CwNo = @cwNo`;
     return new sqlRequest().input('cwNo', VarChar(50), m.CwNo).query(query);
   });
-  await Promise.all(removed);
 
-  const updates = materials.map(c => {
+  const allChemicals = cwChemicals.map(c => {
     const request = new sqlRequest();
     const sets = [];
     const parameters = [
@@ -572,8 +576,7 @@ export async function updateSDS(materials: Array<CwRow>) {
       {name: 'Un', type: VarChar(50)},
       {name: 'DocNo', type: VarChar(50)},
       {name: 'Language', type: VarChar(50)},
-      {name: 'Country', type: VarChar(50)},
-
+      {name: 'Country', type: VarChar(50)}
     ]
     parameters.forEach(_ => {
       request.input(_.name, _.type, c[_.name]);
@@ -586,7 +589,52 @@ export async function updateSDS(materials: Array<CwRow>) {
     if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('extractionDate', sqlDate, c.ExtractionDate);
     const query = `UPDATE [MSDS].dbo.Materials SET ${sets.join(', ')} WHERE CwNo = @cwNo`;
     return request.query(query);
-  })
-  await Promise.all(updates);
+  });
+
+   const updatedChemicals = cwChemicals.filter(m => currentChemicals.find(c => c.CwNo === m.CwNo)?.DocNo !== m.DocNo).map(
+    cwData => {
+      const getQuery = 'SELECT RTRIM(ITEMNMBR) itemNmbr FROM [MSDS].dbo.ProductLinks WHERE CwNo = @cwNo';
+      return new sqlRequest().input('cwNo', VarChar(31), cwData.CwNo).query(getQuery)
+        .then((_: IResult<{itemNmbr: string}[]>) => _.recordset.map(_ => _.itemNmbr))
+        .then(_ => aquirePdf(cwData.DocNo as string, _));
+    }
+  );
+
+  await Promise.all(updatedChemicals);
+  await Promise.all(missingChemicals);
+  await Promise.all(removedChemicals);
+  await Promise.all(allChemicals);
   return 1;
+}
+
+async function aquirePdf(docNo: string, itemNmbrs: Array<string>): Promise<Buffer> {
+  const cw = await initChemwatch();
+  return await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).then(res => {
+    const buffer = Buffer.from(res.data);
+    itemNmbrs.forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
+    fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
+    return buffer;
+  });
+}
+
+export async function getSdsPdf(docNo: string, itemNmbr: string): Promise<Buffer> {
+  if (!docNo) throw new Error;
+  return await fileExists(`pdfs/pd${docNo}.pdf`) ? fs.readFileSync(`pdfs/pd${docNo}.pdf`) : aquirePdf(docNo, [itemNmbr]);
+}
+
+export async function getMaterialsInFolder(page = 1): Promise<CwFolder> {
+  const cw = await initChemwatch();
+  return cw.jsonInstance.get<CwFolder>(`json/materialsInFolder?folderId=${cwFolderId}&page=${page}&pageSize=250`).then(
+    async res => {
+      const rows = res.data.Rows;
+      rows.map(row => {
+        row['IssueDate'] = new Date(row['IssueDate']);
+        row['ExtractionDate'] = new Date(row['ExtractionDate']);
+        return row;
+      })
+      const nextPage = res.data.PageNumber < res.data.PageCount ? (await getMaterialsInFolder(res.data.PageNumber + 1)).Rows : [];
+      res.data.Rows = [...rows, ...nextPage];
+      return res.data;
+    }
+  );
 }
