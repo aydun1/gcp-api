@@ -418,7 +418,7 @@ export function getOrders(branch: string, itemNmbr: string) {
   return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
 }
 
-export function getChemicals(branch: string, itemNumber: string, order: string, orderby: string) {
+export function getChemicals(branch: string, itemNumber: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
   branch = parseBranch(branch);
   const request = new sqlRequest();
   let query =
