@@ -476,16 +476,16 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   });
 }
 
-export function getDocNo(itemNumber: string) {
+export function getBasicChemicalInfo(itemNumber: string): Promise<{docNo: string, cwNo: string}> {
   const request = new sqlRequest();
   const query = 
   `
-  SELECT DocNo docNo
-  FROM [MSDS].dbo.ProductLinks d
-  LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
-  WHERE d.ITEMNMBR = @itemNumber
+  SELECT DocNo docNo, b.CwNo cwNo
+  FROM [MSDS].dbo.ProductLinks a
+  LEFT JOIN [MSDS].dbo.Materials b ON a.CwNo = b.CwNo
+  WHERE a.ITEMNMBR = @itemNumber
   `;
-  return request.input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string}[]>) => _.recordset[0] ? _.recordset[0].docNo : '');
+  return request.input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string, cwNo: string}[]>) => _.recordset[0] ? _.recordset[0] : {docNo: '', cwNo: ''});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string): Promise<number> {
@@ -537,9 +537,16 @@ export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRo
   const updateQuery = currentCount === 0 ?
   `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)` :
   `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
-  return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('cwNo', VarChar(50), cwNo).query(updateQuery).then(() =>
-    getChemicals('', itemNmbr, '', '').then(c => c['chemicals'][0])
-  )
+  await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('cwNo', VarChar(50), cwNo).query(updateQuery);
+  await copyPdfToItem(itemNmbr);
+  return await getChemicals('', itemNmbr, '', '').then(c => c['chemicals'][0]);
+}
+
+export async function unlinkChemical(itemNmbr: string): Promise<CwRow> {
+  const deleteQuery = `DELETE FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr`
+  await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(deleteQuery);
+  await removePdfFromItem(itemNmbr);
+  return await getChemicals('', itemNmbr, '', '').then(c => c['chemicals'][0]);
 }
 
 export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
@@ -592,12 +599,7 @@ export async function updateSDS(cwChemicals: Array<CwRow>) {
   });
 
    const updatedChemicals = cwChemicals.filter(m => currentChemicals.find(c => c.CwNo === m.CwNo)?.DocNo !== m.DocNo).map(
-    cwData => {
-      const getQuery = 'SELECT RTRIM(ITEMNMBR) itemNmbr FROM [MSDS].dbo.ProductLinks WHERE CwNo = @cwNo';
-      return new sqlRequest().input('cwNo', VarChar(31), cwData.CwNo).query(getQuery)
-        .then((_: IResult<{itemNmbr: string}[]>) => _.recordset.map(_ => _.itemNmbr))
-        .then(_ => aquirePdf(cwData.DocNo as string, _));
-    }
+    cwData => aquirePdfForCwNo(cwData.CwNo)
   );
 
   await Promise.all(updatedChemicals);
@@ -607,19 +609,38 @@ export async function updateSDS(cwChemicals: Array<CwRow>) {
   return 1;
 }
 
-async function aquirePdf(docNo: string, itemNmbrs: Array<string>): Promise<Buffer> {
+async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
+  const getQuery = `
+  SELECT a.DocNo, RTRIM(ITEMNMBR) ItemNmbr FROM [MSDS].dbo.Materials a
+  LEFT JOIN [MSDS].dbo.ProductLinks b ON a.CwNo = b.CwNo
+  WHERE a.CwNo = @cwNo
+  `;
+  const entries = await new sqlRequest().input('cwNo', VarChar(31), cwNo).query(getQuery)
+    .then((_: IResult<{ItemNmbr: string, DocNo: string}[]>) => _.recordset)
+  const docNo = entries[0].DocNo;
   const cw = await initChemwatch();
-  return await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).then(res => {
-    const buffer = Buffer.from(res.data);
-    itemNmbrs.forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
-    fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
-    return buffer;
-  });
+  const fileBuffer = await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`);
+  const buffer = Buffer.from(fileBuffer.data);
+  entries.map(_ => _.ItemNmbr).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
+  fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
+  return buffer;
 }
 
-export async function getSdsPdf(docNo: string, itemNmbr: string): Promise<Buffer> {
+
+export async function getSdsPdf(docNo: string, cwNo: string): Promise<Buffer> {
   if (!docNo) throw new Error;
-  return await fileExists(`pdfs/pd${docNo}.pdf`) ? fs.readFileSync(`pdfs/pd${docNo}.pdf`) : aquirePdf(docNo, [itemNmbr]);
+  return await fileExists(`pdfs/pd${docNo}.pdf`) ? fs.readFileSync(`pdfs/pd${docNo}.pdf`) : aquirePdfForCwNo(cwNo);
+}
+
+async function copyPdfToItem(itemNmbr: string): Promise<void> {
+  const chemical = await getBasicChemicalInfo(itemNmbr);
+  return await fileExists(`pdfs/pd${chemical.docNo}.pdf`) ?
+    fs.copyFileSync(`pdfs/pd${chemical.docNo}.pdf`, `pdfs/gp/${itemNmbr}.pdf`) :
+    aquirePdfForCwNo(chemical.cwNo).then(() => undefined)
+}
+
+async function removePdfFromItem(itemNmbr: string): Promise<void> {
+  if(await fileExists(`pdfs/gp/${itemNmbr}.pdf`)) fs.rmSync(`pdfs/gp/${itemNmbr}.pdf`);
 }
 
 export async function getMaterialsInFolder(page = 1): Promise<CwFolder> {

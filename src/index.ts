@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getChemicals, getCustomer, getCustomerAddresses, getCustomers, getDocNo, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getCwNoFromItem, getDocNo, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
 import { keyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -302,10 +302,21 @@ app.get('/gp/link-material', auth, (req, res) => {
   });
 });
 
+app.get('/gp/unlink-material', auth, (req, res) => {
+  const params = req.query;
+  const itemNmbr = params['itemNmbr'] as string || '';
+  unlinkChemical(itemNmbr).then(_ => {
+    res.status(200).json(_);
+  }).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err})
+  });
+});
+
 app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
   const params = req.params;
   const itemNmbr = params['itemNmbr'];
-  getDocNo(itemNmbr).then(_ => getSdsPdf(_, itemNmbr)).then(_ => {
+  getBasicChemicalInfo(itemNmbr).then(_ => getSdsPdf(_.docNo, _.cwNo)).then(_ => {
     res.contentType('application/pdf');
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
