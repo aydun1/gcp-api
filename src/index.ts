@@ -337,7 +337,7 @@ app.get('/chemicals/search', (req, res) => {
       }
     </script>
     <body>
-    <h1>GCP SDS Search</h1>
+    <h1>GCP SDS Lookup</h1>
       <form onsubmit="return getUrl()">
         <label>Product code: <input type="text" id="prodNo"></label>
         <input type="submit" value="Open SDS">
