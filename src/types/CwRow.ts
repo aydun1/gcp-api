@@ -108,5 +108,5 @@ export interface CwRow {
   'Country'?: string;
   'Language'?: string;
   [key: string]: string | undefined | number | boolean | Date | Array<string>;
-
+  ItemNmbr: string;
 }

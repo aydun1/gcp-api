@@ -65,7 +65,6 @@ function verifyPalletApiToken(req: Request, res: Response, next: NextFunction) {
 function verifyChemicalListToken(req: Request, res: Response, next: NextFunction) {
   const params = req.query;
   const bearerToken = params['key'] as string || '';
-  console.log(bearerToken, chemListKeyHash)
   const matched = compareSync(bearerToken, chemListKeyHash);
   if (!matched) return res.sendStatus(401);
   next();
@@ -322,7 +321,26 @@ app.get('/gp/unlink-material', auth, (req, res) => {
   });
 });
 
-app.get('/public/chemicals', verifyChemicalListToken, (req, res) => {
+app.get('/chemicals/search', (req, res) => {
+  res.setHeader('Content-Security-Policy', '');
+  res.status(200).send(  
+    `
+    <script>
+      function getUrl() {
+        const prodNo = document.getElementById('prodNo').value.replace(/[^a-zA-Z0-9]/g, '');
+        if (prodNo)window.location.href = '/public/sds/' + prodNo + '.pdf';
+        return false;
+      }
+    </script>
+    <form onsubmit="return getUrl()">
+      <label>Product code: <input type="text" id="prodNo"></label>
+      <input type="submit" value="Open SDS">
+    </form>
+    `
+  )
+});
+
+app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getChemicals(branch, '', '', 'Name').then(
@@ -331,7 +349,7 @@ app.get('/public/chemicals', verifyChemicalListToken, (req, res) => {
         '<ul><li>' +
         chemicals.chemicals.filter(_ => _.docNo)
           .filter((v,i,a)=>a.findIndex(v2=>(v2.docNo===v.docNo))===i)
-          .map(c => `<a href="https://api.gardencityplastics.com/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
+          .map(c => `<a href="public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
         '</li></ul>'
       )
     }
@@ -348,7 +366,7 @@ app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
-    return res.status(err.code || 404).send();
+    return res.status(err.code || 404).send('Unable to load SDS. Please check the product code is correct.');
   });
 });
 
