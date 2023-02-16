@@ -1,5 +1,5 @@
 import { connect } from 'mssql';
-import { compare } from 'bcrypt';
+import { compare, compareSync } from 'bcrypt';
 import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 'passport-azure-ad';
 import express, { NextFunction, Request, RequestHandler, Response } from 'express';
 import fs from 'fs';
@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 
 import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
-import { keyHash, sqlConfig, webConfig } from './config';
+import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
 
@@ -52,14 +52,23 @@ app.use((req, res, next) => {
   next();
 });
 
-function verifyApiKey(req: Request, res: Response, next: NextFunction) {
+function verifyPalletApiToken(req: Request, res: Response, next: NextFunction) {
   const bearerHeader = req.headers['authorization'];
   if (typeof bearerHeader === 'undefined') return res.sendStatus(401);
   const bearerToken = bearerHeader.split(' ')[1];
-  compare(bearerToken, keyHash, (err, matched) => {
+  compare(bearerToken, palletKeyHash, (err, matched) => {
     if (!matched || err) return res.sendStatus(401);
     next();
   });
+}
+
+function verifyChemicalListToken(req: Request, res: Response, next: NextFunction) {
+  const params = req.query;
+  const bearerToken = params['key'] as string || '';
+  console.log(bearerToken, chemListKeyHash)
+  const matched = compareSync(bearerToken, chemListKeyHash);
+  if (!matched) return res.sendStatus(401);
+  next();
 }
 
 app.get( '/', ( req, res ) => {
@@ -239,7 +248,7 @@ app.post('/gp/itt', auth, (req: Request, res: Response) => {
   res.status(200).send({'status': 'Successfully added ITT.'});
 });
 
-app.post('/pallets', verifyApiKey, (req, res) => {
+app.post('/pallets', verifyPalletApiToken, (req, res) => {
   const body = req.body as Body;
   updatePallets(body.customer, body.palletType, body.palletQty).then(
     () => res.status(200).json({result: 'Pallet updated successfully.'})
@@ -260,7 +269,7 @@ app.get('/gp/chemicals', auth, (req, res) => {
     _ => res.status(200).json(_)
   ).catch((err: {code: number, message: string}) => {console.log(err)
     res.status(err.code || 500).json({'result': err?.message || err})
-});
+  });
 });
 
 app.get('/gp/saved-materials', auth, (req, res) => {
@@ -310,6 +319,24 @@ app.get('/gp/unlink-material', auth, (req, res) => {
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
     return res.status(err.code || 500).json({'result': err?.message || err})
+  });
+});
+
+app.get('/public/chemicals', verifyChemicalListToken, (req, res) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  getChemicals(branch, '', '', 'Name').then(
+    chemicals => {
+      res.status(200).send(    
+        '<ul><li>' +
+        chemicals.chemicals.filter(_ => _.docNo)
+          .filter((v,i,a)=>a.findIndex(v2=>(v2.docNo===v.docNo))===i)
+          .map(c => `<a href="https://api.gardencityplastics.com/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
+        '</li></ul>'
+      )
+    }
+  ).catch((err: {code: number, message: string}) => {console.log(err)
+    res.status(err.code || 500).json({'result': err?.message || err})
   });
 });
 

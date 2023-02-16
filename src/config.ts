@@ -29,5 +29,6 @@ export const webConfig = {
   port: process.env.PORT || '3000',
 }
 
-export const keyHash = process.env.API_KEY_BCRYPT_HASH || '';
+export const palletKeyHash = process.env.PALLET_KEY_BCRYPT_HASH || '';
+export const chemListKeyHash = process.env.CHEMICAL_LIST_BCRYPT_HASH || '';
 export const targetDir = process.env.TARGET_DIR || '';
