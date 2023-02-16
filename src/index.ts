@@ -358,7 +358,7 @@ app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
         '<html><head><title>GCP SDS List</title></head><body><ul><li>' +
         chemicals.chemicals.filter(_ => _.docNo)
           .filter((v,i,a)=>a.findIndex(v2=>(v2.docNo===v.docNo))===i)
-          .map(c => `<a href="public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
+          .map(c => `<a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
         '</li></ul></body></html>'
       )
     }
