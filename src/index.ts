@@ -325,17 +325,25 @@ app.get('/chemicals/search', (req, res) => {
   res.setHeader('Content-Security-Policy', '');
   res.status(200).send(  
     `
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
     <script>
       function getUrl() {
         const prodNo = document.getElementById('prodNo').value.replace(/[^a-zA-Z0-9]/g, '');
-        if (prodNo)window.location.href = '/public/sds/' + prodNo + '.pdf';
+        if (prodNo) window.location.href = '/public/sds/' + prodNo + '.pdf';
         return false;
       }
     </script>
-    <form onsubmit="return getUrl()">
-      <label>Product code: <input type="text" id="prodNo"></label>
-      <input type="submit" value="Open SDS">
-    </form>
+    <body>
+    <h1>GCP SDS Search</h1>
+      <form onsubmit="return getUrl()">
+        <label>Product code: <input type="text" id="prodNo"></label>
+        <input type="submit" value="Open SDS">
+      </form>
+    </body>
+    </html>
     `
   )
 });
@@ -366,7 +374,12 @@ app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
-    return res.status(err.code || 404).send('Unable to load SDS. Please check the product code is correct.');
+    return res.status(err.code || 404).send(`
+    <html>
+      <head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+      <body><p>Unable to load SDS. Please check the product code is correct.</p></body>
+    </html>
+    `);
   });
 });
 
