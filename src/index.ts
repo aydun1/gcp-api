@@ -321,7 +321,7 @@ app.get('/gp/unlink-material', auth, (req, res) => {
   });
 });
 
-app.get('/chemicals/search', (req, res) => {
+app.get('/chemicals/lookup', (req, res) => {
   res.setHeader('Content-Security-Policy', '');
   res.status(200).send(  
     `
