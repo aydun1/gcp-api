@@ -551,7 +551,7 @@ export async function unlinkChemical(itemNmbr: string): Promise<CwRow> {
 
 export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
   const request = new sqlRequest();
-  const query = 'SELECT CwNo, Name FROM [MSDS].dbo.Materials ORDER BY Name ASC';
+  const query = 'SELECT CwNo, Name FROM [MSDS].dbo.Materials WHERE onchemwatch = 1 ORDER BY Name ASC';
   return request.query(query).then((_: IResult<CwRow>) => {return {chemicals: _.recordset}});
 }
 
@@ -584,11 +584,13 @@ export async function updateSDS(cwChemicals: Array<CwRow>) {
       {name: 'DocNo', type: VarChar(50)},
       {name: 'Language', type: VarChar(50)},
       {name: 'Country', type: VarChar(50)}
-    ]
+    ];
+
     parameters.forEach(_ => {
       request.input(_.name, _.type, c[_.name]);
       sets.push(`${_.name} = @${_.name}`);
-    })
+    });
+
     sets.push('OnChemwatch = 1');
     if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('IssueDate = @issueDate');
     if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('issueDate', sqlDate, c.IssueDate);
@@ -634,6 +636,10 @@ export async function getSdsPdf(docNo: string, cwNo: string): Promise<Buffer> {
 
 async function copyPdfToItem(itemNmbr: string): Promise<void> {
   const chemical = await getBasicChemicalInfo(itemNmbr);
+  console.log('WWW')
+  console.log(chemical)
+  console.log('WWW')
+
   return await fileExists(`pdfs/pd${chemical.docNo}.pdf`) ?
     fs.copyFileSync(`pdfs/pd${chemical.docNo}.pdf`, `pdfs/gp/${itemNmbr}.pdf`) :
     aquirePdfForCwNo(chemical.cwNo).then(() => undefined)
