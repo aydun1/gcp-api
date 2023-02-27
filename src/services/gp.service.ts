@@ -25,7 +25,7 @@ const dct: {[key: string]: {uom: string, divisor: number}} = {
 };
 const fileExists = (path: string) => fs.promises.stat(path).then(() => true, () => false);
 const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`);
-const ignoreRegexp = /2g|4g|80g|g\/l|g\/kg/;
+const ignoreRegexp = /2g|4g|5g|80g|g\/l|g\/kg/;
 const cartonRegexp = /\[ctn([0-9]+)\]/;
 const cwFolderId = '4006663';
 
@@ -459,7 +459,7 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
     })
     const chemicals = _.recordset.map(c => {
       const carton = (c.ItemDesc as string).toLocaleLowerCase().match(cartonRegexp);
-      const cartonMulti = carton ? parseInt(carton[1], 10) : 1
+      const cartonMulti = carton ? parseInt(carton[1], 10) : 1;
       const match = (c.ItemDesc as string).toLocaleLowerCase().replace(ignoreRegexp, '').match(sizeRegexp);
       if (match) {
         c['size'] = (Number(match[1]) * cartonMulti) / dct[match[2]]['divisor'];
@@ -467,12 +467,12 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
         c['quantity'] = c['size'] * (c.onHand as number);
       }
       return c;
-    });
+    }).filter(_ => _['size'] !== undefined);
     return {chemicals: (orderby === 'quantity') ? order === 'asc' ?
       chemicals.sort((a, b) => (a.quantity as number || 0) - (b.quantity as number || 0)) :
       chemicals.sort((a, b) => (b.quantity as number || 0) - (a.quantity as number || 0)) :
       chemicals
-    }
+    };
   });
 }
 
@@ -512,7 +512,7 @@ export function writeTransferFile(fromSite: string, toSite: string, body: Array<
   const header = ['Transfer Date', 'PO Number', 'From Site', 'Item Number', 'Item Desc', 'To Site', 'Order Qty', 'Qty Shipped', 'Cancelled Qty'];
   const date = new Date().toISOString().split('T')[0];
   const lines = body.map(_ => [date, _.poNumber, fromSite, _.itemNumber, _.itemDesc, toSite, _.toTransfer, _.toTransfer, 0].join(','));
-  const path = `${targetDir}/Transfers`
+  const path = `${targetDir}/Transfers`;
   const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
   fs.writeFileSync(`${path}/transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
   setTimeout(() => fs.writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
