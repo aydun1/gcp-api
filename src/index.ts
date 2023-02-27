@@ -40,6 +40,8 @@ const bearerStrategy = new BearerStrategy(options, (token: ITokenPayload, done: 
 
 const app = express();
 app.use('/enews', express.static('enews'));
+app.use('/assets', express.static('assets'));
+
 app.use(express.json());
 app.use(helmet());
 app.use(morgan('combined', { stream: accessLogStream }));
@@ -327,8 +329,9 @@ app.get('/chemicals/lookup', (req, res) => {
     `
     <html>
     <head>
-    <title>GCP SDS Lookup</title>
+    <title>Garden City SDS Lookup</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/assets/chemical-lookup.css">
     </head>
     <script>
       function getUrl() {
@@ -338,11 +341,15 @@ app.get('/chemicals/lookup', (req, res) => {
       }
     </script>
     <body>
-    <h1>GCP SDS Lookup</h1>
-      <form onsubmit="return getUrl()">
-        <label>Product code: <input type="text" id="prodNo"></label>
-        <input type="submit" value="Open SDS">
-      </form>
+    <img src="/assets/gcp_banner.png" alt="Garden City Plastic banner">
+    <form onsubmit="return getUrl()">
+      <h2>SDS Lookup</h2>
+      <div class="text-field">
+        <label for="prodNo">Product code</label>
+        <input type="text" id="prodNo">
+      </div>
+      <button type="submit" value="Open SDS">Open SDS</button>
+    </form>
     </body>
     </html>
     `

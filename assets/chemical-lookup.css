@@ -1,0 +1,42 @@
+body {
+  font-family: 'Lato', 'PT Sans', sans-serif;
+}
+
+h2 {
+  margin-bottom: 16px;
+}
+
+form {
+  margin: 10px auto;
+  max-width: 216px;
+  padding: 0 20px 10px 20px;
+  border: 1px solid #00000042;
+  border-radius: 8px;
+}
+
+label {
+  display: block;
+}
+
+button {
+  background-color: #388e3c;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  display: block;
+  margin: 18px auto 6px auto;
+  max-width: 100%;
+  padding: 10px 20px;
+  width: 180px;
+}
+
+input {
+  font-size: 18px;
+  width: 100%;
+}
+
+img {
+  max-width: 240px;
+  width: 100%;
+}
