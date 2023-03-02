@@ -175,6 +175,12 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   e.NSW OnHandNSW,
   e.SA OnHandSA,
   e.WA OnHandWA,
+  f.HEA AllocHEA,
+  f.QLD AllocQLD,
+  f.NSW AllocNSW,
+  f.SA AllocSA,
+  f.MAIN AllocVIC,
+  f.WA AllocWA,
   b.QTYONHND QtyOnHand,
   b.QTYBKORD QtyBackordered,
   b.ATYALLOC QtyAllocated,
@@ -257,6 +263,20 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     ) Pivot_table
   ) e
   ON a.ITEMNMBR = e.ITEMNMBR
+
+  -- Get branch Alloc
+  LEFT JOIN (
+    SELECT * FROM (
+      SELECT ITEMNMBR, LOCNCODE, ATYALLOC
+      FROM IV00102
+      WHERE ATYALLOC <> 0
+    ) a
+    PIVOT (
+      SUM(ATYALLOC)
+      FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA, MAIN)
+    ) Pivot_table
+  ) f
+  ON a.ITEMNMBR = f.ITEMNMBR
 
   WHERE b.LOCNCODE = @branch
   `;
