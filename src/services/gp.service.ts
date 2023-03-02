@@ -326,7 +326,7 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   `;
   const filterConditions = [];
   const palletFilters = [];
-  if (branches.length > 0) filterConditions.push(`a.SALSTERR in ('${branches.join('\', \'')}')`);
+  if (branches.length > 0) filterConditions.push(`a.CUSTCLAS in ('${branches.join('\', \'')}')`);
   if (filters.length === 0) filterConditions.push(`a.INACTIVE = 0`);
   if (filters.includes('loscam')) palletFilters.push('USERDEF2 <> 0');
   if (filters.includes('chep')) palletFilters.push('USERDEF1 <> 0');
