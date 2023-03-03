@@ -461,7 +461,7 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ITEMNMBR = d.ITEMNMBR
   LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
   LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
-  WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZERS', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
+  WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZER', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
   `;
   if (itemNumber) query += `
   AND a.ITEMNMBR = @itemNumber
