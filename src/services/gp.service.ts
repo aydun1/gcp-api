@@ -169,18 +169,34 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   b.ORDRUPTOLVL OrderUpToLvl,
   b.MNMMORDRQTY MinOrderQty,
   b.MXMMORDRQTY MaxOrderQty,
+
   pw.OnHand OnHandVIC,
   e.HEA OnHandHEA,
   e.QLD OnHandQLD,
   e.NSW OnHandNSW,
   e.SA OnHandSA,
   e.WA OnHandWA,
+
   f.HEA AllocHEA,
   f.QLD AllocQLD,
   f.NSW AllocNSW,
   f.SA AllocSA,
   f.MAIN AllocVIC,
   f.WA AllocWA,
+
+  g.HEA BackorderHEA,
+  g.QLD BackorderQLD,
+  g.NSW BackorderNSW,
+  g.SA BackorderSA,
+  g.MAIN BackorderVIC,
+  g.WA BackorderWA,
+
+  e.HEA - f.HEA - g.HEA AvailHEA,
+  e.QLD - f.QLD - g.QLD AvailQLD,
+  e.NSW - f.NSW - g.NSW AvailNSW,
+  e.SA - f.SA - g.SA AvailSA,
+  e.WA - f.WA - g.WA AvailWA,
+
   b.QTYONHND QtyOnHand,
   b.QTYBKORD QtyBackordered,
   b.ATYALLOC QtyAllocated,
@@ -239,9 +255,8 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   LEFT JOIN (
     SELECT a.[PROD.NO] ITEMNMBR, SUM([PAL.TOT.QTY]) OnHand, MAX(a.[PROD.HEIGHT]) Height, MAX([PAL.QTY]) PalletQuantity, MAX([CARTON.QTY]) CartonQuantity
     FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a       
-    LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW b
+    LEFT JOIN (SELECT * FROM [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW WHERE [PAL.STATUS] = '02') b
     ON a.[PROD.NO] = b.[PROD.NO]
-    WHERE b.[PAL.STATUS] = '02'
     GROUP BY a.[PROD.NO]
   ) pw
   ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = pw.ITEMNMBR COLLATE DATABASE_DEFAULT
@@ -277,6 +292,16 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     ) Pivot_table
   ) f
   ON a.ITEMNMBR = f.ITEMNMBR
+
+  -- Get branch backorders
+  LEFT JOIN (
+    SELECT * FROM (SELECT ITEMNMBR, LOCNCODE, QTYBKORD FROM IV00102 WHERE QTYBKORD <> 0) a
+    PIVOT (
+      SUM(QTYBKORD)
+      FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA, MAIN)
+    ) Pivot_table
+  ) g
+  ON a.ITEMNMBR = g.ITEMNMBR
 
   WHERE b.LOCNCODE = @branch
   `;
