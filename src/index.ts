@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -41,7 +41,6 @@ const bearerStrategy = new BearerStrategy(options, (token: ITokenPayload, done: 
 const app = express();
 app.use('/enews', express.static('enews'));
 app.use('/assets', express.static('assets'));
-
 app.use(express.json());
 app.use(helmet());
 app.use(morgan('combined', { stream: accessLogStream }));
@@ -93,7 +92,7 @@ app.get('/gp/customers', auth, (req: Request, res: Response) => {
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -104,7 +103,7 @@ app.get('/gp/customers/:id(*)/addresses', auth, (req: Request, res: Response) =>
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -115,7 +114,7 @@ app.get('/gp/customers/:id(*)', auth, (req: Request, res: Response) => {
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -128,7 +127,7 @@ app.get('/gp/pan', auth, (req: Request, res: Response) => {
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -144,7 +143,7 @@ app.get('/gp/inventory', auth, (req: Request, res: Response) => {
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -157,7 +156,7 @@ app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -170,7 +169,7 @@ app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -184,7 +183,7 @@ app.get('/gp/po', auth, (req: Request, res: Response) => {
   ).catch(
     err => {
       console.log(err);
-      res.status(500).send(err)
+      res.status(500).send(err);
     }
   );
 });
@@ -255,7 +254,7 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
     () => res.status(200).json({result: 'Pallet updated successfully.'})
   ).catch((err: {code: number, message: string}) => {
     console.log(err);
-    res.status(500).json({'result': err?.message || err})
+    res.status(500).json({'result': err?.message || err});
   });
 });
 
@@ -268,8 +267,9 @@ app.get('/gp/chemicals', auth, (req, res) => {
 
   getChemicals(branch, itemNumber, sort, order).then(
     _ => res.status(200).json(_)
-  ).catch((err: {code: number, message: string}) => {console.log(err)
-    res.status(err.code || 500).json({'result': err?.message || err})
+  ).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    res.status(err.code || 500).json({'result': err?.message || err});
   });
 });
 
@@ -295,8 +295,33 @@ app.get('/gp/sync-from-cw', auth, (req, res) => {
 
 app.get('/gp/synced-materials', auth, (req, res) => {
   getSyncedChemicals().then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-    console.log(err)
-    return res.status(err.code || 500).json({'result': err?.message || err})
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err});
+  });
+});
+
+app.get('/gp/non-inventory-chemicals', auth, (req, res) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  getNonInventoryChemicals(branch).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err});
+  });
+});
+
+app.post('/gp/non-inventory-chemicals', auth, (req: Request, res: Response) => {
+  const body = req.body as {itemNmbr: string, itemDesc: string, size: number, units: string};
+  addNonInventoryChemical(body.itemNmbr, body.itemDesc, body.size, body.units).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err});
+  });
+});
+
+app.post('/gp/non-inventory-chemical-qty', auth, (req: Request, res: Response) => {
+  const body = req.body as {itemNmbr: string, quantity: number, branch: string};
+  updateNonInventoryChemicalQuantity(body.itemNmbr, body.quantity, body.branch).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err});
   });
 });
 
@@ -308,7 +333,7 @@ app.get('/gp/link-material', auth, (req, res) => {
     res.status(200).json(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
-    return res.status(err.code || 500).json({'result': err?.message || err})
+    return res.status(err.code || 500).json({'result': err?.message || err});
   });
 });
 
@@ -319,7 +344,7 @@ app.get('/gp/unlink-material', auth, (req, res) => {
     res.status(200).json(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
-    return res.status(err.code || 500).json({'result': err?.message || err})
+    return res.status(err.code || 500).json({'result': err?.message || err});
   });
 });
 

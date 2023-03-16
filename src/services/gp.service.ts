@@ -1,4 +1,4 @@
-import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX } from 'mssql';
+import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX, Numeric, Char, Int } from 'mssql';
 import fs from 'fs';
 
 import { allowedPallets } from '../../config.json';
@@ -474,12 +474,10 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   rtrim(c.BIN) Bin,
   Coalesce(Pkg, '') packingGroup,
   Coalesce(Dgc, '') class,
-  Name, DocNo docNo,
   Coalesce(Replace(HazardRating, -1, ''), '') hazardRating,
-  HCodes,
-  OnChemwatch,
-  IssueDate, ExtractionDate, VendorName, Country, Language,
-  CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END as sdsExists
+  Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language,
+  CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
+  1 Inventory
   FROM IV00101 a
   LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
   LEFT JOIN IV00117 c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
@@ -487,14 +485,32 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
   LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
   WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZER', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
+  AND b.LOCNCODE = @locnCode
+  AND b.QTYONHND > 0
+  AND f.PropertyValue != 'Hardware & Accessories'
   `;
   if (itemNumber) query += `
   AND a.ITEMNMBR = @itemNumber
   `;
+
   query += `
-  AND b.LOCNCODE = @locnCode
-  AND b.QTYONHND > 0
-  AND f.PropertyValue != 'Hardware & Accessories'
+  UNION
+  SELECT a.ItemNmbr,
+    CONCAT(a.ItemDesc, ' - ', CAST(ContainerSize AS float), ' ', Units) AS ItemDesc,
+    b.Quantity onHand,
+    '' Bin,
+    Coalesce(e.Pkg, '') packingGroup,
+    Coalesce(Dgc, '') class,
+    Coalesce(Replace(HazardRating, -1, ''), '') hazardRating,
+    Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language,
+    CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
+    0 Inventory
+  FROM [MSDS].dbo.Consumables a
+  LEFT JOIN [MSDS].dbo.Quantities b ON a.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ItemNmbr = d.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
+  WHERE b.Site = @locnCode
+  AND b.Quantity > 0
   `;
   if (orderby && orderby !== 'quantity') query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order || 'ASC'}`;
   return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
@@ -598,6 +614,35 @@ export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
   const request = new sqlRequest();
   const query = 'SELECT CwNo, Name FROM [MSDS].dbo.Materials WHERE onchemwatch = 1 ORDER BY Name ASC';
   return request.query(query).then((_: IResult<CwRow>) => {return {chemicals: _.recordset}});
+}
+
+export function getNonInventoryChemicals(site: string): Promise<{chemicals: IRecordSet<CwRow>}> {
+  const request = new sqlRequest();
+  const query = `
+  SELECT a.ItemNmbr, CONCAT(ItemDesc, ' - ', CAST(ContainerSize AS float), Units) AS ItemDesc, ContainerSize, Units, b.Quantity
+  FROM [MSDS].dbo.Consumables a
+  LEFT JOIN ( SELECT * FROM [MSDS].dbo.Quantities WHERE Site = @site) b ON a.ItemNmbr = b.ItemNmbr
+  ORDER BY ItemDesc ASC
+  `;
+  return request.input('site', Char(11), site).query(query).then((_: IResult<CwRow>) => {
+    return {chemicals: _.recordset}
+  });
+}
+
+export async function addNonInventoryChemical(itemNmbr: string, itemDesc: string, containerSize: number, units: string): Promise<boolean> {
+  const updateQuery = `
+  INSERT INTO [MSDS].dbo.Consumables (ItemNmbr, ItemDesc, ContainerSize, Units)
+  VALUES (@itemNmbr, @itemDesc, @containerSize, @units)`;
+  return new sqlRequest().input('itemNmbr', VarChar(50), `${itemNmbr}${containerSize}`).input('itemDesc', VarChar(101), itemDesc).input('containerSize', Numeric(19, 5), containerSize).input('units', VarChar(50), units).query(updateQuery).then(() => true);
+}
+
+export async function updateNonInventoryChemicalQuantity(itemNmbr: string, quantity: number, branch: string): Promise<boolean> {
+  const getQuery = 'SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = @branch';
+  const currentCount = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('branch', VarChar(31), branch).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
+  const updateQuery = currentCount === 0 ?
+  `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, @site, @quantity)` :
+  `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = @Site`;
+  return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('site', Char(11), branch).input('quantity', Int, quantity).query(updateQuery).then(() => true);
 }
 
 export async function updateSDS(cwChemicals: Array<CwRow>) {
