@@ -637,12 +637,26 @@ export async function addNonInventoryChemical(itemNmbr: string, itemDesc: string
 }
 
 export async function updateNonInventoryChemicalQuantity(itemNmbr: string, quantity: number, branch: string): Promise<boolean> {
-  const getQuery = 'SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = @branch';
-  const currentCount = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('branch', VarChar(31), branch).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
-  const updateQuery = currentCount === 0 ?
-  `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, @site, @quantity)` :
-  `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = @Site`;
-  return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('site', Char(11), branch).input('quantity', Int, quantity).query(updateQuery).then(() => true);
+  const entryExists = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('branch', VarChar(31), branch).query(
+    'SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = @branch'
+  ).then((_: IResult<gpRes>) => _.recordset.length) === 0;
+
+  const updateQuery = entryExists ?
+    `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, @site, @quantity)` :
+    `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = @Site`;
+
+  return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('site', Char(11), branch).input('quantity', Int, quantity).query(updateQuery).then(async () => {
+    const totalQuantity = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(
+      `SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site <> ''`
+    ).then((_: IResult<{Quantity: number}[]>) => _.recordset.reduce((acc, cur) => acc += cur.Quantity, 0));
+    const totalResCount = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(
+      `SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = ''`
+    ).then((_: IResult<gpRes>) => _.recordset.length);
+    const updateTotalQuery = totalResCount === 0 ?
+      `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, '', @quantity)` :
+      `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = ''`;
+    return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('quantity', Int, totalQuantity).query(updateTotalQuery);
+  }).then(() => true);
 }
 
 export async function updateSDS(cwChemicals: Array<CwRow>) {
