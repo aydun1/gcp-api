@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -164,7 +164,20 @@ app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
 app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getOrders(branch, req.params.id).then(
+  getOrdersByLine(branch, req.params.id).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err);
+    }
+  );
+});
+
+app.get('/gp/orders', auth, (req: Request, res: Response) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  getOrders(branch, 'released').then(
     result => res.status(200).send(result)
   ).catch(
     err => {

@@ -441,7 +441,7 @@ export function getHistory(branch: string, itemNmbr: string) {
   return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
 }
 
-export function getOrders(branch: string, itemNmbr: string) {
+export function getOrdersByLine(branch: string, itemNmbr: string) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
   const query =
@@ -461,6 +461,30 @@ export function getOrders(branch: string, itemNmbr: string) {
   ORDER BY a.DOCDATE DESC
   `;
   return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+}
+
+export function getOrders(branch: string, batch: string) {
+  branch = parseBranch(branch);
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT SOPTYPE sopType,
+  RTRIM(SOPNUMBE) sopNumber,
+  RTRIM(CUSTNMBR) custNumber,
+  RTRIM(CUSTNAME) custName,
+  RTRIM(ShipToName) shipToName,
+  RTRIM(Address1) address1,
+  RTRIM(ADDRESS2) address2,
+  RTRIM(ADDRESS3) address3,
+  RTRIM(CITY) city,
+  RTRIM([STATE]) state,
+  RTRIM(ZIPCODE) postCode,
+  RTRIM(SHIPMTHD) shipMethod
+  FROM SOP10100 a
+  WHERE BACHNUMB = @batch
+  AND LOCNCODE = @locnCode
+  `;
+  return request.input('batch', VarChar(12), batch).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
 
 export function getChemicals(branch: string, itemNumber: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
