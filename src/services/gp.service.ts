@@ -1,4 +1,4 @@
-import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX, Numeric, Char, Int } from 'mssql';
+import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX, Numeric, Char, Int, DateTime } from 'mssql';
 import fs from 'fs';
 
 import { allowedPallets } from '../../config.json';
@@ -468,8 +468,15 @@ export function getOrders(branch: string, batch: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT SOPTYPE sopType,
+
+  SELECT
+  RTRIM(BACHNUMB) batchNumber,
+  DOCDATE docDate,
+  ReqShipDate reqShipDate,
+  SOPTYPE sopType,
   RTRIM(SOPNUMBE) sopNumber,
+  ORIGTYPE origType,
+  RTRIM(ORIGNUMB) origNumber,
   RTRIM(CUSTNMBR) custNumber,
   RTRIM(CUSTNAME) custName,
   RTRIM(ShipToName) shipToName,
@@ -479,13 +486,47 @@ export function getOrders(branch: string, batch: string) {
   RTRIM(CITY) city,
   RTRIM([STATE]) state,
   RTRIM(ZIPCODE) postCode,
-  RTRIM(SHIPMTHD) shipMethod
-  FROM SOP10100 a
-  WHERE BACHNUMB = @batch
+  RTRIM(SHIPMTHD) shipMethod,
+  0 posted
+  FROM SOP10100
+  WHERE LOCNCODE = @locnCode
+  AND (SOPTYPE = 2 OR SOPTYPE = 3)
+  AND ReqShipDate = @date
+  UNION ALL
+  SELECT
+  RTRIM(BACHNUMB) batchNumber,
+  DOCDATE docDate,
+  ReqShipDate reqShipDate,
+  SOPTYPE sopType,
+  RTRIM(SOPNUMBE) sopNumber,
+  ORIGTYPE origType,
+  RTRIM(ORIGNUMB) origNumber,
+  RTRIM(CUSTNMBR) custNumber,
+  RTRIM(CUSTNAME) custName,
+  RTRIM(ShipToName) shipToName,
+  RTRIM(Address1) address1,
+  RTRIM(ADDRESS2) address2,
+  RTRIM(ADDRESS3) address3,
+  RTRIM(CITY) city,
+  RTRIM([STATE]) state,
+  RTRIM(ZIPCODE) postCode,
+  RTRIM(SHIPMTHD) shipMethod,
+  1 posted
+
+  FROM SOP30200
+  WHERE ReqShipDate = @date
   AND LOCNCODE = @locnCode
+  AND (SOPTYPE = 2 OR SOPTYPE = 3)
+  ORDER BY CUSTNAME
   `;
-  return request.input('batch', VarChar(12), batch).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
+  const now = new Date(new Date().getTime() + 60 * 60 * 24 * 1000).toLocaleDateString('fr-CA');
+  const date = `${now} 00:00:00.000`;
+  return request.input('date', VarChar(23), date).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
+
+//export function getOrderLines(sopType: string, sopNumber: string) {
+//  select * from SOP10200
+//}
 
 export function getChemicals(branch: string, itemNumber: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
   branch = parseBranch(branch);
