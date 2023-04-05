@@ -490,7 +490,7 @@ export function getOrders(branch: string, batch: string) {
   0 posted
   FROM SOP10100
   WHERE LOCNCODE = @locnCode
-  AND (SOPTYPE = 2 OR SOPTYPE = 3)
+  AND (SOPTYPE = 2)
   AND ReqShipDate = @date
   UNION ALL
   SELECT
@@ -516,7 +516,7 @@ export function getOrders(branch: string, batch: string) {
   FROM SOP30200
   WHERE ReqShipDate = @date
   AND LOCNCODE = @locnCode
-  AND (SOPTYPE = 2 OR SOPTYPE = 3)
+  AND (SOPTYPE = 2)
   ORDER BY CUSTNAME
   `;
   const now = new Date(new Date().getTime() + 60 * 60 * 24 * 1000).toLocaleDateString('fr-CA');
