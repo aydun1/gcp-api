@@ -528,10 +528,10 @@ export function getOrders(branch: string, batch: string) {
 //  select * from SOP10200
 //}
 
-export function getChemicals(branch: string, itemNumber: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
+export function getChemicals(branch: string, itemNumber: string, type: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
   branch = parseBranch(branch);
   const request = new sqlRequest();
-  let query =
+  let query1 =
   `
   SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(ITEMDESC) ItemDesc,
@@ -554,12 +554,11 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   AND b.QTYONHND > 0
   AND f.PropertyValue != 'Hardware & Accessories'
   `;
-  if (itemNumber) query += `
+  if (itemNumber) query1 += `
   AND a.ITEMNMBR = @itemNumber
   `;
 
-  query += `
-  UNION
+  const query2 = `
   SELECT a.ItemNmbr,
     CONCAT(a.ItemDesc, ' - ', CAST(ContainerSize AS float), ' ', Units) AS ItemDesc,
     b.Quantity onHand,
@@ -577,6 +576,7 @@ export function getChemicals(branch: string, itemNumber: string, order: string, 
   WHERE b.Site = @locnCode
   AND b.Quantity > 0
   `;
+  let query = type === 'inventory' ? query1 : type === 'nonInventory' ? query2 : `${query1} UNION ${query2}`;
   if (orderby && orderby !== 'quantity') query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order || 'ASC'}`;
   return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
     _.recordset.map(c => {

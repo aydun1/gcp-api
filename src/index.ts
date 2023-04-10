@@ -277,8 +277,9 @@ app.get('/gp/chemicals', auth, (req, res) => {
   const itemNumber = params['itemNmbr'] as string || '';
   const sort = params['order'] as string || '';
   const order = params['orderby'] as string || '';
+  const category = params['category'] as string || '';
 
-  getChemicals(branch, itemNumber, sort, order).then(
+  getChemicals(branch, itemNumber, category, sort, order).then(
     _ => res.status(200).json(_)
   ).catch((err: {code: number, message: string}) => {
     console.log(err);
@@ -397,7 +398,7 @@ app.get('/chemicals/lookup', (req, res) => {
 app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getChemicals(branch, '', '', 'Name').then(
+  getChemicals(branch, '', '', '', 'Name').then(
     chemicals => {
       res.status(200).send(    
         '<html><head><title>GCP SDS List</title></head><body><ul><li>' +
