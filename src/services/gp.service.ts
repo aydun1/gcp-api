@@ -541,7 +541,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   AND a.ITEMNMBR = @itemNumber
   `;
 
-  const query2 = `
+  let query2 = `
   SELECT a.ItemNmbr,
     CONCAT(a.ItemDesc, ' - ', CAST(ContainerSize AS float), ' ', Units) AS ItemDesc,
     b.Quantity onHand,
@@ -558,6 +558,9 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
   WHERE b.Site = @locnCode
   AND b.Quantity > 0
+  `;
+  if (itemNumber) query2 += `
+  AND a.ITEMNMBR = @itemNumber
   `;
   let query = type === 'inventory' ? query1 : type === 'nonInventory' ? query2 : `${query1} UNION ${query2}`;
   if (orderby && orderby !== 'quantity') query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order || 'ASC'}`;
@@ -648,14 +651,14 @@ export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRo
   `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
   await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('cwNo', VarChar(50), cwNo).query(updateQuery);
   await copyPdfToItem(itemNmbr);
-  return await getChemicals('', itemNmbr, '', '').then(c => c['chemicals'][0]);
+  return await getChemicals('', itemNmbr, '', '', '').then(c => c['chemicals'][0]);
 }
 
 export async function unlinkChemical(itemNmbr: string): Promise<CwRow> {
   const deleteQuery = `DELETE FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr`
   await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(deleteQuery);
   await removePdfFromItem(itemNmbr);
-  return await getChemicals('', itemNmbr, '', '').then(c => c['chemicals'][0]);
+  return await getChemicals('', itemNmbr, '', '', '').then(c => c['chemicals'][0]);
 }
 
 export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
