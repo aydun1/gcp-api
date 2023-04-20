@@ -162,7 +162,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   pw.Height PalletHeight,
   pw.CartonQuantity PackSize,
   RTRIM(b.LOCNCODE) Location,
-  RTRIM(d.BIN) Bin,
+  --RTRIM(d.BIN) Bin,
   RTRIM(b.PRIMVNDR) Vendor,
   RTRIM(a.USCATVLS_3) Category,
   b.ORDRPNTQTY OrderPointQty,
@@ -262,8 +262,8 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = pw.ITEMNMBR COLLATE DATABASE_DEFAULT
 
   -- Get bin allocations
-  LEFT JOIN IV00117 d
-  ON a.ITEMNMBR = d.ITEMNMBR AND b.LOCNCODE = d.LOCNCODE
+  --LEFT JOIN IV00117 d
+  --ON a.ITEMNMBR = d.ITEMNMBR AND b.LOCNCODE = d.LOCNCODE
 
   -- Get branch SOHs
   LEFT JOIN (
@@ -463,7 +463,9 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
   return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
 }
 
-export function getOrders(branch: string, batch: string) {
+export function getOrders(branch: string, batch: string, date: string) {
+  const now = date || new Date(new Date().getTime() + 60 * 60 * 24 * 1000).toLocaleDateString('fr-CA');
+  const dt = `${now} 00:00:00.000`;
   branch = parseBranch(branch);
   const request = new sqlRequest();
   const query =
@@ -481,9 +483,7 @@ export function getOrders(branch: string, batch: string) {
   AND (SOPTYPE = 2)
   ORDER BY CUSTNAME
   `;
-  const now = new Date(new Date().getTime() + 60 * 60 * 24 * 1000).toLocaleDateString('fr-CA');
-  const date = `${now} 00:00:00.000`;
-  return request.input('date', VarChar(23), date).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
+  return request.input('date', VarChar(23), dt).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
 
 export function getOrderLines(sopType: number, sopNumber: string) {

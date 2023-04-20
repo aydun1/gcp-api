@@ -177,7 +177,8 @@ app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
 app.get('/gp/orders', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getOrders(branch, 'released').then(
+  const date = params['date'] as string || '';
+  getOrders(branch, 'released', date).then(
     result => res.status(200).send(result)
   ).catch(
     err => {
