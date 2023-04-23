@@ -529,7 +529,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   1 Inventory
   FROM IV00101 a
   LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN IV00117 c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
+  LEFT JOIN (SELECT * FROM IV00117 WHERE PRIORITY = 1) c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
   LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ITEMNMBR = d.ITEMNMBR
   LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
   LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
