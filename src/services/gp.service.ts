@@ -17,6 +17,7 @@ const dct: {[key: string]: {uom: string, divisor: number}} = {
   ml: {divisor: 1000, uom: 'L'},
   litre: {divisor: 1, uom: 'L'},
   liter: {divisor: 1, uom: 'L'},
+  ltr: {divisor: 1, uom: 'L'},
   l: {divisor: 1, uom: 'L'},
   kilogram: {divisor: 1, uom: 'kg'},
   kg: {divisor: 1, uom: 'kg'},
@@ -534,9 +535,13 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
   WHERE a.ITMCLSCD IN ('BASACOTE', 'CHEMICALS', 'FERTILIZER', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
   AND b.LOCNCODE = @locnCode
-  AND b.QTYONHND > 0
   AND f.PropertyValue != 'Hardware & Accessories'
   `;
+
+  if (branch) query1 += `
+  AND b.QTYONHND > 0
+  `;
+
   if (itemNumber) query1 += `
   AND a.ITEMNMBR = @itemNumber
   `;
@@ -557,8 +562,12 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ItemNmbr = d.ITEMNMBR
   LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
   WHERE b.Site = @locnCode
+  `;
+
+  if (branch) query2 += `
   AND b.Quantity > 0
   `;
+
   if (itemNumber) query2 += `
   AND a.ITEMNMBR = @itemNumber
   `;
