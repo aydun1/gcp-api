@@ -586,6 +586,10 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
         c['size'] = (Number(match[1]) * cartonMulti) / dct[match[2]]['divisor'];
         c['uofm'] = dct[match[2].toLocaleLowerCase()]['uom'];
         c['quantity'] = c['size'] * (c.onHand as number);
+      } else if ((c.ItemDesc as string).startsWith('Perlite')) {
+        c['size'] = 100;
+        c['uofm'] = 'L';
+        c['quantity'] = c['size'] * (c.onHand as number);
       }
       return c;
     }).filter(_ => _['size'] !== undefined);
