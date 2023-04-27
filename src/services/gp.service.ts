@@ -490,7 +490,8 @@ export function getOrders(branch: string, batch: string, date: string) {
 export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query = `
-  SELECT SOPTYPE, SOPNUMBE, ITEMNMBR itemNmbr, ITEMDESC itemDesc, QTYPRINV * QTYBSUOM quantity, LNITMSEQ
+  SELECT SOPTYPE, SOPNUMBE, ITEMNMBR itemNmbr, ITEMDESC itemDesc, QTYPRINV * QTYBSUOM quantity, LNITMSEQ,
+  (pw.[PROD.HEIGHT] / 2600) * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY]) palletSpaces
   FROM (
     SELECT a.SOPTYPE, a.SOPNUMBE, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYBSUOM, b.LNITMSEQ
     FROM SOP10100 a
@@ -502,14 +503,14 @@ export function getOrderLines(sopType: number, sopNumber: string) {
     LEFT JOIN SOP30300 b
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
   ) t
+  LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
+  ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT
   WHERE SOPTYPE = @soptype
   AND SOPNUMBE = @sopnumber
   AND QTYPRINV * QTYBSUOM > 0
   ORDER BY LNITMSEQ ASC
   `;
   return request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query).then((_: IResult<gpRes>) => {return {lines  : _.recordset}});
-
-
 }
 
 export function getChemicals(branch: string, itemNumber: string, type: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
