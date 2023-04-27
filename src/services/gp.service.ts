@@ -504,15 +504,15 @@ export function getOrders(branch: string, batch: string, date: string) {
 export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query = `
-  SELECT SOPTYPE, SOPNUMBE, ITEMNMBR itemNmbr, ITEMDESC itemDesc, QTYPRINV * QTYBSUOM quantity, LNITMSEQ,
+  SELECT SOPTYPE, SOPNUMBE, ITEMNMBR itemNmbr, ITEMDESC itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, LNITMSEQ,
   (pw.[PROD.HEIGHT] / 2600) * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY]) palletSpaces
   FROM (
-    SELECT a.SOPTYPE, a.SOPNUMBE, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYBSUOM, b.LNITMSEQ
+    SELECT a.SOPTYPE, a.SOPNUMBE, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
     FROM SOP10100 a
     LEFT JOIN SOP10200 b
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
     UNION
-    SELECT a.SOPTYPE, a.SOPNUMBE, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYBSUOM, b.LNITMSEQ
+    SELECT a.SOPTYPE, a.SOPNUMBE, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
     FROM SOP30200 a
     LEFT JOIN SOP30300 b
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
@@ -521,7 +521,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT
   WHERE SOPTYPE = @soptype
   AND SOPNUMBE = @sopnumber
-  AND QTYPRINV * QTYBSUOM > 0
+  AND (QTYPRINV > 0 OR QTYTOINV > 0)
   ORDER BY LNITMSEQ ASC
   `;
   return request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query).then((_: IResult<gpRes>) => {return {lines  : _.recordset}});
