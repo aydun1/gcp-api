@@ -471,17 +471,31 @@ export function getOrders(branch: string, batch: string, date: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, ReqShipDate reqShipDate, SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, RTRIM(CUSTNAME) custName, RTRIM(ShipToName) shipToName, RTRIM(Address1) address1, RTRIM(ADDRESS2) address2, RTRIM(ADDRESS3) address3, RTRIM(CITY) city, RTRIM([STATE]) state, RTRIM(ZIPCODE) postCode, RTRIM(SHIPMTHD) shipMethod, 0 posted
-  FROM SOP10100
-  WHERE LOCNCODE = @locnCode
-  AND (SOPTYPE = 2)
-  AND ReqShipDate = @date
+  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, RTRIM(CUSTNAME) custName, RTRIM(a.ShipToName) shipToName, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces
+  FROM SOP10100 a
+  LEFT JOIN (
+    SELECT SOPTYPE, SOPNUMBE, SUM((pw.[PROD.HEIGHT] / 2600) * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces FROM SOP30300
+    LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
+    ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT  
+    GROUP BY SOPTYPE, SOPNUMBE
+  ) b
+  ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
+  WHERE a.LOCNCODE = @locnCode
+  AND (a.SOPTYPE = 2)
+  AND a.ReqShipDate = @date
   UNION ALL
-  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, ReqShipDate reqShipDate, SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, RTRIM(CUSTNAME) custName, RTRIM(ShipToName) shipToName, RTRIM(ADDRESS1) address1, RTRIM(ADDRESS2) address2, RTRIM(ADDRESS3) address3, RTRIM(CITY) city, RTRIM([STATE]) state, RTRIM(ZIPCODE) postCode, RTRIM(SHIPMTHD) shipMethod, 1 posted
-  FROM SOP30200
-  WHERE ReqShipDate = @date
-  AND LOCNCODE = @locnCode
-  AND (SOPTYPE = 2)
+  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, RTRIM(CUSTNAME) custName, RTRIM(a.ShipToName) shipToName, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 1 posted, b.palletSpaces
+  FROM SOP30200 a
+  LEFT JOIN (
+    SELECT SOPTYPE, SOPNUMBE, SUM((pw.[PROD.HEIGHT] / 2600) * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces FROM SOP30300
+    LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
+    ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT  
+    GROUP BY SOPTYPE, SOPNUMBE
+  ) b
+  ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
+  WHERE a.ReqShipDate = @date
+  AND a.LOCNCODE = @locnCode
+  AND (a.SOPTYPE = 2)
   ORDER BY CUSTNAME
   `;
   return request.input('date', VarChar(23), dt).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
