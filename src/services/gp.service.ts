@@ -474,7 +474,8 @@ export function getOrders(branch: string, batch: string, date: string) {
   SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, RTRIM(CUSTNAME) custName, RTRIM(a.ShipToName) shipToName, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces
   FROM SOP10100 a
   LEFT JOIN (
-    SELECT SOPTYPE, SOPNUMBE, SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces FROM SOP30300
+    SELECT SOPTYPE, SOPNUMBE, SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYTOINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces
+    FROM SOP10200
     LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
     ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT  
     GROUP BY SOPTYPE, SOPNUMBE
@@ -487,7 +488,8 @@ export function getOrders(branch: string, batch: string, date: string) {
   SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, RTRIM(CUSTNAME) custName, RTRIM(a.ShipToName) shipToName, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 1 posted, b.palletSpaces
   FROM SOP30200 a
   LEFT JOIN (
-    SELECT SOPTYPE, SOPNUMBE, SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces FROM SOP30300
+    SELECT SOPTYPE, SOPNUMBE, SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces
+    FROM SOP30300
     LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
     ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT  
     GROUP BY SOPTYPE, SOPNUMBE
