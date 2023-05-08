@@ -506,15 +506,15 @@ export function getOrders(branch: string, batch: string, date: string) {
 export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query = `
-  SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv,
+  SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate,
   CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY]) palletSpaces
   FROM (
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
+    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.REQSHIPDATE
     FROM SOP10100 a
     LEFT JOIN SOP10200 b
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
     UNION
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
+    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.REQSHIPDATE
     FROM SOP30200 a
     LEFT JOIN SOP30300 b
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
@@ -529,12 +529,13 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   ORDER BY LNITMSEQ ASC
   `;
   const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
-  return lines.then((_: IResult<Array<{custNmbr: string, custName: string, sopType: number, sopNumbe: string}>>) => {
+  return lines.then((_: IResult<Array<{custNmbr: string, custName: string, sopType: number, sopNumbe: string, reqShipDate: string}>>) => {
     return {
       custNumber: _.recordset[0].custNmbr,
       custName: _.recordset[0].custName,
       sopType: _.recordset[0].sopType,
       sopNumber: _.recordset[0].sopNumbe,
+      reqShipDate: new Date(_.recordset[0].reqShipDate),
       lines: _.recordset
     }
   });
