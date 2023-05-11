@@ -414,10 +414,10 @@ app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
   const branch = params['branch'] as string || '';
   getChemicals(branch, '', '', '', 'Name').then(
     chemicals => {
-      res.status(200).send(    
+      res.status(200).send(
         '<html><head><title>GCP SDS List</title></head><body><ul><li>' +
-        chemicals.chemicals.filter(_ => _.docNo)
-          .filter((v,i,a)=>a.findIndex(v2=>(v2.docNo===v.docNo))===i)
+        chemicals.chemicals.filter(_ => _.sdsExists)
+          .filter((v,i,a)=>a.findIndex(v2=>(v2.DocNo===v.DocNo))===i)
           .map(c => `<a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
         '</li></ul></body></html>'
       )

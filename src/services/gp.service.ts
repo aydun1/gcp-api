@@ -10,6 +10,23 @@ import { CwFolder } from '../types/CwFolder';
 import { CwRow } from '../types/CwRow';
 import { initChemwatch } from './cw.service';
 
+interface Order {
+  custNmbr: string;
+  custName: string;
+  sopType: number;
+  sopNumbe: string;
+  reqShipDate: string;
+  shipToName: string;
+  address1: string;
+  address2: string;
+  address3: string;
+  city: string;
+  state: string;
+  postCode: string;
+  shipMethod: string;
+  lines: Array<any>;
+}
+
 const storedProcedure = 'usp_PalletUpdate';
 const dct: {[key: string]: {uom: string, divisor: number}} = {
   millilitre: {divisor: 1000, uom: 'L'},
@@ -506,15 +523,15 @@ export function getOrders(branch: string, batch: string, date: string) {
 export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query = `
-  SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate,
+  SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(ShipToName) shipToName, RTRIM(t.Address1) address1, RTRIM(t.ADDRESS2) address2, RTRIM(t.ADDRESS3) address3, RTRIM(t.CITY) city, RTRIM(t.[STATE]) state, RTRIM(t.ZIPCODE) postCode, RTRIM(t.SHIPMTHD) shipMethod,
   CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY]) palletSpaces
   FROM (
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.REQSHIPDATE
+    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, a.REQSHIPDATE, a.ShipToName, a.Address1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
     FROM SOP10100 a
     LEFT JOIN SOP10200 b
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
     UNION
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.REQSHIPDATE
+    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, a.REQSHIPDATE, a.ShipToName, a.Address1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
     FROM SOP30200 a
     LEFT JOIN SOP30300 b
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
@@ -529,12 +546,20 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   ORDER BY LNITMSEQ ASC
   `;
   const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
-  return lines.then((_: IResult<Array<{custNmbr: string, custName: string, sopType: number, sopNumbe: string, reqShipDate: string}>>) => {
+  return lines.then((_: IResult<Array<Order>>) => {
     return {
       custNumber: _.recordset[0].custNmbr,
       custName: _.recordset[0].custName,
       sopType: _.recordset[0].sopType,
       sopNumber: _.recordset[0].sopNumbe,
+      shipToName: _.recordset[0].shipToName,
+      address1: _.recordset[0].address1,
+      address2: _.recordset[0].address2,
+      address3: _.recordset[0].address3,
+      city: _.recordset[0].city,
+      state: _.recordset[0].state,
+      postCode: _.recordset[0].postCode,
+      shipMethod: _.recordset[0].shipMethod,
       reqShipDate: new Date(_.recordset[0].reqShipDate),
       lines: _.recordset
     }
@@ -553,7 +578,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   Coalesce(Pkg, '') packingGroup,
   Coalesce(Dgc, '') class,
   Coalesce(Replace(HazardRating, -1, ''), '') hazardRating,
-  Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language,
+  Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language, DocNo,
   CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
   1 Inventory
   FROM IV00101 a
@@ -583,7 +608,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
     Coalesce(e.Pkg, '') packingGroup,
     Coalesce(Dgc, '') class,
     Coalesce(Replace(HazardRating, -1, ''), '') hazardRating,
-    Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language,
+    Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language, DocNo,
     CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
     0 Inventory
   FROM [MSDS].dbo.Consumables a
