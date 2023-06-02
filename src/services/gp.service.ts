@@ -486,12 +486,15 @@ export function getOrders(branch: string, batch: string, date: string) {
   const dt = `${now} 00:00:00.000`;
   branch = parseBranch(branch);
   const request = new sqlRequest();
+  console.log(1)
   const query =
   `
-  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces
+  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces, b.orderWeight
   FROM SOP10100 a
   LEFT JOIN (
-    SELECT SOPTYPE, SOPNUMBE, SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYTOINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces
+    SELECT SOPTYPE, SOPNUMBE,
+    SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYTOINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces,
+    SUM(pw.[BU.WEIGHT] * QTYTOINV * QTYBSUOM / pw.[CARTON.QTY]) orderWeight
     FROM SOP10200
     LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
     ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT  
@@ -502,10 +505,12 @@ export function getOrders(branch: string, batch: string, date: string) {
   AND (a.SOPTYPE = 2)
   AND a.ReqShipDate = @date
   UNION ALL
-  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 1 posted, b.palletSpaces
+  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 1 posted, b.palletSpaces, b.orderWeight
   FROM SOP30200 a
   LEFT JOIN (
-    SELECT SOPTYPE, SOPNUMBE, SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces
+    SELECT SOPTYPE, SOPNUMBE,
+    SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces,
+    SUM(pw.[BU.WEIGHT] * QTYPRINV * QTYBSUOM / pw.[CARTON.QTY]) orderWeight
     FROM SOP30300
     LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
     ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT  
@@ -524,7 +529,8 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query = `
   SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(t.CNTCPRSN) cntPrsn, RTRIM(t.Address1) address1, RTRIM(t.ADDRESS2) address2, RTRIM(t.ADDRESS3) address3, RTRIM(t.CITY) city, RTRIM(t.[STATE]) state, RTRIM(t.ZIPCODE) postCode, RTRIM(t.SHIPMTHD) shipMethod,
-  CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / pw.[PAL.QTY]) palletSpaces
+  CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / pw.[PAL.QTY]) palletSpaces,
+  pw.[BU.WEIGHT] * (QTYPRINV + QTYTOINV) * QTYBSUOM / pw.[CARTON.QTY] lineWeight
   FROM (
     SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
     FROM SOP10100 a
