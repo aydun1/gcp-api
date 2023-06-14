@@ -489,7 +489,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   console.log(1)
   const query =
   `
-  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces, b.orderWeight
+  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(PHNUMBR1) phoneNumber1, RTRIM(PHNUMBR2) phoneNumber2, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces, b.orderWeight
   FROM SOP10100 a
   LEFT JOIN (
     SELECT SOPTYPE, SOPNUMBE,
@@ -505,7 +505,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   AND (a.SOPTYPE = 2)
   AND a.ReqShipDate = @date
   UNION ALL
-  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, 1 posted, b.palletSpaces, b.orderWeight
+  SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(PHNUMBR1) phoneNumber1, RTRIM(PHNUMBR2) phoneNumber2, RTRIM(a.SHIPMTHD) shipMethod, 1 posted, b.palletSpaces, b.orderWeight
   FROM SOP30200 a
   LEFT JOIN (
     SELECT SOPTYPE, SOPNUMBE,
