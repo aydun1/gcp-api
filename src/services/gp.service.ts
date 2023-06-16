@@ -490,7 +490,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   const query =
   `
   SELECT * FROM (
-    SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, a.LOCNCODE locnCode, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(PHNUMBR1) phoneNumber1, RTRIM(PHNUMBR2) phoneNumber2, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces, b.orderWeight
+    SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, RTRIM(a.LOCNCODE) locnCode, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(PHNUMBR1) phoneNumber1, RTRIM(PHNUMBR2) phoneNumber2, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces, b.orderWeight
     FROM SOP10100 a WITH (NOLOCK)
     LEFT JOIN (
       SELECT SOPTYPE, SOPNUMBE,
@@ -504,7 +504,7 @@ export function getOrders(branch: string, batch: string, date: string) {
     ON a.SOPTYPE = b.SOPTYPE
     AND a.SOPNUMBE = b.SOPNUMBE
     UNION ALL
-    SELECT RTRIM(a.BACHNUMB) batchNumber, a.DOCDATE docDate, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, a.LOCNCODE locnCode, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, a.ORIGTYPE origType, RTRIM(a.ORIGNUMB) origNumber, RTRIM(a.CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(a.CUSTNAME) custName, RTRIM(COALESCE(c.CNTCPRSN, a.CNTCPRSN)) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) address1, RTRIM(COALESCE(c.ADDRESS2, a.ADDRESS2)) address2, RTRIM(COALESCE(c.ADDRESS3, a.ADDRESS3)) address3, RTRIM(COALESCE(c.CITY, a.CITY)) city, RTRIM(COALESCE(c.STATE, a.STATE)) state, RTRIM(COALESCE(c.ZIPCODE, a.ZIPCODE)) postCode, RTRIM(COALESCE(c.PHNUMBR1, a.PHNUMBR1)) phoneNumber1, RTRIM(COALESCE(c.PHNUMBR2, a.PHNUMBR2)) phoneNumber2, RTRIM(COALESCE(c.SHIPMTHD, a.SHIPMTHD)) shipMethod, 1 posted, b.palletSpaces, b.orderWeight
+    SELECT RTRIM(a.BACHNUMB) batchNumber, a.DOCDATE docDate, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, RTRIM(a.LOCNCODE) locnCode, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, a.ORIGTYPE origType, RTRIM(a.ORIGNUMB) origNumber, RTRIM(a.CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(a.CUSTNAME) custName, RTRIM(COALESCE(c.CNTCPRSN, a.CNTCPRSN)) cntPrsn, RTRIM(COALESCE(c.ADDRESS1, a.ADDRESS1)) address1, RTRIM(COALESCE(c.ADDRESS2, a.ADDRESS2)) address2, RTRIM(COALESCE(c.ADDRESS3, a.ADDRESS3)) address3, RTRIM(COALESCE(c.CITY, a.CITY)) city, RTRIM(COALESCE(c.STATE, a.STATE)) state, RTRIM(COALESCE(c.ZIPCODE, a.ZIPCODE)) postCode, RTRIM(COALESCE(c.PHNUMBR1, a.PHNUMBR1)) phoneNumber1, RTRIM(COALESCE(c.PHNUMBR2, a.PHNUMBR2)) phoneNumber2, RTRIM(COALESCE(c.SHIPMTHD, a.SHIPMTHD)) shipMethod, 1 posted, b.palletSpaces, b.orderWeight
     FROM SOP30200 a WITH (NOLOCK)
     LEFT JOIN (
       SELECT SOPTYPE, SOPNUMBE,
