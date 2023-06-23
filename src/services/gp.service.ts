@@ -224,20 +224,20 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   COALESCE(c.QTYONHND, 0) InTransit,
   COALESCE(h.IttRemaining, 0) PreTransit,
   b.QTYONHND + COALESCE(c.QTYONHND, 0) + COALESCE(h.IttRemaining, 0) - b.ATYALLOC - b.QTYBKORD QtyAvailable
-  FROM IV00101 a
+  FROM IV00101 a WITH (NOLOCK)
 
   -- Get quantities and shiz
-  INNER JOIN IV00102 b
+  INNER JOIN IV00102 b WITH (NOLOCK)
   ON a.ITEMNMBR = b.ITEMNMBR
 
   -- Get UofM
-  LEFT JOIN IV40201 u
+  LEFT JOIN IV40201 u WITH (NOLOCK)
   ON a.UOMSCHDL = u.UOMSCHDL
 
   -- get ITTs
   LEFT JOIN (
     SELECT ITEMNMBR, TRNSTLOC, SUM(TRNSFQTY) - SUM(QTYSHPPD) IttRemaining
-    FROM SVC00701
+    FROM SVC00701 WITH (NOLOCK)
     GROUP BY ITEMNMBR, TRNSTLOC
   ) h
   ON a.ITEMNMBR = h.ITEMNMBR AND b.LOCNCODE = h.TRNSTLOC
@@ -247,7 +247,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     SELECT ITEMNMBR,
     REPLACE(LOCNCODE, 'TRANS', '') lcn,
     QTYONHND
-    FROM IV00102
+    FROM IV00102 WITH (NOLOCK)
     WHERE LOCNCODE LIKE '%TRANS'
     AND QTYONHND > 0
   ) c
@@ -261,8 +261,8 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     SUM(CASE WHEN b.ReqShipDate <=  DATEADD(DAY, +7, CONVERT(VARCHAR, GETDATE(), 23)) THEN b.ATYALLOC * b.QTYBSUOM else 0 END) Week,
     SUM(CASE WHEN b.ReqShipDate <=  DATEADD(DAY, +30, CONVERT(VARCHAR, GETDATE(), 23))  THEN b.ATYALLOC * b.QTYBSUOM else 0 END) Month,
     SUM(CASE WHEN b.ReqShipDate <=  DATEADD(DAY, +365, CONVERT(VARCHAR, GETDATE(), 23))  THEN b.ATYALLOC * b.QTYBSUOM else 0 END) Year
-    FROM SOP10100 a
-    INNER JOIN SOP10200 b
+    FROM SOP10100 a WITH (NOLOCK)
+    INNER JOIN SOP10200 b WITH (NOLOCK)
     ON a.SOPNUMBE = b.SOPNUMBE AND a.SOPTYPE = b.SOPTYPE
     WHERE b.SOPTYPE = 2
     GROUP BY b.ITEMNMBR, b.LOCNCODE
@@ -272,22 +272,22 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   -- Get Vic stock from Paperless
   LEFT JOIN (
     SELECT a.[PROD.NO] ITEMNMBR, SUM([PAL.TOT.QTY]) OnHand, MAX(a.[PROD.HEIGHT]) Height, MAX([PAL.QTY]) PalletQuantity, MAX([CARTON.QTY]) CartonQuantity
-    FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a       
-    LEFT JOIN (SELECT * FROM [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW WHERE [PAL.STATUS] = '02') b
+    FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a WITH (NOLOCK)
+    LEFT JOIN (SELECT * FROM [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW WITH (NOLOCK) WHERE [PAL.STATUS] = '02') b
     ON a.[PROD.NO] = b.[PROD.NO]
     GROUP BY a.[PROD.NO]
   ) pw
   ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = pw.ITEMNMBR COLLATE DATABASE_DEFAULT
 
   -- Get bin allocations
-  --LEFT JOIN IV00117 d
+  --LEFT JOIN IV00117 d WITH (NOLOCK)
   --ON a.ITEMNMBR = d.ITEMNMBR AND b.LOCNCODE = d.LOCNCODE
 
   -- Get branch SOHs
   LEFT JOIN (
     SELECT * FROM (
       SELECT ITEMNMBR, LOCNCODE, QTYONHND
-      FROM IV00102
+      FROM IV00102 WITH (NOLOCK)
       WHERE QTYONHND <> 0
     ) a
     PIVOT (
@@ -301,7 +301,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   LEFT JOIN (
     SELECT * FROM (
       SELECT ITEMNMBR, LOCNCODE, ATYALLOC
-      FROM IV00102
+      FROM IV00102 WITH (NOLOCK)
       WHERE ATYALLOC <> 0
     ) a
     PIVOT (
@@ -313,7 +313,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
 
   -- Get branch backorders
   LEFT JOIN (
-    SELECT * FROM (SELECT ITEMNMBR, LOCNCODE, QTYBKORD FROM IV00102 WHERE QTYBKORD <> 0) a
+    SELECT * FROM (SELECT ITEMNMBR, LOCNCODE, QTYBKORD FROM IV00102 WITH (NOLOCK) WHERE QTYBKORD <> 0) a
     PIVOT (
       SUM(QTYBKORD)
       FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA, MAIN)
