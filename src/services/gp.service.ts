@@ -600,12 +600,12 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language, DocNo,
   CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
   1 Inventory
-  FROM IV00101 a
-  LEFT JOIN IV00102 b ON a.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN (SELECT * FROM IV00117 WHERE PRIORITY = 1) c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
-  LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ITEMNMBR = d.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
-  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
+  FROM IV00101 a WITH (NOLOCK)
+  LEFT JOIN IV00102 b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN (SELECT * FROM IV00117 WITH (NOLOCK) WHERE PRIORITY = 1) c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
+  LEFT JOIN [MSDS].dbo.ProductLinks d WITH (NOLOCK) ON a.ITEMNMBR = d.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.Materials e WITH (NOLOCK) ON d.CwNo = e.CwNo
+  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WITH (NOLOCK) WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
   WHERE a.ITMCLSCD IN ('ADDITIVE', 'BASACOTE', 'CHEMICALS', 'FERTILIZER', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
   AND b.LOCNCODE = @locnCode
   AND f.PropertyValue != 'Hardware & Accessories'
@@ -630,10 +630,10 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
     Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language, DocNo,
     CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
     0 Inventory
-  FROM [MSDS].dbo.Consumables a
-  LEFT JOIN [MSDS].dbo.Quantities b ON a.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.ProductLinks d ON a.ItemNmbr = d.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.Materials e ON d.CwNo = e.CwNo
+  FROM [MSDS].dbo.Consumables a WITH (NOLOCK)
+  LEFT JOIN [MSDS].dbo.Quantities b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.ProductLinks d WITH (NOLOCK) ON a.ItemNmbr = d.ITEMNMBR
+  LEFT JOIN [MSDS].dbo.Materials e WITH (NOLOCK) ON d.CwNo = e.CwNo
   WHERE b.Site = @locnCode
   `;
 
