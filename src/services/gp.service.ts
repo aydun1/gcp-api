@@ -234,6 +234,10 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   LEFT JOIN IV40201 u WITH (NOLOCK)
   ON a.UOMSCHDL = u.UOMSCHDL
 
+  -- Get specs
+  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  ON a.ITEMNMBR = p.Product
+
   -- get ITTs
   LEFT JOIN (
     SELECT ITEMNMBR, TRNSTLOC, SUM(TRNSFQTY) - SUM(QTYSHPPD) IttRemaining
@@ -440,23 +444,30 @@ export function getCustomerAddresses(custNmbr: string) {
   return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
 }
 
-export function getHistory(branch: string, itemNmbr: string) {
-  branch = parseBranch(branch);
+export function getHistory(itemNmbr: string) {
   const request = new sqlRequest();
   const query =
   `
-  Select TOP(100) a.DOCDATE date, a.SOPTYPE sopType, a.SOPNUMBE sopNmbr, b.ITEMNMBR itemNmbr, a.LOCNCODE, b.QUANTITY quantity, c.CUSTNAME customer
-  FROM SOP30200 a
-  LEFT JOIN SOP30300 b
-  ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
-  LEFT JOIN RM00101 c
-  ON a.CUSTNMBR = c.CUSTNMBR
-  WHERE b.ITEMNMBR = @itemnmbr
-  AND a.LOCNCODE = @locnCode
-  AND a.SOPTYPE = 3
-  ORDER BY a.DOCDATE DESC
+  SELECT * FROM (
+    SELECT s.LOCNCODE, SUM(CASE t.SOPTYPE WHEN 3 THEN QUANTITY * QTYBSUOM WHEN 4 THEN QUANTITY * -QTYBSUOM END) /12 PRICE
+    FROM SOP30200 s WITH (NOLOCK)
+    LEFT JOIN SOP30300 t WITH (NOLOCK)
+    ON s.SOPTYPE = t.SOPTYPE
+    AND s.SOPNUMBE = t.SOPNUMBE
+    WHERE s.DOCDATE > DATEADD(year,-1,GETDATE())
+    AND s.VOIDSTTS = 0
+    AND s.SOPTYPE in (3,4)
+    AND ITEMNMBR = @itemnmbr
+    GROUP BY ITEMNMBR, s.LOCNCODE
+  ) a
+  PIVOT (
+    SUM(PRICE)
+    FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA, MAIN)
+  ) Pivot_table
   `;
-  return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+  return request.input('itemnmbr', VarChar(32), itemNmbr).query(query).then((_: IResult<gpRes>) => {
+    return {itemNumber: itemNmbr, history: _.recordset[0]};
+  });
 }
 
 export function getOrdersByLine(branch: string, itemNmbr: string) {
@@ -486,7 +497,6 @@ export function getOrders(branch: string, batch: string, date: string) {
   const dt = `${now} 00:00:00.000`;
   branch = parseBranch(branch);
   const request = new sqlRequest();
-  console.log(1)
   const query =
   `
   SELECT * FROM (
@@ -497,6 +507,8 @@ export function getOrders(branch: string, batch: string, date: string) {
       SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYTOINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces,
       SUM(pw.[BU.WEIGHT] * QTYTOINV * QTYBSUOM / pw.[CARTON.QTY]) orderWeight
       FROM SOP10200 WITH (NOLOCK)
+      LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+      ON itemNmbr = p.Product
       LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw WITH (NOLOCK)
       ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO]
       GROUP BY SOPTYPE, SOPNUMBE
@@ -511,6 +523,8 @@ export function getOrders(branch: string, batch: string, date: string) {
       SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces,
       SUM(pw.[BU.WEIGHT] * QTYPRINV * QTYBSUOM / pw.[CARTON.QTY]) orderWeight
       FROM SOP30300 WITH (NOLOCK)
+      LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+      ON itemNmbr = p.Product
       LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw WITH (NOLOCK)
       ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO]
       GROUP BY SOPTYPE, SOPNUMBE

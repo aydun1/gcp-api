@@ -149,9 +149,7 @@ app.get('/gp/inventory', auth, (req: Request, res: Response) => {
 });
 
 app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
-  const params = req.query;
-  const branch = params['branch'] as string || '';
-  getHistory(branch, req.params.id).then(
+  getHistory(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {
