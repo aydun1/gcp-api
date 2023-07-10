@@ -54,6 +54,27 @@ interface gpRes {
   returnValue: number;
 }
 
+function createIttId(branch: string): Promise<string> {
+  const request = new sqlRequest();
+  const branchLetter = branch[0].toLocaleUpperCase();
+  const prefix = `ITT[${branchLetter}]`;
+  const ittLookup = `${prefix}0%`;
+  const query =
+  `
+  SELECT TOP(1) * FROM (
+    SELECT ORDDOCID FROM SVC00700 WHERE ORDDOCID LIKE @lookup
+    UNION
+    SELECT ORDDOCID FROM SVC30700 WHERE ORDDOCID LIKE @lookup
+  ) u
+  ORDER BY ORDDOCID DESC
+  `;
+  return request.input('lookup', VarChar(15), ittLookup).query(query).then((_: IResult<{ORDDOCID: string}>) =>  {
+    const match = _.recordset[0] ? parseInt(_.recordset[0].ORDDOCID.slice(4)) : 0;
+    const nextSuffix = String(match + 1).padStart(8, '0');
+    return `ITT${branchLetter}${nextSuffix}`;
+  });
+}
+
 function parseBranch(branch: string): string {
   return branch === 'VIC' ? 'MAIN' : branch;
 }
@@ -718,19 +739,8 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   );
 }
 
-export function writeTransferFile(fromSite: string, toSite: string, body: Array<Line>): void {
-  fromSite = parseBranch(fromSite);
-  toSite = parseBranch(toSite);
-  const header = ['Transfer Date', 'PO Number', 'From Site', 'Item Number', 'Item Desc', 'To Site', 'Order Qty', 'Qty Shipped', 'Cancelled Qty'];
-  const date = new Date().toISOString().split('T')[0];
-  const lines = body.map(_ => [date, _.poNumber, fromSite, _.itemNumber, _.itemDesc, toSite, _.toTransfer, _.toTransfer, 0].join(','));
-  const path = `${targetDir}/Transfers`;
-  const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
-  fs.writeFileSync(`${path}/transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
-  setTimeout(() => fs.writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
-}
-
-export function writeInTransitTransferFile(id: string, fromSite: string, toSite: string, body: Array<Line>): void {
+export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
+  if (!id) id = await createIttId(toSite);
   fromSite = parseBranch(fromSite);
   toSite = parseBranch(toSite);
   let i = 0;
@@ -741,6 +751,7 @@ export function writeInTransitTransferFile(id: string, fromSite: string, toSite:
   const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
   fs.writeFileSync(`${path}/itt_transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
   setTimeout(() => fs.writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
+  return id;
 }
 
 export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRow> {

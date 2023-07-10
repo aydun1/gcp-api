@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getPurchaseOrder, getPurchaseOrderNumbers, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, writeTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -199,46 +199,6 @@ app.get('/gp/orders/:sopType/:sopNumber', auth, (req: Request, res: Response) =>
   );
 });
 
-app.get('/gp/po', auth, (req: Request, res: Response) => {
-  const params = req.query;
-  const from = params['from'] as string || '';
-  const to = params['to'] as string || '';
-  getPurchaseOrderNumbers(from, to).then(
-    result => res.status(200).send(result)
-  ).catch(
-    err => {
-      console.log(err);
-      res.status(500).send(err);
-    }
-  );
-});
-
-app.post('/gp/po', auth, (req: Request, res: Response) => {
-  const body = req.body as Transfer;
-  try {
-    writeTransferFile(body.fromSite, body.toSite, body.lines);
-  } catch(err) {
-    res.status(500).send({err});
-  }
-  res.status(200).send({'status': 'Successfully added PO.'});
-});
-
-app.get('/gp/po/:id', auth, (req: Request, res: Response) => {
-  getPurchaseOrder(req.params.id).then(
-    result => res.status(200).send(result)
-  ).catch(
-    err => res.status(500).send(err)
-  );
-});
-
-app.patch('/gp/po/:id', auth, (req: Request, res: Response) => {
-  getPurchaseOrder(req.params.id).then(
-    result => res.status(200).send(result)
-  ).catch(
-    err => res.status(500).send(err)
-  );
-});
-
 app.get('/gp/itt', auth, (req: Request, res: Response) => {
   const params = req.query;
   const from = params['from'] as string || '';
@@ -265,12 +225,11 @@ app.get('/gp/itt/:id', auth, (req: Request, res: Response) => {
 
 app.post('/gp/itt', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
-  try {
-    writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines);
-  } catch(err) {
-    res.status(500).send({err});
-  }
-  res.status(200).send({'status': 'Successfully added ITT.'});
+  writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines).then(
+    _ => res.status(200).send({docId: _, status: 'Successfully added ITT.'})
+  ).catch(
+    err => res.status(500).send(err)
+  );
 });
 
 app.post('/pallets', verifyPalletApiToken, (req, res) => {
