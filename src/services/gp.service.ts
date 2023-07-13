@@ -197,9 +197,9 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(a.ITEMDESC) ItemDesc,
   RTRIM(u.BASEUOFM) BaseUom,
-  pw.PalletQuantity PalletQty,
-  pw.Height PalletHeight,
-  pw.CartonQuantity PackSize,
+  p.PalletQty PalletQty,
+  p.PalletHeight PalletHeight,
+  p.PackQty PackSize,
   RTRIM(b.LOCNCODE) Location,
   --RTRIM(d.BIN) Bin,
   RTRIM(b.PRIMVNDR) Vendor,
@@ -296,7 +296,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
 
   -- Get Vic stock from Paperless
   LEFT JOIN (
-    SELECT a.[PROD.NO] ITEMNMBR, SUM([PAL.TOT.QTY]) OnHand, MAX(a.[PROD.HEIGHT]) Height, MAX([PAL.QTY]) PalletQuantity, MAX([CARTON.QTY]) CartonQuantity
+    SELECT a.[PROD.NO] ITEMNMBR, SUM([PAL.TOT.QTY]) OnHand
     FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a WITH (NOLOCK)
     LEFT JOIN (SELECT * FROM [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW WITH (NOLOCK) WHERE [PAL.STATUS] = '02') b
     ON a.[PROD.NO] = b.[PROD.NO]
@@ -520,55 +520,51 @@ export function getOrders(branch: string, batch: string, date: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT * FROM (
-    SELECT RTRIM(BACHNUMB) batchNumber, DOCDATE docDate, a.ReqShipDate reqShipDate, RTRIM(a.LOCNCODE) locnCode, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, ORIGTYPE origType, RTRIM(ORIGNUMB) origNumber, RTRIM(CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(CUSTNAME) custName, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.ADDRESS1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(PHNUMBR1) phoneNumber1, RTRIM(PHNUMBR2) phoneNumber2, RTRIM(a.SHIPMTHD) shipMethod, 0 posted, b.palletSpaces, b.orderWeight
+  SELECT
+  RTRIM(MAX(BACHNUMB)) batchNumber, MAX(DOCDATE) docDate, MAX(ReqShipDate) ReqShipDate, rtrim(MAX(LOCNCODE)) locnCode, MAX(a.SOPTYPE) sopType, RTRIM(MAX(a.SOPNUMBE)) sopNumber, MAX(ORIGTYPE) origType, RTRIM(MAX(ORIGNUMB)) origNumber, RTRIM(MAX(CUSTNMBR)) custNumber, rtrim(MAX(a.PRSTADCD)) adrsCode, RTRIM(MAX(CUSTNAME)) custName, RTRIM(MAX(a.CNTCPRSN)) cntPrsn, RTRIM(MAX(a.ADDRESS1)) address1, RTRIM(MAX(a.ADDRESS2)) address2,
+  RTRIM(MAX(a.ADDRESS3)) address3, RTRIM(MAX(a.CITY)) city, RTRIM(MAX(a.[STATE])) state, RTRIM(MAX(a.ZIPCODE)) postCode,  RTRIM(MAX(PHNUMBR1)) phoneNumber1, RTRIM(MAX(PHNUMBR2)) phoneNumber2, RTRIM(MAX(a.SHIPMTHD)) shipMethod, MAX(posted) as posted,
+  SUM(CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty)) palletSpaces,
+  SUM(p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / COALESCE(p.PackQty, 1)) orderWeight
+  FROM (
+    SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted
     FROM SOP10100 a WITH (NOLOCK)
-    LEFT JOIN (
-      SELECT SOPTYPE, SOPNUMBE,
-      SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYTOINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces,
-      SUM(pw.[BU.WEIGHT] * QTYTOINV * QTYBSUOM / pw.[CARTON.QTY]) orderWeight
-      FROM SOP10200 WITH (NOLOCK)
-      LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
-      ON itemNmbr = p.Product
-      LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw WITH (NOLOCK)
-      ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO]
-      GROUP BY SOPTYPE, SOPNUMBE
-    ) b
-    ON a.SOPTYPE = b.SOPTYPE
-    AND a.SOPNUMBE = b.SOPNUMBE
+    WHERE ReqShipDate = @date
+    AND LOCNCODE = @locnCode
+    AND SOPTYPE = 2
     UNION ALL
-    SELECT RTRIM(a.BACHNUMB) batchNumber, a.DOCDATE docDate, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, RTRIM(a.LOCNCODE) locnCode, a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, a.ORIGTYPE origType, RTRIM(a.ORIGNUMB) origNumber, RTRIM(a.CUSTNMBR) custNumber, rtrim(a.PRSTADCD) adrsCode, RTRIM(a.CUSTNAME) custName, RTRIM(COALESCE(c.CNTCPRSN, a.CNTCPRSN)) cntPrsn, RTRIM(COALESCE(c.ADDRESS1, a.ADDRESS1)) address1, RTRIM(COALESCE(c.ADDRESS2, a.ADDRESS2)) address2, RTRIM(COALESCE(c.ADDRESS3, a.ADDRESS3)) address3, RTRIM(COALESCE(c.CITY, a.CITY)) city, RTRIM(COALESCE(c.STATE, a.STATE)) state, RTRIM(COALESCE(c.ZIPCODE, a.ZIPCODE)) postCode, RTRIM(COALESCE(c.PHNUMBR1, a.PHNUMBR1)) phoneNumber1, RTRIM(COALESCE(c.PHNUMBR2, a.PHNUMBR2)) phoneNumber2, RTRIM(COALESCE(c.SHIPMTHD, a.SHIPMTHD)) shipMethod, 1 posted, b.palletSpaces, b.orderWeight
+    SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted
     FROM SOP30200 a WITH (NOLOCK)
-    LEFT JOIN (
-      SELECT SOPTYPE, SOPNUMBE,
-      SUM(CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * (QTYPRINV * QTYBSUOM / pw.[PAL.QTY])) palletSpaces,
-      SUM(pw.[BU.WEIGHT] * QTYPRINV * QTYBSUOM / pw.[CARTON.QTY]) orderWeight
-      FROM SOP30300 WITH (NOLOCK)
-      LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
-      ON itemNmbr = p.Product
-      LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw WITH (NOLOCK)
-      ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO]
-      GROUP BY SOPTYPE, SOPNUMBE
-    ) b
-    ON a.SOPTYPE = b.SOPTYPE
-    AND a.SOPNUMBE = b.SOPNUMBE
     LEFT JOIN (
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2
       FROM SOP10100 WITH (NOLOCK)
       WHERE ReqShipDate = @date
+      AND LOCNCODE = @locnCode
+      AND SOPTYPE = 3
       UNION ALL
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2
       FROM SOP30200 WITH (NOLOCK)
       WHERE ReqShipDate = @date
+      AND LOCNCODE = @locnCode
+      AND SOPTYPE = 3
     ) c
-    ON c.SOPTYPE = 3
-    AND a.SOPTYPE = c.ORIGTYPE
+    ON a.SOPTYPE = c.ORIGTYPE
     AND a.SOPNUMBE = c.ORIGNUMB
+    WHERE a.SOPTYPE = 2
+    AND LOCNCODE = @locnCode
   ) a
+  left join (
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
+    UNION
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP30300 f WITH (NOLOCK)
+  ) b
+  ON a.SOPTYPE = b.SOPTYPE
+  AND a.SOPNUMBE = b.SOPNUMBE
+  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  ON ITEMNMBR = p.Product
   WHERE a.ReqShipDate = @date
   AND a.locnCode = @locnCode
-  AND a.sopType = 2
-  ORDER BY a.CUSTNAME
+  GROUP BY a.SOPTYPE, a.SOPNUMBE, CUSTNAME
+  ORDER BY CUSTNAME
   `;
   return request.input('date', VarChar(23), dt).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
@@ -577,23 +573,23 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query = `
   SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(t.CNTCPRSN) cntPrsn, RTRIM(t.Address1) address1, RTRIM(t.ADDRESS2) address2, RTRIM(t.ADDRESS3) address3, RTRIM(t.CITY) city, RTRIM(t.[STATE]) state, RTRIM(t.ZIPCODE) postCode, RTRIM(t.SHIPMTHD) shipMethod,
-  CASE WHEN pw.[PROD.HEIGHT] = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / pw.[PAL.QTY]) palletSpaces,
-  pw.[BU.WEIGHT] * (QTYPRINV + QTYTOINV) * QTYBSUOM / pw.[CARTON.QTY] lineWeight
+  CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
+  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
   FROM (
     SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
-    FROM SOP10100 a
-    LEFT JOIN SOP10200 b
+    FROM SOP10100 a WITH (NOLOCK)
+    LEFT JOIN SOP10200 b WITH (NOLOCK)
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
     UNION
     SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ
-    FROM SOP30200 a
-    LEFT JOIN SOP30300 b
+    FROM SOP30200 a WITH (NOLOCK)
+    LEFT JOIN SOP30300 b WITH (NOLOCK)
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
   ) t
-  LEFT JOIN RM00101 c
+  LEFT JOIN RM00101 c WITH (NOLOCK)
   ON t.CUSTNMBR = c.CUSTNMBR
-  LEFT JOIN [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW pw
-  ON itemNmbr COLLATE DATABASE_DEFAULT = pw.[PROD.NO] COLLATE DATABASE_DEFAULT
+  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  ON itemNmbr = p.Product
   WHERE SOPTYPE = @soptype
   AND SOPNUMBE = @sopnumber
   AND (QTYPRINV > 0 OR QTYTOINV > 0)
