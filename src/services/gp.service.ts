@@ -46,7 +46,7 @@ const fileExists = (path: string) => fs.promises.stat(path).then(() => true, () 
 const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`);
 const ignoreRegexp = /2g|4g|5g|80g|g\/l|g\/kg/;
 const cartonRegexp = /\[ctn([0-9]+)\]/;
-const driverNoteRegexp = /\*(.+)\*/;
+const driverNoteRegexp = /\*(.+)\*/g;
 const cwFolderId = '4006663';
 
 interface gpRes {
@@ -601,7 +601,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   `;
   const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
   return lines.then((_: IResult<Array<Order>>) => {
-    const noteMatch = _.recordset[0].note?.match(driverNoteRegexp);
+    const noteMatch = [...(_.recordset[0].note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
     return {
       custNumber: _.recordset[0].custNmbr,
       custName: _.recordset[0].custName,
@@ -616,7 +616,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
       postCode: _.recordset[0].postCode,
       shipMethod: _.recordset[0].shipMethod,
       reqShipDate: new Date(_.recordset[0].reqShipDate),
-      note: noteMatch ? noteMatch[1] : '',
+      note: noteMatch,
       lines: _.recordset
     }
   });
