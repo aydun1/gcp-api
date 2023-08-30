@@ -2,14 +2,21 @@
 
 Somewhat proprietry API for communicating with Dynamics GP and Chemwatch.
 
-Installation  
-`npm install`
+Installation
+- `git clone https://github.com/aydun1/gcp-api.git`
+- `cd gcp-api`
+- `npm install`
 
 To run locally  
-`npm run dev`
+- `npm run dev`
 
+To run in production
+- `npm install pm2 -g`
+- `npm run build`
+- `mv dist/src/* dist`
+- `pm2 start dist/index.js`
 
-Create a .env file with the following:
+Environmental variables (.env):
 
 DB_SERVER="Dynamics GP db server"  
 DB_DATABASE="Dynamics GP db name"  
