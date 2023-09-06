@@ -7,6 +7,7 @@ import path from 'path';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
+import compression  = require('compression');
 
 import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2 } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
@@ -45,6 +46,7 @@ app.use(express.json());
 app.use(helmet());
 app.use(morgan('combined', { stream: accessLogStream }));
 app.use(passport.initialize());
+app.use(compression());
 passport.use(bearerStrategy);
 
 app.use((req, res, next) => {
