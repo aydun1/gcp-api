@@ -15,6 +15,9 @@ interface Order {
   custName: string;
   sopType: number;
   sopNumbe: string;
+  batchNumber: string;
+  pickStatus: 0 | 1 | 2;
+  posted: string;
   reqShipDate: string;
   cntPrsn: string;
   address1: string;
@@ -571,7 +574,10 @@ export function getOrders(branch: string, batch: string, date: string) {
   ORDER BY CUSTNAME
   `;
   return request.input('date', VarChar(23), dt).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<Order>) => {
-    _.recordset.forEach(o => o['note'] = [...(o.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n'));
+    _.recordset.forEach(o => {
+      o['note'] = [...(o.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
+      o['pickStatus'] = o['posted'] || o['batchNumber'] === 'FULFILLED' ? 2 : o['batchNumber'] === 'INTERVENE' ? 1 : 0;
+    });
     return {orders: _.recordset};
   });
 }
@@ -579,16 +585,16 @@ export function getOrders(branch: string, batch: string, date: string) {
 export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query = `
-  SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(t.CNTCPRSN) cntPrsn, RTRIM(t.Address1) address1, RTRIM(t.ADDRESS2) address2, RTRIM(t.ADDRESS3) address3, RTRIM(t.CITY) city, RTRIM(t.[STATE]) state, RTRIM(t.ZIPCODE) postCode, RTRIM(t.SHIPMTHD) shipMethod, n.TXTFIELD note,
+  SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(BACHNUMB) batchNumber, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(t.CNTCPRSN) cntPrsn, RTRIM(t.Address1) address1, RTRIM(t.ADDRESS2) address2, RTRIM(t.ADDRESS3) address3, RTRIM(t.CITY) city, RTRIM(t.[STATE]) state, RTRIM(t.ZIPCODE) postCode, RTRIM(t.SHIPMTHD) shipMethod, n.TXTFIELD note,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
   p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
   FROM (
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.NOTEINDX
+    SELECT a.SOPTYPE, a.SOPNUMBE, a.BACHNUMB, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.NOTEINDX
     FROM SOP10100 a WITH (NOLOCK)
     LEFT JOIN SOP10200 b WITH (NOLOCK)
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
     UNION ALL
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.NOTEINDX
+    SELECT a.SOPTYPE, a.SOPNUMBE, a.BACHNUMB, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.NOTEINDX
     FROM SOP30200 a WITH (NOLOCK)
     LEFT JOIN SOP30300 b WITH (NOLOCK)
     ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
@@ -606,22 +612,25 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   `;
   const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
   return lines.then((_: IResult<Array<Order>>) => {
-    const noteMatch = [...(_.recordset[0].note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
+    const order = _.recordset[0];
+    const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
+    const pickStatus = order['posted'] || order['batchNumber'] === 'FULFILLED' ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
     return {
-      custNumber: _.recordset[0].custNmbr,
-      custName: _.recordset[0].custName,
-      sopType: _.recordset[0].sopType,
-      sopNumber: _.recordset[0].sopNumbe,
-      cntPrsn: _.recordset[0].cntPrsn,
-      address1: _.recordset[0].address1,
-      address2: _.recordset[0].address2,
-      address3: _.recordset[0].address3,
-      city: _.recordset[0].city,
-      state: _.recordset[0].state,
-      postCode: _.recordset[0].postCode,
-      shipMethod: _.recordset[0].shipMethod,
-      reqShipDate: new Date(_.recordset[0].reqShipDate),
+      custNumber: order.custNmbr,
+      custName: order.custName,
+      sopType: order.sopType,
+      sopNumber: order.sopNumbe,
+      cntPrsn: order.cntPrsn,
+      address1: order.address1,
+      address2: order.address2,
+      address3: order.address3,
+      city: order.city,
+      state: order.state,
+      postCode: order.postCode,
+      shipMethod: order.shipMethod,
+      reqShipDate: new Date(order.reqShipDate),
       note: noteMatch,
+      pickStatus: pickStatus,
       lines: _.recordset
     }
   });
@@ -631,7 +640,7 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note,
+  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
   p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
 
@@ -671,24 +680,25 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
   `;
   const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
   return lines.then((_: IResult<Array<Order>>) => {
-    console.log(_.recordset[0].note)
-    const noteMatch = [...(_.recordset[0].note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
-    console.log(noteMatch)
+    const order = _.recordset[0];
+    const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
+    const pickStatus = (order['posted'] || order['batchNumber'] === 'FULFILLED') ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
     return {
-      custNumber: _.recordset[0].custNmbr,
-      custName: _.recordset[0].custName,
-      sopType: _.recordset[0].sopType,
-      sopNumber: _.recordset[0].sopNumbe,
-      cntPrsn: _.recordset[0].cntPrsn,
-      address1: _.recordset[0].address1,
-      address2: _.recordset[0].address2,
-      address3: _.recordset[0].address3,
-      city: _.recordset[0].city,
-      state: _.recordset[0].state,
-      postCode: _.recordset[0].postCode,
-      shipMethod: _.recordset[0].shipMethod,
-      reqShipDate: new Date(_.recordset[0].reqShipDate),
+      custNumber: order.custNmbr,
+      custName: order.custName,
+      sopType: order.sopType,
+      sopNumber: order.sopNumbe,
+      cntPrsn: order.cntPrsn,
+      address1: order.address1,
+      address2: order.address2,
+      address3: order.address3,
+      city: order.city,
+      state: order.state,
+      postCode: order.postCode,
+      shipMethod: order.shipMethod,
+      reqShipDate: new Date(order.reqShipDate),
       note: noteMatch,
+      pickStatus: pickStatus,
       lines: _.recordset
     }
   });

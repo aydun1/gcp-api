@@ -191,7 +191,7 @@ app.get('/gp/orders', auth, (req: Request, res: Response) => {
 app.get('/gp/orders/:sopType/:sopNumber', auth, (req: Request, res: Response) => {
   const sopType = +req.params.sopType;
   const sopNumber = req.params.sopNumber;
-  getOrderLines(sopType, sopNumber).then(
+  getOrderLines2(sopType, sopNumber).then(
     result => res.status(200).send(result)
   ).catch(
     err => {
