@@ -640,7 +640,7 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
+  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
   p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
 
@@ -668,9 +668,9 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
   LEFT JOIN SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
   left join (
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
     UNION
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP30300 f WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP30300 f WITH (NOLOCK)
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
