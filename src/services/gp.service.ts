@@ -462,7 +462,7 @@ export function getCustomerAddresses(custNmbr: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT rtrim(ADRSCODE) name, rtrim(CNTCPRSN) contact, rtrim(ADDRESS1) line1, rtrim(ADDRESS2) line2, rtrim(ADDRESS3) line3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIP) postcode
+  SELECT rtrim(ADRSCODE) name, rtrim(CNTCPRSN) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIP) postcode
   FROM RM00102
   WHERE CUSTNMBR = @custnmbr
   ORDER BY ADRSCODE ASC
