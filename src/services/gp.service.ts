@@ -462,7 +462,7 @@ export function getCustomerAddresses(custNmbr: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT rtrim(ADRSCODE) name, rtrim(CNTCPRSN) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIP) postcode
+  SELECT rtrim(ADRSCODE) name, rtrim(CNTCPRSN) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIP) postcode, RTRIM(PHONE1) phoneNumber1, RTRIM(PHONE2) phoneNumber2
   FROM RM00102
   WHERE CUSTNMBR = @custnmbr
   ORDER BY ADRSCODE ASC
@@ -491,7 +491,7 @@ export function getVendorAddresses(vendNmbr: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT rtrim(ADRSCODE) name, rtrim(VNDCNTCT) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIPCODE) postcode
+  SELECT rtrim(ADRSCODE) name, rtrim(VNDCNTCT) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIPCODE) postcode, RTRIM(PHNUMBR1) phoneNumber1, RTRIM(PHNUMBR2) phoneNumber2
   FROM PM00300
   WHERE VENDORID = @vendnmbr
   ORDER BY ADRSCODE ASC
