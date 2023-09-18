@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression  = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2 } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2, getVendorAddresses, getVendors } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -112,6 +112,31 @@ app.get('/gp/customers/:id(*)/addresses', auth, (req: Request, res: Response) =>
 
 app.get('/gp/customers/:id(*)', auth, (req: Request, res: Response) => {
   getCustomer(req.params.id).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err);
+    }
+  );
+});
+
+app.get('/gp/vendors', auth, (req: Request, res: Response) => {
+  const params = req.query;
+  const search = params['search'] as string || '';
+  const page = parseInt(params['page'] as string) || 1;
+  getVendors(search, page).then(
+    result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err);
+    }
+  );
+});
+
+app.get('/gp/vendors/:id(*)/addresses', auth, (req: Request, res: Response) => {
+  getVendorAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(
     err => {

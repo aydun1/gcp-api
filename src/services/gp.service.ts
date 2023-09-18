@@ -470,6 +470,35 @@ export function getCustomerAddresses(custNmbr: string) {
   return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
 }
 
+export function getVendors(search: string, page: number): Promise<{vendors: gpRes[]}> {
+  const request = new sqlRequest();
+  const offset = Math.max(0, (page - 1) * 50);
+  let query =
+  `
+  SELECT rtrim(a.VENDORID) vendId, rtrim(a.VENDNAME) name
+  FROM PM00200 a
+  `;
+  const filterConditions = [];
+  filterConditions.push(`a.VENDSTTS = 1`);
+  if (search) filterConditions.push(`(a.VENDORID LIKE '${search}%' OR a.VENDNAME LIKE '%${search}%')`);
+  if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
+  query += ` ORDER BY VENDNAME ASC`;
+  query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY';
+  return request.input('offset', SmallInt, offset).query(query).then((_: IResult<gpRes>) => {return {vendors: _.recordset}});
+}
+
+export function getVendorAddresses(vendNmbr: string) {
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT rtrim(ADRSCODE) name, rtrim(VNDCNTCT) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIPCODE) postcode
+  FROM PM00300
+  WHERE VENDORID = @vendnmbr
+  ORDER BY ADRSCODE ASC
+  `;
+  return request.input('vendnmbr', VarChar(15), vendNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
+}
+
 export function getHistory(itemNmbr: string) {
   const request = new sqlRequest();
   const query =
