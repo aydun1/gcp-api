@@ -530,7 +530,7 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
   const request = new sqlRequest();
   const query =
   `
-  Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, b.QUANTITY * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT notes
+  Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, b.ATYALLOC * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT notes
   FROM SOP10100 a
   LEFT JOIN SOP10200 b
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
@@ -540,7 +540,6 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
   WHERE b.ITEMNMBR = @itemnmbr
   AND a.SOPTYPE IN (2, 3, 5)
-  AND SOPSTATUS IN (0, 1)
   AND a.LOCNCODE = @locnCode
   ORDER BY a.DOCDATE DESC
   `;
