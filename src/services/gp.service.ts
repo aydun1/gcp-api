@@ -354,7 +354,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   WHERE b.LOCNCODE = @branch
   `;
   if (itemNumbers && itemNumbers.length > 0) {
-    const itemList = itemNumbers.map(_ => `'${_}'`).join(',');
+    const itemList = itemNumbers.map(_ => `${_}`).join(',');
     request.input('items', VarChar, itemList);
     query += ' AND a.ITEMNMBR in (@items)';
   } else if (searchTerm) {
@@ -504,7 +504,7 @@ export function getHistory(itemNmbr: string) {
   const query =
   `
   SELECT * FROM (
-    SELECT s.LOCNCODE, SUM(CASE t.SOPTYPE WHEN 3 THEN QUANTITY * QTYBSUOM WHEN 4 THEN QUANTITY * -QTYBSUOM END) /12 PRICE
+    SELECT s.LOCNCODE, SUM(CASE t.SOPTYPE WHEN 3 THEN QUANTITY * QTYBSUOM WHEN 4 THEN QUANTITY * -QTYBSUOM END) / 12 TOTALS
     FROM SOP30200 s WITH (NOLOCK)
     LEFT JOIN SOP30300 t WITH (NOLOCK)
     ON s.SOPTYPE = t.SOPTYPE
@@ -516,7 +516,7 @@ export function getHistory(itemNmbr: string) {
     GROUP BY ITEMNMBR, s.LOCNCODE
   ) a
   PIVOT (
-    SUM(PRICE)
+    SUM(TOTALS)
     FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA, MAIN)
   ) Pivot_table
   `;

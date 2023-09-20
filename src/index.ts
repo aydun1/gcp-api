@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression  = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2, getVendorAddresses, getVendors } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2, getVendorAddresses, getVendors, getCurrentStock } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -191,6 +191,17 @@ app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   const branch = params['branch'] as string || '';
   getOrdersByLine(branch, req.params.id).then(
     result => res.status(200).send(result)
+  ).catch(
+    err => {
+      console.log(err);
+      res.status(500).send(err);
+    }
+  );
+});
+
+app.get('/gp/inventory/:id/stock', auth, (req: Request, res: Response) => {
+  getItems('', [req.params.id], '').then(
+    result => res.status(200).send(result['lines'][0])
   ).catch(
     err => {
       console.log(err);
