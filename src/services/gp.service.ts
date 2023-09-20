@@ -75,7 +75,7 @@ function createIttId(branch: string): Promise<string> {
   `;
   return request.input('lookup', VarChar(15), ittLookup).query(query).then((_: IResult<{ORDDOCID: string}>) =>  {
     const match = _.recordset[0] ? parseInt(_.recordset[0].ORDDOCID.slice(4)) : 0;
-    const nextSuffix = String(match + 1).padStart(8, '0');
+    const nextSuffix = String(match + 1).padStart(5, '0');
     return `ITT${branchLetter}${nextSuffix}`;
   });
 }
