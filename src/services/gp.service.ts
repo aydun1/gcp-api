@@ -383,7 +383,7 @@ export function cancelLines(lines: Array<Line>): Promise<{lines: object[]}> {
     const lnRef = `ln${i}`;
     const qtRef = `qt${i}`;
 
-    const toCancel = Math.min(v.orderQty, v.cancelledQty + v.toTransfer)
+    const toCancel = Math.min(v.orderQty, v.cancelledQty + v.ToTransfer)
     query += ` WHEN PONUMBER = @${poRef} AND LineNumber = @${lnRef} THEN @${qtRef}`;
     request.input(poRef, VarChar(17), v.poNumber);
     request.input(lnRef, SmallInt, v.lineNumber);
@@ -858,7 +858,7 @@ export async function writeInTransitTransferFile(id: string | null, fromSite: st
   let i = 0;
   const header = ['Id', 'Seq', 'Transfer Date', 'From Site', 'To Site', 'Item Number', 'Qty Shipped'];
   const date = new Date().toLocaleDateString('fr-CA');
-  const lines = body.map(_ => [id, i += 1, date, fromSite, toSite, _.itemNumber, _.toTransfer]).map(_ => _.join(','));
+  const lines = body.map(_ => [id, i += 1, date, fromSite, toSite, _.ItemNmbr, _.ToTransfer]).map(_ => _.join(','));
   const path = `${targetDir}/PICKS/ITT Between SITES`
   const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
   fs.writeFileSync(`${path}/itt_transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
