@@ -31,7 +31,6 @@ const options: IBearerStrategyOptionWithRequest = {
   audience: config.credentials.clientID,
   validateIssuer: config.settings.validateIssuer,
   passReqToCallback: false,
-  loggingLevel: 'info',
   scope: config.protectedRoutes.gp.scopes
 };
 
