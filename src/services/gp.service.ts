@@ -709,6 +709,7 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
   const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
   return lines.then((_: IResult<Array<Order>>) => {
     const order = _.recordset[0];
+    if (!order) return {};
     const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
     const pickStatus = (order['posted'] || order['batchNumber'] === 'FULFILLED') ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
     return {
