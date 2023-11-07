@@ -1002,10 +1002,12 @@ async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
   const entries = await new sqlRequest().input('cwNo', VarChar(31), cwNo).query(getQuery)
     .then((_: IResult<{ItemNmbr: string, DocNo: string}[]>) => _.recordset);
   const docNo = entries[0].DocNo;
-  const cw = await initChemwatch().catch(_ => {
-    throw _;
+  const cw = await initChemwatch().catch(e => {
+    throw e;
   });
-  const fileBuffer = await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`);
+  const fileBuffer = await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).catch((e: {request: {path: string}, response: {statusText: string, path: string}}) => {
+    throw new Error(e.response.statusText);
+  });
   const buffer = Buffer.from(fileBuffer.data);
   entries.map(_ => _.ItemNmbr).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
   fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
