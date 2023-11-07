@@ -874,7 +874,10 @@ export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRo
   `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)` :
   `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
   await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('cwNo', VarChar(50), cwNo).query(updateQuery);
-  await copyPdfToItem(itemNmbr);
+  await copyPdfToItem(itemNmbr).catch(async _ => {
+    await unlinkChemical(itemNmbr);
+    throw _;
+  });
   return await getChemicals('', itemNmbr, '', '', '').then(c => c['chemicals'][0]);
 }
 
@@ -997,16 +1000,17 @@ async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
   WHERE a.CwNo = @cwNo
   `;
   const entries = await new sqlRequest().input('cwNo', VarChar(31), cwNo).query(getQuery)
-    .then((_: IResult<{ItemNmbr: string, DocNo: string}[]>) => _.recordset)
+    .then((_: IResult<{ItemNmbr: string, DocNo: string}[]>) => _.recordset);
   const docNo = entries[0].DocNo;
-  const cw = await initChemwatch();
+  const cw = await initChemwatch().catch(_ => {
+    throw _;
+  });
   const fileBuffer = await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`);
   const buffer = Buffer.from(fileBuffer.data);
   entries.map(_ => _.ItemNmbr).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
   fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
   return buffer;
 }
-
 
 export async function getSdsPdf(docNo: string, cwNo: string): Promise<Buffer> {
   if (!docNo) throw new Error;
@@ -1015,10 +1019,6 @@ export async function getSdsPdf(docNo: string, cwNo: string): Promise<Buffer> {
 
 async function copyPdfToItem(itemNmbr: string): Promise<void> {
   const chemical = await getBasicChemicalInfo(itemNmbr);
-  console.log('WWW')
-  console.log(chemical)
-  console.log('WWW')
-
   return await fileExists(`pdfs/pd${chemical.docNo}.pdf`) ?
     fs.copyFileSync(`pdfs/pd${chemical.docNo}.pdf`, `pdfs/gp/${itemNmbr}.pdf`) :
     aquirePdfForCwNo(chemical.cwNo).then(() => undefined)
