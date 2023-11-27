@@ -9,10 +9,11 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression  = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2, getVendorAddresses, getVendors } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
+import { Delivery } from './types/delivery';
 
 interface Body {
   customer: string;
@@ -276,6 +277,35 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
   ).catch((err: {code: number, message: string}) => {
     console.log(err);
     res.status(500).json({'result': err?.message || err});
+  });
+});
+
+app.get('/gp/deliveries', auth, (req, res) => {
+  const body = req.query as {branch: string, run: string, status: string, deliveryType: string};
+  const archived = body.status === 'Archived' ? true : false;
+  getDeliveries(body.branch, body.run, body.deliveryType, archived).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err});
+  });
+});
+
+app.post('/gp/deliveries', auth, (req, res) => {
+  const body = req.body as {fields: Delivery};
+  addDelivery(body.fields).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err});
+  });
+});
+
+app.post('/gp/deliveries/batch', auth, (req, res) => {
+  const body = req.body as {requests: [{id: number, method: string, body: {fields: Delivery}}]};
+  const updates = body.requests.filter(_ => _.method.toUpperCase() === 'PATCH').map(_ => updateDelivery(_.id, _.body.fields));
+  const deletes = body.requests.filter(_ => _.method.toUpperCase() === 'DELETE').map(_ => removeDelivery(_.id));
+  Promise.all([...updates, ...deletes]).then(_ => {
+    res.status(200).json({responses: _})
+  }).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 500).json({'result': err?.message || err});
   });
 });
 

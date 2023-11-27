@@ -1,8 +1,9 @@
-import { TYPES, Request as sqlRequest, IResult, VarChar, SmallInt, Date as sqlDate, IRecordSet, MAX, Numeric, Char, Int } from 'mssql';
+import { TYPES, Request as sqlRequest, IResult, IRecordSet, MAX } from 'mssql';
 import fs from 'fs';
 
 import { allowedPallets } from '../../config.json';
 import { targetDir } from '../config';
+import { Delivery } from '../types/delivery';
 import { Line } from '../types/line';
 import { InTransitTransferLine } from '../types/in-transit-transfer-line';
 import { InTransitTransfer } from '../types/in-transit-transfer';
@@ -73,7 +74,7 @@ function createIttId(branch: string): Promise<string> {
   ) u
   ORDER BY ORDDOCID DESC
   `;
-  return request.input('lookup', VarChar(15), ittLookup).query(query).then((_: IResult<{ORDDOCID: string}>) =>  {
+  return request.input('lookup', TYPES.VarChar(15), ittLookup).query(query).then((_: IResult<{ORDDOCID: string}>) =>  {
     const match = _.recordset[0] ? parseInt(_.recordset[0].ORDDOCID.slice(4)) : 0;
     const nextSuffix = String(match + 1).padStart(5, '0');
     return `ITT${branchLetter}${nextSuffix}`;
@@ -96,7 +97,7 @@ export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
   FROM SVC00700
   WHERE ORDDOCID = @doc_id
   `;
-  return request.input('doc_id', VarChar(15), id).query(query).then((_: IResult<InTransitTransfer>) =>  {return _.recordset[0]});
+  return request.input('doc_id', TYPES.VarChar(15), id).query(query).then((_: IResult<InTransitTransfer>) =>  {return _.recordset[0]});
 }
 
 export function getInTransitTransfers(id: string, from: string, to: string): Promise<{lines: InTransitTransferLine[]}> {
@@ -138,7 +139,7 @@ export function getInTransitTransfers(id: string, from: string, to: string): Pro
   if (from) query += ' AND b.TRNSFLOC = @from_state';
   if (to) query += ' AND b.TRNSTLOC = @to_state';
   query +=' ORDER BY a.ORDRDATE DESC';
-  return request.input('doc_id', VarChar(15), id).input('from_state', VarChar(15), from).input('to_state', VarChar(15), to).query(query).then((_: IResult<InTransitTransferLine>) =>  {return {lines: _.recordset}});
+  return request.input('doc_id', TYPES.VarChar(15), id).input('from_state', TYPES.VarChar(15), from).input('to_state', TYPES.VarChar(15), to).query(query).then((_: IResult<InTransitTransferLine>) =>  {return {lines: _.recordset}});
 }
 
 export function getPurchaseOrderNumbers(from: string, to: string): Promise<{lines: object[]}> {
@@ -174,7 +175,7 @@ export function getPurchaseOrderNumbers(from: string, to: string): Promise<{line
   if (from) query += ' AND a.PURCHSTATE = @from_state';
   if (to) query += ' AND b.LOCNCODE = @to_state';
   query +=' ORDER BY Date DESC';
-  return request.input('from_state', VarChar(15), from).input('to_state', VarChar(15), to).query(query).then((_: IResult<gpRes>) =>  {return {lines: _.recordset}});
+  return request.input('from_state', TYPES.VarChar(15), from).input('to_state', TYPES.VarChar(15), to).query(query).then((_: IResult<gpRes>) =>  {return {lines: _.recordset}});
 }
 
 export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
@@ -355,10 +356,10 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   `;
   if (itemNumbers && itemNumbers.length > 0) {
     const itemList = itemNumbers.map(_ => `${_}`).join(',');
-    request.input('items', VarChar, itemList);
+    request.input('items', TYPES.VarChar, itemList);
     query += ' AND a.ITEMNMBR in (@items)';
   } else if (searchTerm) {
-    request.input('item', VarChar(32), `${searchTerm}%`);
+    request.input('item', TYPES.VarChar(32), `${searchTerm}%`);
     query += ' AND a.ITEMNMBR LIKE @item';
   } else {
     query += ` AND (
@@ -367,7 +368,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     )`
   }
   query += ' ORDER BY a.ITEMNMBR ASC';
-  return request.input('branch', VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
+  return request.input('branch', TYPES.VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
 export function cancelLines(lines: Array<Line>): Promise<{lines: object[]}> {
@@ -385,9 +386,9 @@ export function cancelLines(lines: Array<Line>): Promise<{lines: object[]}> {
 
     const toCancel = Math.min(v.orderQty, v.cancelledQty + v.ToTransfer)
     query += ` WHEN PONUMBER = @${poRef} AND LineNumber = @${lnRef} THEN @${qtRef}`;
-    request.input(poRef, VarChar(17), v.poNumber);
-    request.input(lnRef, SmallInt, v.lineNumber);
-    request.input(qtRef, SmallInt, toCancel);
+    request.input(poRef, TYPES.VarChar(17), v.poNumber);
+    request.input(lnRef, TYPES.SmallInt, v.lineNumber);
+    request.input(qtRef, TYPES.SmallInt, toCancel);
   })
   query += ' ELSE QTYCANCE END';
   query += ` WHERE PONUMBER IN ('${poNumbers}')`;
@@ -430,7 +431,7 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
   query += ` ORDER BY ${orderby.replace('name', 'custName') || 'custName'} ${order}`;
   query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY';
-  return request.input('offset', SmallInt, offset).input('orderby', VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
+  return request.input('offset', TYPES.SmallInt, offset).input('orderby', TYPES.VarChar(15), orderby).query(query).then((_: IResult<gpRes>) => {return {customers: _.recordset}});
 }
 
 export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
@@ -455,7 +456,7 @@ export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
   ) c ON a.CUSTNMBR = c.CUSTNMBR
   WHERE a.CUSTNMBR = @custnmbr
   `;
-  return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {customer: _.recordset[0]}});
+  return request.input('custnmbr', TYPES.VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {customer: _.recordset[0]}});
 }
 
 export function getCustomerAddresses(custNmbr: string) {
@@ -467,7 +468,7 @@ export function getCustomerAddresses(custNmbr: string) {
   WHERE CUSTNMBR = @custnmbr
   ORDER BY ADRSCODE ASC
   `;
-  return request.input('custnmbr', VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
+  return request.input('custnmbr', TYPES.VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
 }
 
 export function getVendors(search: string, page: number): Promise<{vendors: gpRes[]}> {
@@ -484,7 +485,7 @@ export function getVendors(search: string, page: number): Promise<{vendors: gpRe
   if (filterConditions.length > 0) query += ` WHERE ${filterConditions.join(' AND ')}`;
   query += ` ORDER BY VENDNAME ASC`;
   query += ' OFFSET @offset ROWS FETCH NEXT 50 ROWS ONLY';
-  return request.input('offset', SmallInt, offset).query(query).then((_: IResult<gpRes>) => {return {vendors: _.recordset}});
+  return request.input('offset', TYPES.SmallInt, offset).query(query).then((_: IResult<gpRes>) => {return {vendors: _.recordset}});
 }
 
 export function getVendorAddresses(vendNmbr: string) {
@@ -496,7 +497,7 @@ export function getVendorAddresses(vendNmbr: string) {
   WHERE VENDORID = @vendnmbr
   ORDER BY ADRSCODE ASC
   `;
-  return request.input('vendnmbr', VarChar(15), vendNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
+  return request.input('vendnmbr', TYPES.VarChar(15), vendNmbr).query(query).then((_: IResult<gpRes>) => {return {addresses: _.recordset}});
 }
 
 export function getHistory(itemNmbr: string) {
@@ -520,7 +521,7 @@ export function getHistory(itemNmbr: string) {
     FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA, MAIN)
   ) Pivot_table
   `;
-  return request.input('itemnmbr', VarChar(32), itemNmbr).query(query).then((_: IResult<gpRes>) => {
+  return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).query(query).then((_: IResult<gpRes>) => {
     return {itemNumber: itemNmbr, history: _.recordset[0]};
   });
 }
@@ -543,7 +544,7 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
   AND a.LOCNCODE = @locnCode
   ORDER BY a.DOCDATE DESC
   `;
-  return request.input('itemnmbr', VarChar(32), itemNmbr).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+  return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
 }
 
 export function getOrders(branch: string, batch: string, date: string) {
@@ -554,7 +555,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   const query =
   `
   SELECT
-  RTRIM(MAX(BACHNUMB)) batchNumber, MAX(DOCDATE) docDate, MAX(ReqShipDate) reqShipDate, rtrim(MAX(LOCNCODE)) locnCode, MAX(a.SOPTYPE) sopType, RTRIM(MAX(a.SOPNUMBE)) sopNumber, MAX(ORIGTYPE) origType, RTRIM(MAX(ORIGNUMB)) origNumber, RTRIM(MAX(CUSTNMBR)) custNumber, rtrim(MAX(a.PRSTADCD)) adrsCode, RTRIM(MAX(CUSTNAME)) custName, RTRIM(MAX(a.CNTCPRSN)) cntPrsn, RTRIM(MAX(a.ADDRESS1)) address1, RTRIM(MAX(a.ADDRESS2)) address2,
+  RTRIM(MAX(BACHNUMB)) batchNumber, MAX(DOCDATE) docDate, MAX(ReqShipDate) reqShipDate, rtrim(MAX(LOCNCODE)) locnCode, MAX(a.SOPTYPE) sopType, MAX(a.SOPNUMBE) sopNumber, MAX(ORIGTYPE) origType, RTRIM(MAX(ORIGNUMB)) origNumber, MAX(CUSTNMBR) custNumber, rtrim(MAX(a.PRSTADCD)) adrsCode, RTRIM(MAX(CUSTNAME)) custName, RTRIM(MAX(a.CNTCPRSN)) cntPrsn, RTRIM(MAX(a.ADDRESS1)) address1, RTRIM(MAX(a.ADDRESS2)) address2,
   RTRIM(MAX(a.ADDRESS3)) address3, RTRIM(MAX(a.CITY)) city, RTRIM(MAX(a.[STATE])) state, RTRIM(MAX(a.ZIPCODE)) postCode,  RTRIM(MAX(PHNUMBR1)) phoneNumber1, RTRIM(MAX(PHNUMBR2)) phoneNumber2, RTRIM(MAX(a.SHIPMTHD)) shipMethod, MAX(posted) as posted,
   SUM(CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty)) palletSpaces,
   SUM(p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / COALESCE(p.PackQty, 1)) orderWeight, MAX(CONVERT (varchar(max), TXTFIELD )) note
@@ -587,6 +588,8 @@ export function getOrders(branch: string, batch: string, date: string) {
   ) a
   LEFT JOIN SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
+  LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  ON a.SOPNUMBE = d.OrderNumber
   left join (
     SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
     UNION
@@ -598,10 +601,11 @@ export function getOrders(branch: string, batch: string, date: string) {
   ON ITEMNMBR = p.Product
   WHERE a.reqShipDate = @date
   AND a.locnCode = @locnCode
+  AND (d.Status <> 'Archived' OR d.Status IS NULL)
   GROUP BY a.SOPTYPE, a.SOPNUMBE, CUSTNAME
   ORDER BY CUSTNAME
   `;
-  return request.input('date', VarChar(23), dt).input('locnCode', VarChar(12), branch).query(query).then((_: IResult<Order>) => {
+  return request.input('date', TYPES.VarChar(23), dt).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<Order>) => {
     _.recordset.forEach(o => {
       o['note'] = [...(o.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
       o['pickStatus'] = o['posted'] || o['batchNumber'] === 'FULFILLED' ? 2 : o['batchNumber'] === 'INTERVENE' ? 1 : 0;
@@ -638,7 +642,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   AND (QTYPRINV > 0 OR QTYTOINV > 0)
   ORDER BY LNITMSEQ ASC
   `;
-  const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
+  const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
   return lines.then((_: IResult<Array<Order>>) => {
     const order = _.recordset[0];
     const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
@@ -706,7 +710,7 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
   ON ITEMNMBR = p.Product
   WHERE a.SOPNUMBE = @sopNumber
   `;
-  const lines = request.input('soptype', SmallInt, sopType).input('sopnumber', Char(21), sopNumber).query(query);
+  const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
   return lines.then((_: IResult<Array<Order>>) => {
     const order = _.recordset[0];
     if (!order) return {};
@@ -731,6 +735,102 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
       lines: _.recordset
     }
   });
+}
+
+export function getDeliveries(branch: string, run: string, deliveryType: string, archived: boolean) {
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT TOP(1000) *
+  FROM [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  WHERE Branch = @branch
+  AND Status ${archived ? '=' : '<>'} 'Archived'
+  ${run !== undefined ? 'AND Run = @run' : ''}
+  ${deliveryType ? 'AND DeliveryType = @deliveryType' : ''}
+  ORDER BY ${archived ? 'DeliveryDate DESC' : 'Sequence ASC'}
+  
+  `;
+
+  return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.Char(15), run).input('deliveryType', TYPES.VarChar(50), deliveryType).query(query).then((_: IResult<Delivery>) => {
+    return {value: _.recordset.map(r =>  {return {id: r.id, fields: r};})}
+  });
+}
+
+export async function addDelivery(delivery: Delivery): Promise<{id: number, fields: Delivery}> {
+  const insertQuery = `
+  INSERT INTO [MSDS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType)
+  VALUES (@Run,@Status,@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Site,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@DeliveryType);
+  SELECT @id = SCOPE_IDENTITY();
+  `;
+
+  const request = new sqlRequest()
+  request.input('Run', TYPES.NVarChar(50), delivery.Run);
+  request.input('Status', TYPES.VarChar(50), 'Active');
+  request.input('CustomerName', TYPES.VarChar(65), delivery.CustomerName);
+  request.input('CustomerNumber', TYPES.Char(15), delivery.CustomerNumber);
+  request.input('Site', TYPES.NVarChar(50), delivery.Site);
+  request.input('City', TYPES.VarChar(35), delivery.City);
+  request.input('State', TYPES.VarChar(29), delivery.State);
+  request.input('Postcode', TYPES.VarChar(11), delivery.Postcode);
+  request.input('Address', TYPES.VarChar(MAX), delivery.Address);
+  request.input('CustomerType', TYPES.VarChar(50), delivery.CustomerType);
+  request.input('ContactPerson', TYPES.VarChar(61), delivery.ContactPerson);
+  request.input('DeliveryDate', TYPES.Date, delivery.DeliveryDate);
+  request.input('OrderNumber', TYPES.Char(21), delivery.OrderNumber);
+  request.input('Spaces', TYPES.Numeric(19, 5), delivery.Spaces);
+  request.input('Weight', TYPES.Numeric(19, 5), delivery.Weight);
+  request.input('PhoneNumber', TYPES.VarChar(50), delivery.PhoneNumber);
+  request.input('Branch', TYPES.Char(15), delivery.Branch);
+  request.input('Created', TYPES.Date, delivery.Created);
+  request.input('Creator', TYPES.NVarChar(50), delivery.Creator);
+  request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
+  request.input('DeliveryType', TYPES.VarChar(50), delivery.DeliveryType);
+  request.output('id', TYPES.Int);
+  return request.query(insertQuery).then(_ => {
+    const id = _['output']['id'] as number;
+    return {id, fields: {...delivery, id}};
+  });
+}
+
+export async function updateDelivery(id: number, delivery: Delivery): Promise<{body: {fields: Delivery, id: number}} | void> {
+  const updates = [];
+  if ('Sequence' in delivery) updates.push('Sequence = @Sequence');
+  if ('Run' in delivery) updates.push('Run = @Run');
+  if ('Notes' in delivery) updates.push('Notes = @Notes');
+  if ('Status' in delivery) updates.push('Status = @Status');
+  if ('RequestedDate' in delivery) updates.push('RequestedDate = @RequestedDate');
+  if ('PickStatus' in delivery) updates.push('PickStatus = @PickStatus');
+  if ('DeliveryDate' in delivery) updates.push('DeliveryDate = @DeliveryDate');
+
+  const updateQuery = `
+  UPDATE [MSDS].[dbo].Deliveries
+  SET ${updates.join()}
+  WHERE id = @id;
+  SELECT * FROM [MSDS].[dbo].Deliveries WHERE id = @id
+  `;
+  const request = new sqlRequest()
+  request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
+  request.input('DeliveryDate', TYPES.Date, delivery.DeliveryDate);
+  request.input('PickStatus', TYPES.TinyInt, delivery.PickStatus);
+  request.input('Sequence', TYPES.Int, delivery.Sequence);
+  request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
+  request.input('Run', TYPES.NVarChar(50), delivery.Run);
+  request.input('Status', TYPES.VarChar(50), delivery.Status);
+  request.input('id', TYPES.Int, id);
+  return request.query(updateQuery).then(_ => {
+    const delivery = _.recordset[0] as Delivery;
+    return {body: {fields: delivery, id}};
+  }).catch(
+    () => {
+      if (updates.length === 0) throw 'No fields to update.';
+      throw 'Unknown error';
+    }
+  );
+}
+
+export function removeDelivery(id: number): Promise<IResult<any>> {
+  const deleteQuery = `DELETE FROM [MSDS].[dbo].Deliveries WHERE id = @id`;
+  return new sqlRequest().input('id', TYPES.Int, id).query(deleteQuery).then((_) => _);
 }
 
 export function getChemicals(branch: string, itemNumber: string, type: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
@@ -794,7 +894,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   `;
   let query = type === 'inventory' ? query1 : type === 'nonInventory' ? query2 : `${query1} UNION ${query2}`;
   if (orderby && orderby !== 'quantity') query += ` ORDER BY ${orderby.replace('product', 'ITEMNMBR') || 'ITEMNMBR'} ${order || 'ASC'}`;
-  return request.input('locnCode', VarChar(12), branch).input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
+  return request.input('locnCode', TYPES.VarChar(12), branch).input('itemNumber', TYPES.VarChar(31), itemNumber).query(query).then((_: IResult<CwRow[]>) => {
     _.recordset.map(c => {
       c['hCodes'] = c.HCodes !== '-' ? c.HCodes?.split(',') : [];
       delete c.HCodes;
@@ -831,7 +931,7 @@ export function getBasicChemicalInfo(itemNumber: string): Promise<{docNo: string
   LEFT JOIN [MSDS].dbo.Materials b ON a.CwNo = b.CwNo
   WHERE a.ITEMNMBR = @itemNumber
   `;
-  return request.input('itemNumber', VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string, cwNo: string}[]>) => _.recordset[0] ? _.recordset[0] : {docNo: '', cwNo: ''});
+  return request.input('itemNumber', TYPES.VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string, cwNo: string}[]>) => _.recordset[0] ? _.recordset[0] : {docNo: '', cwNo: ''});
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string): Promise<number> {
@@ -869,11 +969,11 @@ export async function writeInTransitTransferFile(id: string | null, fromSite: st
 
 export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRow> {
   const getQuery = 'SELECT ITEMNMBR, CwNo FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr';
-  const currentCount = await new sqlRequest().input('itemNmbr', VarChar(31), itemNmbr).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
+  const currentCount = await new sqlRequest().input('itemNmbr', TYPES.VarChar(31), itemNmbr).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
   const updateQuery = currentCount === 0 ?
   `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)` :
   `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
-  await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('cwNo', VarChar(50), cwNo).query(updateQuery);
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('cwNo', TYPES.VarChar(50), cwNo).query(updateQuery);
   await copyPdfToItem(itemNmbr).catch(async _ => {
     await unlinkChemical(itemNmbr);
     throw _;
@@ -883,7 +983,7 @@ export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRo
 
 export async function unlinkChemical(itemNmbr: string): Promise<CwRow> {
   const deleteQuery = `DELETE FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr`
-  await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(deleteQuery);
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery);
   await removePdfFromItem(itemNmbr);
   return await getChemicals('', itemNmbr, '', '', '').then(c => c['chemicals'][0]);
 }
@@ -902,7 +1002,7 @@ export function getNonInventoryChemicals(site: string): Promise<{chemicals: IRec
   LEFT JOIN ( SELECT * FROM [MSDS].dbo.Quantities WHERE Site = @site) b ON a.ItemNmbr = b.ItemNmbr
   ORDER BY ItemDesc ASC
   `;
-  return request.input('site', Char(11), site).query(query).then((_: IResult<CwRow>) => {
+  return request.input('site', TYPES.Char(11), site).query(query).then((_: IResult<CwRow>) => {
     return {chemicals: _.recordset}
   });
 }
@@ -911,11 +1011,11 @@ export async function addNonInventoryChemical(itemNmbr: string, itemDesc: string
   const updateQuery = `
   INSERT INTO [MSDS].dbo.Consumables (ItemNmbr, ItemDesc, ContainerSize, Units)
   VALUES (@itemNmbr, @itemDesc, @containerSize, @units)`;
-  return new sqlRequest().input('itemNmbr', VarChar(50), `${itemNmbr}${containerSize}`).input('itemDesc', VarChar(101), itemDesc).input('containerSize', Numeric(19, 5), containerSize).input('units', VarChar(50), units).query(updateQuery).then(() => true);
+  return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), `${itemNmbr}${containerSize}`).input('itemDesc', TYPES.VarChar(101), itemDesc).input('containerSize', TYPES.Numeric(19, 5), containerSize).input('units', TYPES.VarChar(50), units).query(updateQuery).then(() => true);
 }
 
 export async function updateNonInventoryChemicalQuantity(itemNmbr: string, quantity: number, branch: string): Promise<boolean> {
-  const entryExists = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('branch', VarChar(31), branch).query(
+  const entryExists = await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('branch', TYPES.VarChar(31), branch).query(
     'SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = @branch'
   ).then((_: IResult<gpRes>) => _.recordset.length) === 0;
 
@@ -923,17 +1023,17 @@ export async function updateNonInventoryChemicalQuantity(itemNmbr: string, quant
     `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, @site, @quantity)` :
     `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = @Site`;
 
-  return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('site', Char(11), branch).input('quantity', Int, quantity).query(updateQuery).then(async () => {
-    const totalQuantity = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(
+  return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('site', TYPES.Char(11), branch).input('quantity', TYPES.Int, quantity).query(updateQuery).then(async () => {
+    const totalQuantity = await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(
       `SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site <> ''`
     ).then((_: IResult<{Quantity: number}[]>) => _.recordset.reduce((acc, cur) => acc += cur.Quantity, 0));
-    const totalResCount = await new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).query(
+    const totalResCount = await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(
       `SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = ''`
     ).then((_: IResult<gpRes>) => _.recordset.length);
     const updateTotalQuery = totalResCount === 0 ?
       `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, '', @quantity)` :
       `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = ''`;
-    return new sqlRequest().input('itemNmbr', VarChar(50), itemNmbr).input('quantity', Int, totalQuantity).query(updateTotalQuery);
+    return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('quantity', TYPES.Int, totalQuantity).query(updateTotalQuery);
   }).then(() => true);
 }
 
@@ -943,29 +1043,29 @@ export async function updateSDS(cwChemicals: Array<CwRow>) {
     .then(_ => _.recordset as IRecordSet<{CwNo: string, DocNo: string, ItemNmbr: string}>);
   const missingChemicals = cwChemicals.filter(m => !currentChemicals.find(_ => _.CwNo === m.CwNo)).map(c => {
     const query = `INSERT INTO [MSDS].dbo.Materials (CwNo) VALUES (@cwNo)`;
-    return new sqlRequest().input('cwNo', VarChar(50), c.CwNo).query(query);
+    return new sqlRequest().input('cwNo', TYPES.VarChar(50), c.CwNo).query(query);
   });
 
   const removedChemicals = currentChemicals.filter(c => !cwChemicals.find(_ => _.CwNo === c.CwNo)).map(m => {
     const query = `UPDATE [MSDS].dbo.Materials SET OnChemwatch = 0 WHERE CwNo = @cwNo`;
-    return new sqlRequest().input('cwNo', VarChar(50), m.CwNo).query(query);
+    return new sqlRequest().input('cwNo', TYPES.VarChar(50), m.CwNo).query(query);
   });
 
   const allChemicals = cwChemicals.map(c => {
     const request = new sqlRequest();
     const sets = [];
     const parameters = [
-      {name: 'CwNo', type: VarChar(50)},
-      {name: 'Name', type: VarChar(MAX)},
-      {name: 'VendorName', type: VarChar(MAX)},
-      {name: 'HazardRating', type: SmallInt},
-      {name: 'HCodes', type: VarChar(MAX)},
-      {name: 'Pkg', type: VarChar(50)},
-      {name: 'Dgc', type: VarChar(50)},
-      {name: 'Un', type: VarChar(50)},
-      {name: 'DocNo', type: VarChar(50)},
-      {name: 'Language', type: VarChar(50)},
-      {name: 'Country', type: VarChar(50)}
+      {name: 'CwNo', type: TYPES.VarChar(50)},
+      {name: 'Name', type: TYPES.VarChar(MAX)},
+      {name: 'VendorName', type: TYPES.VarChar(MAX)},
+      {name: 'HazardRating', type: TYPES.SmallInt},
+      {name: 'HCodes', type: TYPES.VarChar(MAX)},
+      {name: 'Pkg', type: TYPES.VarChar(50)},
+      {name: 'Dgc', type: TYPES.VarChar(50)},
+      {name: 'Un', type: TYPES.VarChar(50)},
+      {name: 'DocNo', type: TYPES.VarChar(50)},
+      {name: 'Language', type: TYPES.VarChar(50)},
+      {name: 'Country', type: TYPES.VarChar(50)}
     ];
 
     parameters.forEach(_ => {
@@ -975,9 +1075,9 @@ export async function updateSDS(cwChemicals: Array<CwRow>) {
 
     sets.push('OnChemwatch = 1');
     if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('IssueDate = @issueDate');
-    if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('issueDate', sqlDate, c.IssueDate);
+    if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('issueDate', TYPES.Date, c.IssueDate);
     if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('ExtractionDate = @extractionDate');
-    if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('extractionDate', sqlDate, c.ExtractionDate);
+    if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('extractionDate', TYPES.Date, c.ExtractionDate);
     const query = `UPDATE [MSDS].dbo.Materials SET ${sets.join(', ')} WHERE CwNo = @cwNo`;
     return request.query(query);
   });
@@ -999,7 +1099,7 @@ async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
   LEFT JOIN [MSDS].dbo.ProductLinks b ON a.CwNo = b.CwNo
   WHERE a.CwNo = @cwNo
   `;
-  const entries = await new sqlRequest().input('cwNo', VarChar(31), cwNo).query(getQuery)
+  const entries = await new sqlRequest().input('cwNo', TYPES.VarChar(31), cwNo).query(getQuery)
     .then((_: IResult<{ItemNmbr: string, DocNo: string}[]>) => _.recordset);
   const docNo = entries[0].DocNo;
   const cw = await initChemwatch().catch(e => {
