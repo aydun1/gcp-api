@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression  = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getOrderLines2, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -227,7 +227,7 @@ app.get('/gp/orders', auth, (req: Request, res: Response) => {
 app.get('/gp/orders/:sopType/:sopNumber', auth, (req: Request, res: Response) => {
   const sopType = +req.params.sopType;
   const sopNumber = req.params.sopNumber;
-  getOrderLines2(sopType, sopNumber).then(
+  getOrderLines(sopType, sopNumber).then(
     result => res.status(200).send(result)
   ).catch(
     err => {

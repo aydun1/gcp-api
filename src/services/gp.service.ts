@@ -565,7 +565,7 @@ export function getOrders(branch: string, batch: string, date: string) {
     WHERE ReqShipDate = @date
     AND LOCNCODE = @locnCode
     AND SOPTYPE = 2
-    UNION ALL
+    UNION
     SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
     FROM SOP30200 a WITH (NOLOCK)
     LEFT JOIN (
@@ -574,7 +574,7 @@ export function getOrders(branch: string, batch: string, date: string) {
       WHERE ReqShipDate = @date
       AND LOCNCODE = @locnCode
       AND SOPTYPE = 3
-      UNION ALL
+      UNION
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
       FROM SOP30200 WITH (NOLOCK)
       WHERE ReqShipDate = @date
@@ -616,60 +616,6 @@ export function getOrders(branch: string, batch: string, date: string) {
 
 export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
-  const query = `
-  SELECT SOPTYPE sopType, RTRIM(SOPNUMBE) sopNumbe, RTRIM(BACHNUMB) batchNumber, RTRIM(c.CUSTNMBR) custNmbr, RTRIM(c.CUSTNAME) custName, RTRIM(ITEMNMBR) itemNmbr, RTRIM(ITEMDESC) itemDesc, QTYPRINV * QTYBSUOM quantity, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(t.CNTCPRSN) cntPrsn, RTRIM(t.Address1) address1, RTRIM(t.ADDRESS2) address2, RTRIM(t.ADDRESS3) address3, RTRIM(t.CITY) city, RTRIM(t.[STATE]) state, RTRIM(t.ZIPCODE) postCode, RTRIM(t.SHIPMTHD) shipMethod, n.TXTFIELD note,
-  CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
-  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
-  FROM (
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.BACHNUMB, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.NOTEINDX
-    FROM SOP10100 a WITH (NOLOCK)
-    LEFT JOIN SOP10200 b WITH (NOLOCK)
-    ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
-    UNION ALL
-    SELECT a.SOPTYPE, a.SOPNUMBE, a.BACHNUMB, a.CUSTNMBR, a.REQSHIPDATE, a.CNTCPRSN, a.ADDRESS1, a.ADDRESS2, a.ADDRESS3, a.CITY, a.[STATE], a.ZIPCODE, a.SHIPMTHD, b.ITEMNMBR, b.ITEMDESC, b.QTYPRINV, b.QTYTOINV, b.QTYBSUOM, b.LNITMSEQ, a.NOTEINDX
-    FROM SOP30200 a WITH (NOLOCK)
-    LEFT JOIN SOP30300 b WITH (NOLOCK)
-    ON a.SOPTYPE = b.SOPTYPE and a.SOPNUMBE = b.SOPNUMBE
-  ) t
-  LEFT JOIN SY03900 n WITH (NOLOCK)
-  ON t.NOTEINDX = n.NOTEINDX
-  LEFT JOIN RM00101 c WITH (NOLOCK)
-  ON t.CUSTNMBR = c.CUSTNMBR
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
-  ON itemNmbr = p.Product
-  WHERE SOPTYPE = @soptype
-  AND SOPNUMBE = @sopnumber
-  AND (QTYPRINV > 0 OR QTYTOINV > 0)
-  ORDER BY LNITMSEQ ASC
-  `;
-  const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
-  return lines.then((_: IResult<Array<Order>>) => {
-    const order = _.recordset[0];
-    const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
-    const pickStatus = order['posted'] || order['batchNumber'] === 'FULFILLED' ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
-    return {
-      custNumber: order.custNmbr,
-      custName: order.custName,
-      sopType: order.sopType,
-      sopNumber: order.sopNumbe,
-      cntPrsn: order.cntPrsn,
-      address1: order.address1,
-      address2: order.address2,
-      address3: order.address3,
-      city: order.city,
-      state: order.state,
-      postCode: order.postCode,
-      shipMethod: order.shipMethod,
-      reqShipDate: new Date(order.reqShipDate),
-      note: noteMatch,
-      pickStatus: pickStatus,
-      lines: _.recordset
-    }
-  });
-}
-
-export function getOrderLines2(sopType: number, sopNumber: string) {
-  const request = new sqlRequest();
   const query =
   `
   SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
@@ -680,7 +626,7 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
     FROM SOP10100 a WITH (NOLOCK)
     WHERE SOPTYPE = 2
-    UNION ALL
+    UNION
     SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
     FROM SOP30200 a WITH (NOLOCK)
 
@@ -688,7 +634,7 @@ export function getOrderLines2(sopType: number, sopNumber: string) {
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
       FROM SOP10100 WITH (NOLOCK)
       WHERE SOPTYPE = 3
-      UNION ALL
+      UNION
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
       FROM SOP30200 WITH (NOLOCK)
       WHERE SOPTYPE = 3
@@ -748,9 +694,9 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   ${run !== undefined ? 'AND Run = @run' : ''}
   ${deliveryType ? 'AND DeliveryType = @deliveryType' : ''}
   ORDER BY ${archived ? 'DeliveryDate DESC' : 'Sequence ASC'}
-  
   `;
 
+  console.log(query)
   return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.Char(15), run).input('deliveryType', TYPES.VarChar(50), deliveryType).query(query).then((_: IResult<Delivery>) => {
     return {value: _.recordset.map(r =>  {return {id: r.id, fields: r};})}
   });
