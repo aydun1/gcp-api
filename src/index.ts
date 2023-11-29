@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression  = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -444,6 +444,30 @@ app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
           .filter((v,i,a)=>a.findIndex(v2=>(v2.DocNo===v.DocNo))===i)
           .map(c => `<a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
         '</li></ul></body></html>'
+      )
+    }
+  ).catch((err: {code: number, message: string}) => {console.log(err)
+    res.status(err.code || 500).json({'result': err?.message || err})
+  });
+});
+
+app.get('/chemicals/outbound', verifyChemicalListToken, (req, res) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  const run = params['run'] as string || '';
+
+  getChemicalsOnRun(branch, run).then(
+    chemicals => {
+      res.status(200).send(
+        `<html lang="en" translate="no"><head>
+        <title>Outbound chemicals</title>
+        <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
+        <meta name="google" content="notranslate">
+        <style> td {padding: 10px 0;}</style>
+        </head><body><table><tr><th>Qty</th><th>Name</th><th>Class</th><tr>` +
+        chemicals
+          .map(c => `<td> ${c.quantity}</td><td><a href="/public/sds/${c.itemNmbr}.pdf" target="_blank">${c.itemDesc || ''}</a> </td><td>${c.Dgc}</td>`).join('</tr>\n<tr>') +
+        '</tr></table></body></html>'
       )
     }
   ).catch((err: {code: number, message: string}) => {console.log(err)

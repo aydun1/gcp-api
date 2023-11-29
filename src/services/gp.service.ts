@@ -868,6 +868,56 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   });
 }
 
+export function getChemicalsOnRun(branch: string, run: string) {
+  const request = new sqlRequest();
+  let query = `
+  SELECT d.Run, RTRIM(b.ITEMNMBR) itemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) itemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) quantity
+  FROM (
+    SELECT SOPTYPE, SOPNUMBE
+    FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
+    WHERE SOPTYPE = 2
+    UNION ALL
+    SELECT a.SOPTYPE, SOPNUMBE
+    FROM [GCP].[dbo].SOP30200 a WITH (NOLOCK)
+    LEFT JOIN (
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB FROM [GCP].[dbo].SOP10100 WITH (NOLOCK) WHERE SOPTYPE = 3
+      UNION
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB FROM [GCP].[dbo].SOP30200 WITH (NOLOCK) WHERE SOPTYPE = 3
+    ) c
+    ON a.SOPTYPE = c.ORIGTYPE AND a.SOPNUMBE = c.ORIGNUMB
+    WHERE a.SOPTYPE = 2
+  ) a
+  left join (
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK) WHERE QTYPRINV * QTYBSUOM > 0
+    UNION
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK) WHERE QTYPRINV * QTYBSUOM > 0
+  ) b
+  ON a.SOPTYPE = b.SOPTYPE
+  AND a.SOPNUMBE = b.SOPNUMBE
+  LEFT JOIN [GCP].[dbo].IV00101 i WITH (NOLOCK)
+  ON i.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN [MSDS].[dbo].ProductLinks l WITH (NOLOCK)
+  ON l.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN [MSDS].[dbo].Materials m WITH (NOLOCK)
+  ON l.CwNo = m.CwNo
+  LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  ON d.OrderNumber = a.SOPNUMBE
+  WHERE d.Branch = @branch
+  AND d.Status = 'Active'
+  `;
+
+  if (run) query += `
+  AND d.Run = @run
+  `;
+
+  query += `
+  AND m.OnChemwatch = 1
+  AND i.ITMCLSCD IN ('ADDITIVE', 'BASACOTE', 'CHEMICALS', 'FERTILIZER', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
+  GROUP BY d.Run, b.ITEMNMBR
+  `;
+  return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.NVarChar(50), run).query(query).then((_: IResult<{Run: string, itemNmbr: string, itemDesc: string, itemName: string, quantity: number, Dgc: number}[]>) => _.recordset);
+}
+
 export function getBasicChemicalInfo(itemNumber: string): Promise<{docNo: string, cwNo: string}> {
   const request = new sqlRequest();
   const query = 
