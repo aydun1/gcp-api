@@ -9,28 +9,9 @@ import { InTransitTransferLine } from '../types/in-transit-transfer-line';
 import { InTransitTransfer } from '../types/in-transit-transfer';
 import { CwFolder } from '../types/CwFolder';
 import { CwRow } from '../types/CwRow';
-import { initChemwatch } from './cw.service';
+import { Order } from '../types/order';
 
-interface Order {
-  custNmbr: string;
-  custName: string;
-  sopType: number;
-  sopNumbe: string;
-  batchNumber: string;
-  pickStatus: 0 | 1 | 2;
-  posted: string;
-  reqShipDate: string;
-  cntPrsn: string;
-  address1: string;
-  address2: string;
-  address3: string;
-  city: string;
-  state: string;
-  postCode: string;
-  shipMethod: string;
-  note: string;
-  lines: Array<Line>;
-}
+import { initChemwatch } from './cw.service';
 
 const storedProcedure = 'usp_PalletUpdate';
 const dct: {[key: string]: {uom: string, divisor: number}} = {
@@ -83,6 +64,15 @@ function createIttId(branch: string): Promise<string> {
 
 function parseBranch(branch: string): string {
   return branch === 'VIC' ? 'MAIN' : branch;
+}
+
+function getNextDay(): Date {
+  const date = new Date();
+  const day = date.getDay();
+  const nextDay = day > 4 ? 8 - day : 1;
+  date.setDate(date.getDate() + nextDay);
+  date.setHours(0,0,0,0);
+  return date;
 }
 
 export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
@@ -548,7 +538,7 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
 }
 
 export function getOrders(branch: string, batch: string, date: string) {
-  const now = date || new Date(new Date().getTime() + 60 * 60 * 24 * 1000).toLocaleDateString('fr-CA');
+  const now = date || getNextDay().toLocaleDateString('fr-CA');
   const dt = `${now} 00:00:00.000`;
   branch = parseBranch(branch);
   const request = new sqlRequest();
@@ -696,7 +686,6 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   ORDER BY ${archived ? 'DeliveryDate DESC' : 'Sequence ASC'}
   `;
 
-  console.log(query)
   return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.Char(15), run).input('deliveryType', TYPES.VarChar(50), deliveryType).query(query).then((_: IResult<Delivery>) => {
     return {value: _.recordset.map(r =>  {return {id: r.id, fields: r};})}
   });
