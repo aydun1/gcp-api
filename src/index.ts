@@ -455,20 +455,23 @@ app.get('/chemicals/outbound', verifyChemicalListToken, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const run = params['run'] as string || '';
-
   getChemicalsOnRun(branch, run).then(
     chemicals => {
-      res.status(200).send(
-        `<html lang="en" translate="no"><head>
-        <title>Outbound chemicals</title>
-        <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
-        <meta name="google" content="notranslate">
-        <style> td {padding: 10px 0;}</style>
-        </head><body><table><tr><th>Qty</th><th>Name</th><th>Class</th><tr>` +
-        chemicals
-          .map(c => `<td> ${c.quantity}</td><td><a href="/public/sds/${c.itemNmbr}.pdf" target="_blank">${c.itemDesc || ''}</a> </td><td>${c.Dgc}</td>`).join('</tr>\n<tr>') +
-        '</tr></table></body></html>'
-      )
+      if (req.accepts('json')) {
+        res.status(200).send({ chemicals });
+      } else {
+        res.status(200).send(
+          `<html lang="en" translate="no"><head>
+          <title>Outbound chemicals</title>
+          <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
+          <meta name="google" content="notranslate">
+          <style> td {padding: 10px 0;}</style>
+          </head><body><table><tr><th>Qty</th><th>Name</th><th>Class</th><tr>` +
+          chemicals
+            .map(c => `<td> ${c.Quantity}</td><td><a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.ItemDesc || ''}</a> </td><td>${c.Dgc}</td>`).join('</tr>\n<tr>') +
+          '</tr></table></body></html>'
+        )
+      }
     }
   ).catch((err: {code: number, message: string}) => {console.log(err)
     res.status(err.code || 500).json({'result': err?.message || err})

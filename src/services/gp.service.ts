@@ -860,7 +860,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
 export function getChemicalsOnRun(branch: string, run: string) {
   const request = new sqlRequest();
   let query = `
-  SELECT d.Run, RTRIM(b.ITEMNMBR) itemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) itemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) quantity
+  SELECT d.Run, RTRIM(b.ITEMNMBR) ItemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) ItemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) Quantity
   FROM (
     SELECT SOPTYPE, SOPNUMBE
     FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
@@ -900,11 +900,11 @@ export function getChemicalsOnRun(branch: string, run: string) {
   `;
 
   query += `
-  AND m.OnChemwatch = 1
+  AND m.OnChemwatch = 1 
   AND i.ITMCLSCD IN ('ADDITIVE', 'BASACOTE', 'CHEMICALS', 'FERTILIZER', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
   GROUP BY d.Run, b.ITEMNMBR
   `;
-  return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.NVarChar(50), run).query(query).then((_: IResult<{Run: string, itemNmbr: string, itemDesc: string, itemName: string, quantity: number, Dgc: number}[]>) => _.recordset);
+  return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.NVarChar(50), run).query(query).then((_: IResult<{Run: string, ItemNmbr: string, ItemDesc: string, itemName: string, Quantity: number, Dgc: number}[]>) => _.recordset);
 }
 
 export function getBasicChemicalInfo(itemNumber: string): Promise<{docNo: string, cwNo: string}> {
