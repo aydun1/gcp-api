@@ -7,7 +7,7 @@ import path from 'path';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
-import compression  = require('compression');
+import compression = require('compression');
 
 import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
@@ -55,6 +55,14 @@ app.use((req, res, next) => {
   next();
 });
 
+function handleError(err: any, res: Response) {
+  if (err.code === 'ENOCONN') {
+    sqlConfig['server'] = '10.30.5.70';
+    connect(sqlConfig, err => {if (err) console.log('Failed to open a SQL Database connection.', err?.message)});
+  }
+  return res.status(500).json({'result': 'Internal server error'});
+}
+
 function verifyPalletApiToken(req: Request, res: Response, next: NextFunction) {
   const bearerHeader = req.headers['authorization'];
   if (typeof bearerHeader === 'undefined') return res.sendStatus(401);
@@ -92,8 +100,7 @@ app.get('/gp/customers', auth, (req: Request, res: Response) => {
   getCustomers(branches, sort, order, filters, search, page).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -101,8 +108,7 @@ app.get('/gp/customers/:id(*)/addresses', auth, (req: Request, res: Response) =>
   getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -110,8 +116,7 @@ app.get('/gp/customers/:id(*)', auth, (req: Request, res: Response) => {
   getCustomer(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -122,8 +127,7 @@ app.get('/gp/vendors', auth, (req: Request, res: Response) => {
   getVendors(search, page).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -131,8 +135,7 @@ app.get('/gp/vendors/:id(*)/addresses', auth, (req: Request, res: Response) => {
   getVendorAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -142,8 +145,7 @@ app.get('/gp/pan', auth, (req: Request, res: Response) => {
   getItems(branch, [], '').then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -156,8 +158,7 @@ app.get('/gp/inventory', auth, (req: Request, res: Response) => {
       res.status(200).send(result)
     }
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -165,8 +166,7 @@ app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
   getHistory(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -176,8 +176,7 @@ app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   getOrdersByLine(branch, req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -185,8 +184,7 @@ app.get('/gp/inventory/:id/stock', auth, (req: Request, res: Response) => {
   getItems('', [req.params.id], '').then(
     result => res.status(200).send(result['lines'][0])
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -197,8 +195,7 @@ app.get('/gp/orders', auth, (req: Request, res: Response) => {
   getOrders(branch, 'released', date).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -208,8 +205,7 @@ app.get('/gp/orders/:sopType/:sopNumber', auth, (req: Request, res: Response) =>
   getOrderLines(sopType, sopNumber).then(
     result => res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -220,8 +216,7 @@ app.get('/gp/itt', auth, (req: Request, res: Response) => {
   getInTransitTransfers('', from, to).then(result => 
     res.status(200).send(result)
   ).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -236,8 +231,7 @@ app.get('/gp/itt/:id', auth, (req: Request, res: Response) => {
       res.status(200).send(payload)
     })
   }).catch(err => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -245,36 +239,32 @@ app.post('/gp/itt', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
   writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines).then(
     _ => res.status(200).send({docId: _, status: 'Successfully added ITT.'})
-  ).catch((err: {code: number, message: string}) => {
-      console.log(err);
-      return res.status(500).json({'result': 'Internal server error'});
-    });
+  ).catch(err => {
+    return handleError(err, res);
+  });
 });
 
 app.post('/pallets', verifyPalletApiToken, (req, res) => {
   const body = req.body as Body;
   updatePallets(body.customer, body.palletType, body.palletQty).then(
     () => res.status(200).json({result: 'Pallet updated successfully.'})
-  ).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  ).catch(err => {
+    return handleError(err, res);
   });
 });
 
 app.get('/gp/deliveries', auth, (req, res) => {
   const body = req.query as {branch: string, run: string, status: string, deliveryType: string};
   const archived = body.status === 'Archived' ? true : false;
-  getDeliveries(body.branch, body.run, body.deliveryType, archived).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-    console.log(err?.message);
-    return res.status(500).json({'result': 'Internal server error'});
+  getDeliveries(body.branch, body.run, body.deliveryType, archived).then(_ => res.status(200).json(_)).catch(err => {
+    return handleError(err, res);
   });
 });
 
 app.post('/gp/deliveries', auth, (req, res) => {
   const body = req.body as {fields: Delivery};
-  addDelivery(body.fields).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  addDelivery(body.fields).then(_ => res.status(200).json(_)).catch(err => {
+    return handleError(err, res);
   });
 });
 
@@ -284,9 +274,8 @@ app.post('/gp/deliveries/batch', auth, (req, res) => {
   const deletes = body.requests.filter(_ => _.method.toUpperCase() === 'DELETE').map(_ => removeDelivery(_.id));
   Promise.all([...updates, ...deletes]).then(_ => {
     res.status(200).json({responses: _})
-  }).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  }).catch(err => {
+    return handleError(err, res);
   });
 });
 
@@ -300,18 +289,17 @@ app.get('/gp/chemicals', auth, (req, res) => {
 
   getChemicals(branch, itemNumber, category, sort, order).then(
     _ => res.status(200).json(_)
-  ).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  ).catch(err => {
+    return handleError(err, res);
   });
 });
 
 app.get('/gp/saved-materials', auth, (req, res) => {
   getMaterialsInFolder().then(
     _ => res.status(200).json(_)
-  ).catch((err: {code: number, message: string}) => 
-    res.status(err.code || 500).json({'result': err?.message || err})
-  );
+  ).catch(err => {
+    return handleError(err, res);
+  });
 });
 
 app.get('/gp/sync-from-cw', auth, (req, res) => {
@@ -320,15 +308,13 @@ app.get('/gp/sync-from-cw', auth, (req, res) => {
   }).then(_ => {
     return res.status(200).json(_);
   }).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
 app.get('/gp/synced-materials', auth, (req, res) => {
   getSyncedChemicals().then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -336,24 +322,21 @@ app.get('/gp/non-inventory-chemicals', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getNonInventoryChemicals(branch).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
 app.post('/gp/non-inventory-chemicals', auth, (req: Request, res: Response) => {
   const body = req.body as {itemNmbr: string, itemDesc: string, size: number, units: string};
   addNonInventoryChemical(body.itemNmbr, body.itemDesc, body.size, body.units).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
 app.post('/gp/non-inventory-chemical-qty', auth, (req: Request, res: Response) => {
   const body = req.body as {itemNmbr: string, quantity: number, branch: string};
   updateNonInventoryChemicalQuantity(body.itemNmbr, body.quantity, body.branch).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+    return handleError(err, res);
   });
 });
 
@@ -363,9 +346,8 @@ app.get('/gp/link-material', auth, (req, res) => {
   const cwNo = params['cwNo'] as string || '';
   linkChemical(itemNmbr, cwNo).then(_ => {
     res.status(200).json(_);
-  }).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  }).catch(err => {
+    return handleError(err, res);
   });
 });
 
@@ -374,9 +356,8 @@ app.get('/gp/unlink-material', auth, (req, res) => {
   const itemNmbr = params['itemNmbr'] as string || '';
   unlinkChemical(itemNmbr).then(_ => {
     res.status(200).json(_);
-  }).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  }).catch(err => {
+    return handleError(err, res);
   });
 });
 
@@ -426,9 +407,8 @@ app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
         '</li></ul></body></html>'
       )
     }
-  ).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  ).catch(err => {
+    return handleError(err, res);
   });
 });
 
@@ -454,9 +434,8 @@ app.get('/chemicals/outbound', verifyChemicalListToken, (req,  res) => {
         )
       }
     }
-  ).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(500).json({'result': 'Internal server error'});
+  ).catch(err => {
+    return handleError(err, res);
   });
 });
 
@@ -480,7 +459,6 @@ app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
 connect(sqlConfig, err => {
   if (err) {
     console.log('Failed to open a SQL Database connection.', err.message);
-    //process.exit(1);
   }
   app.listen(parseInt(webConfig.port, 10), webConfig.ip, () => {
     console.log(`server started at http://localhost:${webConfig.port}`);
