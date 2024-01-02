@@ -58,7 +58,9 @@ app.use((req, res, next) => {
 function handleError(err: any, res: Response) {
   if (err.code === 'ENOCONN') {
     sqlConfig['server'] = '10.30.5.70';
-    connect(sqlConfig, err => {if (err) console.log('Failed to open a SQL Database connection.', err?.message)});
+    connect(sqlConfig, err => {
+      if (err) console.log('Failed to open a SQL Database connection.', err?.message)
+    });
   }
   return res.status(500).json({'result': 'Internal server error'});
 }
@@ -446,7 +448,7 @@ app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
     res.contentType('application/pdf');
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
-    console.log(err);
+    console.error(err);
     return res.status(err.code || 404).send(`
     <html>
       <head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>

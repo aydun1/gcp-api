@@ -931,7 +931,7 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   request.input('Qty', TYPES.Int, qty.toString(10));
   return request.execute(storedProcedure).then(() => 200).catch(
     e => {
-      console.log(e);
+      console.error(e);
       return 500;
     }
   );
