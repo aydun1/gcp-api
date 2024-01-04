@@ -62,6 +62,7 @@ function handleError(err: any, res: Response) {
       if (err) console.log('Failed to open a SQL Database connection.', err?.message)
     });
   }
+  console.error(err);
   return res.status(500).json({'result': 'Internal server error'});
 }
 

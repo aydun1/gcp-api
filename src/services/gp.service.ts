@@ -1,4 +1,4 @@
-import { TYPES, Request as sqlRequest, IResult, IRecordSet, MAX } from 'mssql';
+import { TYPES, Request as sqlRequest, IResult, IRecordSet, MAX, IProcedureResult } from 'mssql';
 import fs from 'fs';
 
 import { allowedPallets } from '../../config.json';
@@ -919,7 +919,7 @@ export function getBasicChemicalInfo(itemNumber: string): Promise<{docNo: string
   return request.input('itemNumber', TYPES.VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string, cwNo: string}[]>) => _.recordset[0] ? _.recordset[0] : {docNo: '', cwNo: ''});
 }
 
-export function updatePallets(customer: string, palletType: string, palletQty: string): Promise<number> {
+export function updatePallets(customer: string, palletType: string, palletQty: string): Promise<IProcedureResult<any>> {
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw 'Missing info';
   if (customer.length > 15) throw 'Bad request';
@@ -929,12 +929,7 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   request.input('Customer', TYPES.Char(15), customer);
   request.input('PalletType', TYPES.Char(15), palletType);
   request.input('Qty', TYPES.Int, qty.toString(10));
-  return request.execute(storedProcedure).then(() => 200).catch(
-    e => {
-      console.error(e);
-      return 500;
-    }
-  );
+  return request.execute(storedProcedure);
 }
 
 export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
