@@ -677,7 +677,7 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   const request = new sqlRequest();
   const query =
   `
-  SELECT TOP(1000) Address, Branch, City, ContactPerson, Created, Creator, CustomerName, CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
+  SELECT TOP(1000) Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
   FROM [MSDS].[dbo].Deliveries d WITH (NOLOCK)
   WHERE Branch = @branch
   AND Status ${archived ? '=' : '<>'} 'Archived'
@@ -741,7 +741,9 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   UPDATE [MSDS].[dbo].Deliveries
   SET ${updates.join()}
   WHERE id = @id;
-  SELECT * FROM [MSDS].[dbo].Deliveries WHERE id = @id
+  SELECT Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
+  FROM [MSDS].[dbo].Deliveries
+  WHERE id = @id
   `;
   const request = new sqlRequest()
   request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
