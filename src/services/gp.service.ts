@@ -677,7 +677,7 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   const request = new sqlRequest();
   const query =
   `
-  SELECT TOP(1000) Address, RTRIM(Branch), City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber), CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber), PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
+  SELECT TOP(1000) Address, Branch, City, ContactPerson, Created, Creator, CustomerName, CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
   FROM [MSDS].[dbo].Deliveries d WITH (NOLOCK)
   WHERE Branch = @branch
   AND Status ${archived ? '=' : '<>'} 'Archived'
