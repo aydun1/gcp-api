@@ -545,7 +545,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   const query =
   `
   SELECT
-  RTRIM(MAX(BACHNUMB)) batchNumber, MAX(DOCDATE) docDate, MAX(ReqShipDate) reqShipDate, rtrim(MAX(LOCNCODE)) locnCode, MAX(a.SOPTYPE) sopType, MAX(a.SOPNUMBE) sopNumber, MAX(ORIGTYPE) origType, RTRIM(MAX(ORIGNUMB)) origNumber, MAX(CUSTNMBR) custNumber, rtrim(MAX(a.PRSTADCD)) adrsCode, RTRIM(MAX(CUSTNAME)) custName, RTRIM(MAX(a.CNTCPRSN)) cntPrsn, RTRIM(MAX(a.ADDRESS1)) address1, RTRIM(MAX(a.ADDRESS2)) address2,
+  RTRIM(MAX(BACHNUMB)) batchNumber, MAX(DOCDATE) docDate, MAX(ReqShipDate) reqShipDate, rtrim(MAX(LOCNCODE)) locnCode, MAX(a.SOPTYPE) sopType, RTRIM(MAX(a.SOPNUMBE)) sopNumber, MAX(ORIGTYPE) origType, RTRIM(MAX(ORIGNUMB)) origNumber, RTRIM(MAX(CUSTNMBR)) custNumber, rtrim(MAX(a.PRSTADCD)) adrsCode, RTRIM(MAX(CUSTNAME)) custName, RTRIM(MAX(a.CNTCPRSN)) cntPrsn, RTRIM(MAX(a.ADDRESS1)) address1, RTRIM(MAX(a.ADDRESS2)) address2,
   RTRIM(MAX(a.ADDRESS3)) address3, RTRIM(MAX(a.CITY)) city, RTRIM(MAX(a.[STATE])) state, RTRIM(MAX(a.ZIPCODE)) postCode,  RTRIM(MAX(PHNUMBR1)) phoneNumber1, RTRIM(MAX(PHNUMBR2)) phoneNumber2, RTRIM(MAX(a.SHIPMTHD)) shipMethod, MAX(posted) as posted,
   SUM(CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty)) palletSpaces,
   SUM(p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / COALESCE(p.PackQty, 1)) orderWeight, MAX(CONVERT (varchar(max), TXTFIELD )) note
@@ -920,6 +920,7 @@ export function getBasicChemicalInfo(itemNumber: string): Promise<{docNo: string
 }
 
 export function updatePallets(customer: string, palletType: string, palletQty: string): Promise<IProcedureResult<any>> {
+  customer = customer.trimEnd();
   const qty = parseInt(palletQty, 10);
   if (!customer || !palletType || !palletQty === undefined) throw 'Missing info';
   if (customer.length > 15) throw 'Bad request';
