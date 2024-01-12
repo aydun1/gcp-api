@@ -421,9 +421,7 @@ app.get('/chemicals/outbound', verifyChemicalListToken, (req,  res) => {
   const run = params['run'] as string || '';
   getChemicalsOnRun(branch, run).then(
     chemicals => {
-      if (req.accepts('json')) {
-        res.status(200).send({ chemicals });
-      } else {
+      if (req.accepts('text/plain')) {
         res.status(200).send(
           `<html lang="en" translate="no"><head>
           <title>Outbound chemicals</title>
@@ -435,6 +433,8 @@ app.get('/chemicals/outbound', verifyChemicalListToken, (req,  res) => {
             .map(c => `<td> ${c.Quantity}</td><td><a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.ItemDesc || ''}</a> </td><td>${c.Dgc}</td>`).join('</tr>\n<tr>') +
           '</tr></table></body></html>'
         )
+      } else {
+        res.status(200).send({ chemicals });
       }
     }
   ).catch(err => {
