@@ -419,9 +419,10 @@ app.get('/chemicals/outbound', verifyChemicalListToken, (req,  res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const run = params['run'] as string || '';
+  const format = params['format'] as string || '';
   getChemicalsOnRun(branch, run).then(
     chemicals => {
-      if (req.accepts('text/html')) {
+      if (format !== 'json') {
         console.log(req.accepts('text/html'))
         res.status(200).send(
           `<html lang="en" translate="no"><head>
