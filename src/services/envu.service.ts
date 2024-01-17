@@ -1,4 +1,4 @@
-import { TYPES, Request as sqlRequest, IResult } from 'mssql';
+import { Request as sqlRequest, IResult } from 'mssql';
 import axios from 'axios';
 
 import { EnvuSale } from '../types/envu-sale';
@@ -6,10 +6,17 @@ import { EnvuReceipt } from '../types/envu-receipt';
 import { EnvuQuery } from '../types/envu-query';
 import { EnvuTransfer } from '../types/envu-transfer';
 
-interface CwRes {
-  Code: number;
-  Message: string;
+interface AuthRes {
+  access_token: string;
+  scope: string;
+  expires_in: number;
+  token_type: string;
+  error?: string;
+  error_description?: string;
 }
+
+let authRes!: AuthRes;
+let authDate!: Date;
 
 const locations = [
   {envuCode: 'AUC-GCP001', gpCode: 'NSW'},
@@ -39,29 +46,55 @@ const products = [
   {envuCode: '80204353', gpCode: 'TRIBUTE1', name: 'TRIBUTE OD22,5 12X1L BOT AU'}
 ];
 
-async function getAccessToken() {
-  const client_id = '';
-  const client_secret = '';
-  const grant_type = 'client_credentials'
-  const auth_endpoint = 'https://auth0-proxy-oat.apac.proagrica.com/auth/token/apigateway';
-  const headers = {'Content-Type': 'application/json'};
-  const body = {client_id, client_secret, grant_type};
-  const res = await axios.post<CwRes>(auth_endpoint, body, {headers});
-  if (res.data.Code !== 200) throw new Error(res.data.Message);
-  return res.data;
+function dateString(): string {
+  const date = new Date();
+  return date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate() + '';
 }
 
-async function sendDocument(data: EnvuSale, pn_messagetype: string) {
-  const pn_source = '';
-  const Authorization = ''
+async function getAccessToken(): Promise<void> {
+  console.log('Getting auth token')
+
+  const now = new Date();
+  const expires = authRes ? new Date(authDate.getTime() + authRes.expires_in * 1000) : 0;
+  if (now < expires) {
+    console.log('Already authenticated')
+    return Promise.resolve()
+  };
+  try {
+    const client_id = 'HJvrEjhzk0NvlNEW2EUVffGslaYt7ljK';
+    const client_secret = 'JjGIXHXl4TiRIMzsLVDmx3HG_OnuDsVqpr_SGCkSwiud27AJBTFzyq8sPRf_23xm';
+    const grant_type = 'client_credentials'
+    const auth_endpoint = 'https://auth0-proxy-oat.apac.proagrica.com/auth/token/apigateway';
+    const headers = {'Content-Type': 'application/json'};
+    const body = {client_id, client_secret, grant_type};
+    const res = await axios.post<AuthRes>(auth_endpoint, body, {headers});
+    if (res.status !== 200 || res.data.error) throw new Error(res.data.error_description);
+    authDate = new Date();
+    authRes = res.data;
+    console.log('Auth token gotten')
+    return;
+  } catch (error: any) {
+    throw new Error(error['code'] || error as string);
+  }
+}
+
+async function sendDocument(data: EnvuReceipt[] | EnvuSale[] | EnvuTransfer[], pn_messagetype: 'goodsreceipt' | 'order' | 'transfer') {
+  console.log('Sending data')
+  const pn_source = 'gcp';
+  const Authorization = authRes.access_token;
   const send_endpoint = 'https://apigateway-oat.apac.proagrica.com/oauth/network/sendDocument';
-  const headers = {'Content-Type': 'application/json', pn_source, pn_messagetype, Authorization};
-  const res = await axios.post<CwRes>(send_endpoint, data, {headers});
-  if (res.data.Code !== 200) throw new Error(res.data.Message);
-  return res.data;
+  const headers = {'Content-Type': 'application/json', pn_source, pn_messagetype, Authorization: `Bearer ${Authorization}`};
+  try {
+    const res = await axios.post<AuthRes>(send_endpoint, data, {headers});
+    console.log('Data sent 👌')
+    return res.data;
+  } catch (error: any) {
+    console.log('Error sending data:', error.response.status)
+    return {};
+  }
 }
 
-export function getChemicalSales() {
+export function getChemicalSales(): Promise<{lines: EnvuSale[]}> {
   const request = new sqlRequest();
   const query =
   `
@@ -75,8 +108,8 @@ export function getChemicalSales() {
   RTRIM(sh.SOPNUMBE) AS trackingId,
   '1' AS revisionNumber,
   RTRIM(CSTPONBR) AS poNumber,
-  'ASAP' AS requestedDeliveryDate,
-  'ASAP' AS requestedDespatchDate,
+  '' AS requestedDeliveryDate,
+  '' AS requestedDispatchDate,
   '' AS buyerCompanyName,
   'Garden City Plastics' AS sellerCompanyName,
   RTRIM(sd.LOCNCODE) AS vendorCode,
@@ -130,14 +163,36 @@ export function getChemicalSales() {
       r['vendorCode'] = locations.find(_ => _.gpCode === r['vendorCode'])?.envuCode || '';
       r['sellerProductCode'] = products.find(_ => _.gpCode === r['sellerProductCode'])?.envuCode || '';
       r['productDescription'] = products.find(_ => _.gpCode === r['productDescription'])?.name || '';
+      r['requestedDeliveryDate'] = dateString();
+      r['requestedDispatchDate'] = dateString();
+      r['soldToName'] = '';
+      r['soldToAddress1'] = '';
+      r['soldToAddress2'] = '';
+      r['soldToAddress3'] = '';
     });
     return {lines: _.recordset}
   });
 }
 
+export async function sendChemicalSalesToEnvu() {
+  console.log('Starting envu sales update')
+  await getAccessToken();
+  const chemicals = await getChemicalTransactions();
+  const order = [chemicals.sales[0], chemicals.sales[1], chemicals.sales[2]];
+  const goodsreceipt = [chemicals.receiving[0], chemicals.receiving[1], chemicals.receiving[2]];
+  const transfers = [chemicals.transfers[0], chemicals.transfers[1], chemicals.transfers[2]];
+  sendDocument(order, 'order')
+  sendDocument(goodsreceipt, 'goodsreceipt')
+  sendDocument(transfers, 'transfer')
+  return {order, goodsreceipt, transfers};
+}
 
 
-export function getChemicalReceivings() {
+
+
+
+
+export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfer[], receiving: EnvuReceipt[], sales: EnvuSale[]}> {
   const request = new sqlRequest();
   const query =
   `
@@ -188,18 +243,32 @@ export function getChemicalReceivings() {
   ORDER BY DOCDATE DESC
   `;
 
-  return request.query(query).then((_: IResult<EnvuQuery[]>) => {
+
+  return await request.query(query).then((_: IResult<EnvuQuery[]>) => {
+
     // Receiving
-    const receiving = _.recordset.filter(_ => _.DOCTYPE === 2).map((r, i, a) => {
+    const receiving = _.recordset.filter(_ => [2].includes(_.DOCTYPE)).map((r, i, a) => {
       const documentIdField = 'DOCNUMBR';
       const sopLines = a.filter(_ => r[documentIdField] === _[documentIdField]);
       return {
-        totalGross: sopLines.reduce((a, b) => a += r.XTNDPRCE + r.TAXAMNT, 0),
+        shipmentNoteNumber: new Date(r.DOCDATE),
+        shipmentNoteDate: r.DOCNUMBR,
+        docCreated: new Date(r.DOCDATE),
+        docTrackingId: r.DOCNUMBR,
+        docRevisionNumber: 1,
+        expectedDeliveryDate: new Date(r.DOCDATE),
+        dateDispatched: new Date(r.DOCDATE),
+        soldToCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
+        sellerCompanyName: 'Envu',
+        buyerCompanyName: 'Garden City Plastics',
+        // Line item detail
         lineNumber: a.slice(0, i + 1).filter(_ => r[documentIdField] === _[documentIdField]).length,
         destinationPartnerId: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
         sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
         productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
-      } as Partial<EnvuReceipt>
+        dispatchedQuantity: r.TRXQTY,
+        uom: 'Each'
+      } as unknown as EnvuReceipt;
     });
 
     // Transfers
@@ -215,8 +284,8 @@ export function getChemicalReceivings() {
         documentCreated: new Date(r.DOCDATE),
         trackingId: r.DOCNUMBR,
         revisionNumber: '1',
-        requestedDeliveryDate: 'ASAP',
-        requestedDespatchDate: 'ASAP',
+        requestedDeliveryDate: dateString(),
+        requestedDispatchDate: dateString(),
         buyerCompanyName: 'Garden City Plastics',
         sellerCompanyName: 'Garden City Plastics',
         vendorCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
@@ -230,7 +299,7 @@ export function getChemicalReceivings() {
         productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
         orderQuantity: r.TRXQTY,
         uom: 'Each'
-      } as Partial<EnvuTransfer>;
+      } as EnvuTransfer;
     });
 
     // Sold
@@ -247,8 +316,8 @@ export function getChemicalReceivings() {
         trackingId: r.DOCNUMBR,
         revisionNumber: '1',
         poNumber: '', // r.CSTPONBR,
-        requestedDeliveryDate: 'ASAP',
-        requestedDespatchDate: 'ASAP',
+        requestedDeliveryDate: dateString(),
+        requestedDispatchDate: dateString(),
         buyerCompanyName: '',
         sellerCompanyName: 'Garden City Plastics',
         vendorCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
