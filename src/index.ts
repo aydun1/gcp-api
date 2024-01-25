@@ -258,9 +258,10 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
 });
 
 app.get('/gp/deliveries', auth, (req, res) => {
-  const body = req.query as {branch: string, run: string, status: string, deliveryType: string};
+  const body = req.query as {branch: string, run: string, status: string, deliveryType: string, orderNumberQuery: string};
   const archived = body.status === 'Archived' ? true : false;
-  getDeliveries(body.branch, body.run, body.deliveryType, archived).then(_ => res.status(200).json(_)).catch(err => {
+  const orderNumberQuery = body.orderNumberQuery;
+  getDeliveries(body.branch, body.run, body.deliveryType, archived, orderNumberQuery).then(_ => res.status(200).json(_)).catch(err => {
     return handleError(err, res);
   });
 });
