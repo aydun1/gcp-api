@@ -9,7 +9,7 @@ export interface EnvuSale {
   revisionNumber: string;
   poNumber: string;
   requestedDeliveryDate: Date | string;
-  requestedDespatchDate: Date | string;
+  requestedDispatchDate: Date | string;
   buyerCompanyName: string;
   sellerCompanyName: string;
   vendorCode: string;

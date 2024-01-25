@@ -13,7 +13,7 @@ export interface EnvuReceipt {
   salesOrderNumber: string;
   shipmentNoteDate: Date;
   expectedDeliveryDate: Date;
-  dateDespatched: Date;
+  dateDispatched: Date;
   soldToCode: string;
   soldToName: string;
   soldToAddress1: string;
