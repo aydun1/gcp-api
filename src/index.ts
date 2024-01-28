@@ -14,7 +14,6 @@ import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
-import { sendChemicalSalesToEnvu } from './services/envu.service';
 
 interface Body {
   customer: string;
