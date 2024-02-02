@@ -14,7 +14,7 @@ import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
-import { getChemicalReceivings, getChemicalSales } from './services/envu.service';
+import { sendChemicalSalesToEnvu } from './services/envu.service';
 
 interface Body {
   customer: string;
@@ -258,9 +258,10 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
 });
 
 app.get('/gp/deliveries', auth, (req, res) => {
-  const body = req.query as {branch: string, run: string, status: string, deliveryType: string};
+  const body = req.query as {branch: string, run: string, status: string, deliveryType: string, orderNumberQuery: string};
   const archived = body.status === 'Archived' ? true : false;
-  getDeliveries(body.branch, body.run, body.deliveryType, archived).then(_ => res.status(200).json(_)).catch(err => {
+  const orderNumberQuery = body.orderNumberQuery;
+  getDeliveries(body.branch, body.run, body.deliveryType, archived, orderNumberQuery).then(_ => res.status(200).json(_)).catch(err => {
     return handleError(err, res);
   });
 });
@@ -463,7 +464,7 @@ app.get('/public/sds/:itemNmbr.pdf', (req, res) => {
 });
 
 app.get('/public/chemical-sales', (req, res) => {
-  getChemicalSales().then(_ => {
+  sendChemicalSalesToEnvu().then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
