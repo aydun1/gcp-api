@@ -676,7 +676,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
 export function getDeliveries(branch: string, run: string, deliveryType: string, archived: boolean, orderNumberQuery: string) {
   const request = new sqlRequest();
   const limit = archived ? 'TOP(100)' : ''
-  const query =
+  let query =
   `
   SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
   FROM [MSDS].[dbo].Deliveries d WITH (NOLOCK)
@@ -684,10 +684,9 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   AND Status ${archived ? '=' : '<>'} 'Archived'
   ${run !== undefined ? 'AND Run = @run' : ''}
   ${deliveryType ? 'AND DeliveryType = @deliveryType' : ''}
-  AND OrderNumber LIKE @orderNumberQuery + '%'
-  ORDER BY ${archived ? 'DeliveryDate DESC' : 'Sequence ASC'}
   `;
-
+  if (orderNumberQuery) query += ` AND OrderNumber LIKE '%' + @orderNumberQuery + '%'`;
+  query += ` ORDER BY ${archived ? 'DeliveryDate DESC' : 'Sequence ASC'}`;
   return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.Char(15), run).input('deliveryType', TYPES.VarChar(50), deliveryType).input('orderNumberQuery', TYPES.VarChar(50), orderNumberQuery).query(query).then((_: IResult<Delivery>) => {
     return {value: _.recordset.map(r =>  {return {id: r.id, fields: r};})}
   });
