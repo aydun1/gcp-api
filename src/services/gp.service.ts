@@ -361,30 +361,6 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   return request.input('branch', TYPES.VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function cancelLines(lines: Array<Line>): Promise<{lines: object[]}> {
-  const poNumbers = Array.from(new Set(lines.map(_ => _.poNumber))).join('\', \'')
-  const request = new sqlRequest();
-  let query =
-  `
-  UPDATE POP10110
-  SET QTYCANCE = CASE
-  `;
-  lines.forEach((v, i) => {
-    const poRef = `po${i}`;
-    const lnRef = `ln${i}`;
-    const qtRef = `qt${i}`;
-
-    const toCancel = Math.min(v.orderQty, v.cancelledQty + v.ToTransfer)
-    query += ` WHEN PONUMBER = @${poRef} AND LineNumber = @${lnRef} THEN @${qtRef}`;
-    request.input(poRef, TYPES.VarChar(17), v.poNumber);
-    request.input(lnRef, TYPES.SmallInt, v.lineNumber);
-    request.input(qtRef, TYPES.SmallInt, toCancel);
-  })
-  query += ' ELSE QTYCANCE END';
-  query += ` WHERE PONUMBER IN ('${poNumbers}')`;
-  return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
-}
-
 export function getCustomers(branches: Array<string>, sort: string, orderby: string, filters: Array<string>, search: string, page: number): Promise<{customers: gpRes[]}> {
   const request = new sqlRequest();
   const offset = Math.max(0, (page - 1) * 50);
@@ -608,7 +584,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
+  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
   p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
 
@@ -636,19 +612,20 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   LEFT JOIN SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
   left join (
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
     UNION
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP30300 f WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP30300 f WITH (NOLOCK)
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
   ON ITEMNMBR = p.Product
   WHERE a.SOPNUMBE = @sopNumber
+  ORDER BY LNITMSEQ
   `;
   const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
-  return lines.then((_: IResult<Array<Order>>) => {
-    const order = _.recordset[0];
+  return lines.then((_: IResult<Array<Line>>) => {
+    const order = _.recordset[0] as unknown as Order;
     if (!order) return {};
     const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
     const pickStatus = (order['posted'] || order['batchNumber'] === 'FULFILLED') ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
@@ -668,7 +645,18 @@ export function getOrderLines(sopType: number, sopNumber: string) {
       reqShipDate: new Date(order.reqShipDate),
       note: noteMatch,
       pickStatus: pickStatus,
-      lines: _.recordset
+      lines: _.recordset.map(l => {
+        return {
+          lineNumber: l.lineNumber,
+          itemNmbr: l.itemNmbr,
+          itemDesc: l.itemDesc,
+          quantity: l.quantity,
+          qtyPrInv: l.qtyPrInv,
+          qtyToInv: l.qtyToInv,
+          palletSpaces: l.palletSpaces,
+          lineWeight: l.lineWeight
+        }
+      })
     }
   });
 }
@@ -863,7 +851,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
 export function getChemicalsOnRun(branch: string, run: string) {
   const request = new sqlRequest();
   let query = `
-  SELECT d.Run, RTRIM(b.ITEMNMBR) ItemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) ItemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) Quantity
+  SELECT d.Run, RTRIM(b.ITEMNMBR) ItemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) ItemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) quantity
   FROM (
     SELECT SOPTYPE, SOPNUMBE
     FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
@@ -981,9 +969,14 @@ export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
 export function getNonInventoryChemicals(site: string): Promise<{chemicals: IRecordSet<CwRow>}> {
   const request = new sqlRequest();
   const query = `
-  SELECT a.ItemNmbr, CONCAT(ItemDesc, ' - ', CAST(ContainerSize AS float), Units) AS ItemDesc, ContainerSize, Units, b.Quantity
+  SELECT a.ItemNmbr,
+  CONCAT(ItemDesc, ' - ', CAST(ContainerSize AS float), Units) ItemDesc,
+  ContainerSize,
+  Units,
+  b.Quantity quantity
   FROM [MSDS].dbo.Consumables a
-  LEFT JOIN ( SELECT * FROM [MSDS].dbo.Quantities WHERE Site = @site) b ON a.ItemNmbr = b.ItemNmbr
+  LEFT JOIN ( SELECT * FROM [MSDS].dbo.Quantities WHERE Site = @site) b
+  ON a.ItemNmbr = b.ItemNmbr
   ORDER BY ItemDesc ASC
   `;
   return request.input('site', TYPES.Char(11), site).query(query).then((_: IResult<CwRow>) => {
