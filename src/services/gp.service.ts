@@ -586,7 +586,8 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   `
   SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
-  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
+  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight,
+  d.Status deliveryStatus, d.Run deliveryRun
 
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
@@ -620,6 +621,8 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
   ON ITEMNMBR = p.Product
+  LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  ON a.SOPNUMBE = d.OrderNumber
   WHERE a.SOPNUMBE = @sopNumber
   ORDER BY LNITMSEQ
   `;
@@ -645,6 +648,8 @@ export function getOrderLines(sopType: number, sopNumber: string) {
       reqShipDate: new Date(order.reqShipDate),
       note: noteMatch,
       pickStatus: pickStatus,
+      deliveryStatus: order.deliveryStatus,
+      deliveryRun: order.deliveryRun,
       lines: _.recordset.map(l => {
         return {
           lineNumber: l.lineNumber,

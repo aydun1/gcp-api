@@ -26,4 +26,6 @@ export interface Order {
   note: string;
   pickStatus: number;
   custNmbr: string;
+  deliveryStatus: string;
+  deliveryRun: string;
 }
