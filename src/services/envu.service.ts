@@ -94,6 +94,21 @@ async function sendDocument(data: EnvuReceipt[] | EnvuSale[] | EnvuTransfer[], p
   }
 }
 
+function groupByProperty(collection: any[], property: string): {key: string, lines: any[]}[] {
+  if(!collection || collection.length === 0) return [{key: 'undefined', lines: []}];
+  const groupedCollection = collection.reduce((previous, current)=> {
+    if(!previous[current[property]]) {
+      previous[current[property]] = [current];
+    } else {
+      previous[current[property]].push(current);
+    }
+    return previous;
+  }, {});
+  return Object.keys(groupedCollection).map(key => ({ key, lines: groupedCollection[key] })).sort((a, b) =>
+    a.key === '' ? 1 : b.key === '' ? -1 : a.key.localeCompare(b.key)
+  );
+}
+
 export function getChemicalSales(): Promise<{lines: EnvuSale[]}> {
   const request = new sqlRequest();
   const query =
@@ -178,19 +193,14 @@ export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update')
   await getAccessToken();
   const chemicals = await getChemicalTransactions();
-  const order = [chemicals.sales[0], chemicals.sales[1], chemicals.sales[2]];
+  const order = groupByProperty([chemicals.sales[0], chemicals.sales[1], chemicals.sales[2]], 'trackingId');
   const goodsreceipt = [chemicals.receiving[0], chemicals.receiving[1], chemicals.receiving[2]];
   const transfers = [chemicals.transfers[0], chemicals.transfers[1], chemicals.transfers[2]];
-  sendDocument(order, 'order')
-  sendDocument(goodsreceipt, 'goodsreceipt')
-  sendDocument(transfers, 'transfer')
+  //sendDocument(order, 'order')
+  //sendDocument(goodsreceipt, 'goodsreceipt')
+  //sendDocument(transfers, 'transfer')
   return {order, goodsreceipt, transfers};
 }
-
-
-
-
-
 
 export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfer[], receiving: EnvuReceipt[], sales: EnvuSale[]}> {
   const request = new sqlRequest();
@@ -354,7 +364,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
         currency: 'AUD'
       } as EnvuSale;
     });
-
+    
     return {transfers, receiving, sales}
   });
 }
