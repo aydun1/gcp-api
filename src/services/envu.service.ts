@@ -195,7 +195,7 @@ export async function sendChemicalSalesToEnvu() {
   const chemicals = await getChemicalTransactions();
   const order = groupByProperty([chemicals.sales[0], chemicals.sales[1], chemicals.sales[2]], 'trackingId');
   const goodsreceipt = [chemicals.receiving[0], chemicals.receiving[1], chemicals.receiving[2]];
-  const transfers = [chemicals.transfers[0], chemicals.transfers[1], chemicals.transfers[2]];
+  const transfers = groupByProperty([chemicals.transfers[0], chemicals.transfers[1], chemicals.transfers[2]], 'trackingId');
   //sendDocument(order, 'order')
   //sendDocument(goodsreceipt, 'goodsreceipt')
   //sendDocument(transfers, 'transfer')
