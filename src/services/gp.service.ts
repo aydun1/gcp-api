@@ -698,8 +698,8 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
 
 export async function addDelivery(delivery: Delivery): Promise<{id: number, fields: Delivery}> {
   const insertQuery = `
-  INSERT INTO [MSDS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType)
-  VALUES (@Run,@Status,@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Site,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@DeliveryType);
+  INSERT INTO [MSDS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
+  VALUES (@Run,@Status,@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Site,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@DeliveryType,@RequestedDate);
   SELECT @id = SCOPE_IDENTITY();
   `;
 
@@ -725,6 +725,7 @@ export async function addDelivery(delivery: Delivery): Promise<{id: number, fiel
   request.input('Creator', TYPES.NVarChar(50), delivery.Creator);
   request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
   request.input('DeliveryType', TYPES.VarChar(50), delivery.DeliveryType);
+  request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
   request.output('id', TYPES.Int);
   return request.query(insertQuery).then(_ => {
     const id = _['output']['id'] as number;
@@ -741,7 +742,9 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   if ('RequestedDate' in delivery) updates.push('RequestedDate = @RequestedDate');
   if ('PickStatus' in delivery) updates.push('PickStatus = @PickStatus');
   if ('DeliveryDate' in delivery) updates.push('DeliveryDate = @DeliveryDate');
-
+  if ('CustomerNumber' in delivery) updates.push('CustomerNumber = @CustomerNumber');
+  if ('CustomerName' in delivery) updates.push('CustomerName = @CustomerName');
+  if ('Address' in delivery) updates.push('Address = @Address');
   const updateQuery = `
   UPDATE [MSDS].[dbo].Deliveries
   SET ${updates.join()}
@@ -756,6 +759,9 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   request.input('PickStatus', TYPES.TinyInt, delivery.PickStatus);
   request.input('Sequence', TYPES.Int, delivery.Sequence);
   request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
+  request.input('CustomerNumber', TYPES.Char(15), delivery.CustomerNumber);
+  request.input('CustomerName', TYPES.VarChar(65), delivery.CustomerName);
+  request.input('Address', TYPES.NVarChar(MAX), delivery.Address);
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), delivery.Status);
   request.input('id', TYPES.Int, id);
