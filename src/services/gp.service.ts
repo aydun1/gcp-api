@@ -31,7 +31,7 @@ const fileExists = (path: string) => fs.promises.stat(path).then(() => true, () 
 const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`);
 const ignoreRegexp = /2g|4g|5g|80g|g\/l|g\/kg/;
 const cartonRegexp = /\[ctn([0-9]+)\]/;
-const driverNoteRegexp = /\*(.+)\*/g;
+const driverNoteRegexp = /\*([a-zA-Z0-9\s,./\\!@#$%^&()\-=]+)\*/g;
 const cwFolderId = '4006663';
 
 interface gpRes {
