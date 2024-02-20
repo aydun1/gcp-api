@@ -94,6 +94,21 @@ async function sendDocument(data: EnvuReceipt[] | EnvuSale[] | EnvuTransfer[], p
   }
 }
 
+function groupByProperty(collection: any[], property: string): {key: string, lines: any[]}[] {
+  if(!collection || collection.length === 0) return [{key: 'undefined', lines: []}];
+  const groupedCollection = collection.reduce((previous, current)=> {
+    if(!previous[current[property]]) {
+      previous[current[property]] = [current];
+    } else {
+      previous[current[property]].push(current);
+    }
+    return previous;
+  }, {});
+  return Object.keys(groupedCollection).map(key => ({ key, lines: groupedCollection[key] })).sort((a, b) =>
+    a.key === '' ? 1 : b.key === '' ? -1 : a.key.localeCompare(b.key)
+  );
+}
+
 export function getChemicalSales(): Promise<{lines: EnvuSale[]}> {
   const request = new sqlRequest();
   const query =
@@ -178,19 +193,14 @@ export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update')
   await getAccessToken();
   const chemicals = await getChemicalTransactions();
-  const order = [chemicals.sales[0], chemicals.sales[1], chemicals.sales[2]];
-  const goodsreceipt = [chemicals.receiving[0], chemicals.receiving[1], chemicals.receiving[2]];
-  const transfers = [chemicals.transfers[0], chemicals.transfers[1], chemicals.transfers[2]];
-  sendDocument(order, 'order')
-  sendDocument(goodsreceipt, 'goodsreceipt')
-  sendDocument(transfers, 'transfer')
+  const order = groupByProperty([chemicals.sales[0], chemicals.sales[1], chemicals.sales[2]], 'trackingId');
+  const goodsreceipt = groupByProperty([...chemicals.receiving.slice(10)], 'trackingId');
+  const transfers = groupByProperty([chemicals.transfers[0], chemicals.transfers[1], chemicals.transfers[2]], 'trackingId');
+  //sendDocument(order, 'order')
+  //sendDocument(goodsreceipt, 'goodsreceipt')
+  //sendDocument(transfers, 'transfer')
   return {order, goodsreceipt, transfers};
 }
-
-
-
-
-
 
 export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfer[], receiving: EnvuReceipt[], sales: EnvuSale[]}> {
   const request = new sqlRequest();
@@ -248,21 +258,23 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
 
     // Receiving
     const receiving = _.recordset.filter(_ => [2].includes(_.DOCTYPE)).map((r, i, a) => {
-      const documentIdField = 'DOCNUMBR';
-      const sopLines = a.filter(_ => r[documentIdField] === _[documentIdField]);
+      const docIdField = 'DOCNUMBR';
+      const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
       return {
         shipmentNoteNumber: new Date(r.DOCDATE),
         shipmentNoteDate: r.DOCNUMBR,
-        docCreated: new Date(r.DOCDATE),
-        docTrackingId: r.DOCNUMBR,
-        docRevisionNumber: 1,
+        documentCreated: new Date(r.DOCDATE),
+        trackingId: r.DOCNUMBR,
+        revisionNumber: 1,
         expectedDeliveryDate: new Date(r.DOCDATE),
         dateDispatched: new Date(r.DOCDATE),
         soldToCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
         sellerCompanyName: 'Envu',
         buyerCompanyName: 'Garden City Plastics',
+        totalLines: sopLines.length,
+        totalQuantity: sopLines.reduce((a, b) => a += b.TRXQTY, 0),
         // Line item detail
-        lineNumber: a.slice(0, i + 1).filter(_ => r[documentIdField] === _[documentIdField]).length,
+        lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
         destinationPartnerId: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
         sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
         productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
@@ -284,6 +296,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
         documentCreated: new Date(r.DOCDATE),
         trackingId: r.DOCNUMBR,
         revisionNumber: '1',
+        poNumber: r.DOCNUMBR,
         requestedDeliveryDate: dateString(),
         requestedDispatchDate: dateString(),
         buyerCompanyName: 'Garden City Plastics',
@@ -291,7 +304,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
         vendorCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
         soldToCode: locations.find(_ => _.gpCode === r['TRNSTLOC'])?.envuCode || '' + r['TRNSTLOC'],
         totalLines: sopLines.length,
-        totalQuantity: sopLines.reduce((a, b) => a += r.TRXQTY, 0),
+        totalQuantity: sopLines.reduce((a, b) => a += b.TRXQTY, 0),
         // Line
         lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
         lineStatus: 'New',
@@ -337,7 +350,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
         totalNet: sopLines.reduce((a, b) => a += b.XTNDPRCE, 0),
         totalTax: sopLines.reduce((a, b) => a += b.TAXAMNT, 0),
         totalLines: sopLines.length,
-        totalQuantity: sopLines.reduce((a, b) => a += r.DOCTYPE === 6 ? r.QTYFULFI * r.QTYBSUOM : r.QUANTITY * r.QTYBSUOM * -1, 0),
+        totalQuantity: sopLines.reduce((a, b) => a += b.DOCTYPE === 6 ? b.QTYFULFI * b.QTYBSUOM : b.QUANTITY * b.QTYBSUOM * -1, 0),
         totalGross: sopLines.reduce((a, b) => a += b.XTNDPRCE + b.TAXAMNT, 0),
         // Line
         lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
@@ -354,7 +367,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
         currency: 'AUD'
       } as EnvuSale;
     });
-
+    
     return {transfers, receiving, sales}
   });
 }

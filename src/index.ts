@@ -117,7 +117,8 @@ app.get('/gp/customers/:id(*)/addresses', auth, (req: Request, res: Response) =>
 });
 
 app.get('/gp/customers/:id(*)', auth, (req: Request, res: Response) => {
-  getCustomer(req.params.id).then(
+  const custId = req.params.id.replace('\'\'', '\'');
+  getCustomer(custId).then(
     result => res.status(200).send(result)
   ).catch(err => {
     return handleError(err, res);

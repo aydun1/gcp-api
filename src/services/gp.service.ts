@@ -361,30 +361,6 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   return request.input('branch', TYPES.VarChar(15), branch).query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
 }
 
-export function cancelLines(lines: Array<Line>): Promise<{lines: object[]}> {
-  const poNumbers = Array.from(new Set(lines.map(_ => _.poNumber))).join('\', \'')
-  const request = new sqlRequest();
-  let query =
-  `
-  UPDATE POP10110
-  SET QTYCANCE = CASE
-  `;
-  lines.forEach((v, i) => {
-    const poRef = `po${i}`;
-    const lnRef = `ln${i}`;
-    const qtRef = `qt${i}`;
-
-    const toCancel = Math.min(v.orderQty, v.cancelledQty + v.ToTransfer)
-    query += ` WHEN PONUMBER = @${poRef} AND LineNumber = @${lnRef} THEN @${qtRef}`;
-    request.input(poRef, TYPES.VarChar(17), v.poNumber);
-    request.input(lnRef, TYPES.SmallInt, v.lineNumber);
-    request.input(qtRef, TYPES.SmallInt, toCancel);
-  })
-  query += ' ELSE QTYCANCE END';
-  query += ` WHERE PONUMBER IN ('${poNumbers}')`;
-  return request.query(query).then((_: IResult<gpRes>) => {return {lines: _.recordset}});
-}
-
 export function getCustomers(branches: Array<string>, sort: string, orderby: string, filters: Array<string>, search: string, page: number): Promise<{customers: gpRes[]}> {
   const request = new sqlRequest();
   const offset = Math.max(0, (page - 1) * 50);
@@ -545,28 +521,31 @@ export function getOrders(branch: string, batch: string, date: string) {
   const query =
   `
   SELECT
+  SUM(LinePicked) linesPicked,
+  COUNT (*) as linesTotal,
+  COALESCE(SUM(CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * (pt.FulfilledQuantity * QTYBSUOM / p.PalletQty)), 0) fulfilledSpaces,
   RTRIM(MAX(BACHNUMB)) batchNumber, MAX(DOCDATE) docDate, MAX(ReqShipDate) reqShipDate, rtrim(MAX(LOCNCODE)) locnCode, MAX(a.SOPTYPE) sopType, RTRIM(MAX(a.SOPNUMBE)) sopNumber, MAX(ORIGTYPE) origType, RTRIM(MAX(ORIGNUMB)) origNumber, RTRIM(MAX(CUSTNMBR)) custNumber, rtrim(MAX(a.PRSTADCD)) adrsCode, RTRIM(MAX(CUSTNAME)) custName, RTRIM(MAX(a.CNTCPRSN)) cntPrsn, RTRIM(MAX(a.ADDRESS1)) address1, RTRIM(MAX(a.ADDRESS2)) address2,
   RTRIM(MAX(a.ADDRESS3)) address3, RTRIM(MAX(a.CITY)) city, RTRIM(MAX(a.[STATE])) state, RTRIM(MAX(a.ZIPCODE)) postCode,  RTRIM(MAX(PHNUMBR1)) phoneNumber1, RTRIM(MAX(PHNUMBR2)) phoneNumber2, RTRIM(MAX(a.SHIPMTHD)) shipMethod, MAX(posted) as posted,
   SUM(CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty)) palletSpaces,
   SUM(p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / COALESCE(p.PackQty, 1)) orderWeight, MAX(CONVERT (varchar(max), TXTFIELD )) note
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
-    FROM SOP10100 a WITH (NOLOCK)
+    FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
     WHERE ReqShipDate = @date
     AND LOCNCODE = @locnCode
     AND SOPTYPE = 2
     UNION
     SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
-    FROM SOP30200 a WITH (NOLOCK)
+    FROM [GCP].[dbo].SOP30200 a WITH (NOLOCK)
     LEFT JOIN (
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM SOP10100 WITH (NOLOCK)
+      FROM [GCP].[dbo].SOP10100 WITH (NOLOCK)
       WHERE ReqShipDate = @date
       AND LOCNCODE = @locnCode
       AND SOPTYPE = 3
       UNION
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM SOP30200 WITH (NOLOCK)
+      FROM [GCP].[dbo].SOP30200 WITH (NOLOCK)
       WHERE ReqShipDate = @date
       AND LOCNCODE = @locnCode
       AND SOPTYPE = 3
@@ -576,19 +555,27 @@ export function getOrders(branch: string, batch: string, date: string) {
     WHERE a.SOPTYPE = 2
     AND LOCNCODE = @locnCode
   ) a
-  LEFT JOIN SY03900 n WITH (NOLOCK)
+  LEFT JOIN [GCP].[dbo].SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
   LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
   left join (
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK)
     UNION
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP30300 f WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK)
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
   ON ITEMNMBR = p.Product
+  LEFT JOIN (
+    SELECT o.SalesOrderCode, u.LineNumber, SUM(u.FulfilledQuantity) FulfilledQuantity, 1 as LinePicked
+    FROM [PanatrackerGP].[dbo].[TrxFulfillOrder] o
+    LEFT JOIN [PanatrackerGP].[dbo].[TrxFulfillOrderUnit] u
+    ON u.TrxFulfillOrderOid = o.Oid
+    GROUP BY SalesOrderCode, LineNumber
+  ) pt
+  ON a.SOPNUMBE = pt.SalesOrderCode AND LNITMSEQ = pt.LineNumber
   WHERE a.reqShipDate = @date
   AND a.locnCode = @locnCode
   AND (d.Status <> 'Archived' OR d.Status IS NULL)
@@ -608,47 +595,51 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   const request = new sqlRequest();
   const query =
   `
-  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
+  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
-  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight
+  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight,
+  d.Status deliveryStatus, d.Run deliveryRun
 
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
-    FROM SOP10100 a WITH (NOLOCK)
+    FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
     WHERE SOPTYPE = 2
     UNION
     SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
-    FROM SOP30200 a WITH (NOLOCK)
+    FROM [GCP].[dbo].SOP30200 a WITH (NOLOCK)
 
     LEFT JOIN (
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM SOP10100 WITH (NOLOCK)
+      FROM [GCP].[dbo].SOP10100 WITH (NOLOCK)
       WHERE SOPTYPE = 3
       UNION
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM SOP30200 WITH (NOLOCK)
+      FROM [GCP].[dbo].SOP30200 WITH (NOLOCK)
       WHERE SOPTYPE = 3
     ) c
     ON a.SOPTYPE = c.ORIGTYPE
     AND a.SOPNUMBE = c.ORIGNUMB
     WHERE a.SOPTYPE = 2
   ) a
-  LEFT JOIN SY03900 n WITH (NOLOCK)
+  LEFT JOIN [GCP].[dbo].SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
   left join (
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP10200 e WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK)
     UNION
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM SOP30300 f WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK)
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
   ON ITEMNMBR = p.Product
+  LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  ON a.SOPNUMBE = d.OrderNumber
   WHERE a.SOPNUMBE = @sopNumber
+  ORDER BY LNITMSEQ
   `;
   const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
-  return lines.then((_: IResult<Array<Order>>) => {
-    const order = _.recordset[0];
+  return lines.then((_: IResult<Array<Line>>) => {
+    const order = _.recordset[0] as unknown as Order;
     if (!order) return {};
     const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
     const pickStatus = (order['posted'] || order['batchNumber'] === 'FULFILLED') ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
@@ -668,7 +659,20 @@ export function getOrderLines(sopType: number, sopNumber: string) {
       reqShipDate: new Date(order.reqShipDate),
       note: noteMatch,
       pickStatus: pickStatus,
-      lines: _.recordset
+      deliveryStatus: order.deliveryStatus,
+      deliveryRun: order.deliveryRun,
+      lines: _.recordset.map(l => {
+        return {
+          lineNumber: l.lineNumber,
+          itemNmbr: l.itemNmbr,
+          itemDesc: l.itemDesc,
+          quantity: l.quantity,
+          qtyPrInv: l.qtyPrInv,
+          qtyToInv: l.qtyToInv,
+          palletSpaces: l.palletSpaces,
+          lineWeight: l.lineWeight
+        }
+      })
     }
   });
 }
@@ -694,8 +698,8 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
 
 export async function addDelivery(delivery: Delivery): Promise<{id: number, fields: Delivery}> {
   const insertQuery = `
-  INSERT INTO [MSDS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType)
-  VALUES (@Run,@Status,@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Site,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@DeliveryType);
+  INSERT INTO [MSDS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
+  VALUES (@Run,@Status,@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Site,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@DeliveryType,@RequestedDate);
   SELECT @id = SCOPE_IDENTITY();
   `;
 
@@ -721,6 +725,7 @@ export async function addDelivery(delivery: Delivery): Promise<{id: number, fiel
   request.input('Creator', TYPES.NVarChar(50), delivery.Creator);
   request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
   request.input('DeliveryType', TYPES.VarChar(50), delivery.DeliveryType);
+  request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
   request.output('id', TYPES.Int);
   return request.query(insertQuery).then(_ => {
     const id = _['output']['id'] as number;
@@ -737,7 +742,9 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   if ('RequestedDate' in delivery) updates.push('RequestedDate = @RequestedDate');
   if ('PickStatus' in delivery) updates.push('PickStatus = @PickStatus');
   if ('DeliveryDate' in delivery) updates.push('DeliveryDate = @DeliveryDate');
-
+  if ('CustomerNumber' in delivery) updates.push('CustomerNumber = @CustomerNumber');
+  if ('CustomerName' in delivery) updates.push('CustomerName = @CustomerName');
+  if ('Address' in delivery) updates.push('Address = @Address');
   const updateQuery = `
   UPDATE [MSDS].[dbo].Deliveries
   SET ${updates.join()}
@@ -752,6 +759,9 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   request.input('PickStatus', TYPES.TinyInt, delivery.PickStatus);
   request.input('Sequence', TYPES.Int, delivery.Sequence);
   request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
+  request.input('CustomerNumber', TYPES.Char(15), delivery.CustomerNumber);
+  request.input('CustomerName', TYPES.VarChar(65), delivery.CustomerName);
+  request.input('Address', TYPES.NVarChar(MAX), delivery.Address);
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), delivery.Status);
   request.input('id', TYPES.Int, id);
@@ -863,7 +873,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
 export function getChemicalsOnRun(branch: string, run: string) {
   const request = new sqlRequest();
   let query = `
-  SELECT d.Run, RTRIM(b.ITEMNMBR) ItemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) ItemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) Quantity
+  SELECT d.Run, RTRIM(b.ITEMNMBR) ItemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) ItemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) quantity
   FROM (
     SELECT SOPTYPE, SOPNUMBE
     FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
@@ -981,9 +991,14 @@ export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
 export function getNonInventoryChemicals(site: string): Promise<{chemicals: IRecordSet<CwRow>}> {
   const request = new sqlRequest();
   const query = `
-  SELECT a.ItemNmbr, CONCAT(ItemDesc, ' - ', CAST(ContainerSize AS float), Units) AS ItemDesc, ContainerSize, Units, b.Quantity
+  SELECT a.ItemNmbr,
+  CONCAT(ItemDesc, ' - ', CAST(ContainerSize AS float), Units) ItemDesc,
+  ContainerSize,
+  Units,
+  b.Quantity quantity
   FROM [MSDS].dbo.Consumables a
-  LEFT JOIN ( SELECT * FROM [MSDS].dbo.Quantities WHERE Site = @site) b ON a.ItemNmbr = b.ItemNmbr
+  LEFT JOIN ( SELECT * FROM [MSDS].dbo.Quantities WHERE Site = @site) b
+  ON a.ItemNmbr = b.ItemNmbr
   ORDER BY ItemDesc ASC
   `;
   return request.input('site', TYPES.Char(11), site).query(query).then((_: IResult<CwRow>) => {
