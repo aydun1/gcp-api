@@ -41,6 +41,7 @@ const bearerStrategy = new BearerStrategy(options, (token: ITokenPayload, done: 
 
 const app = express();
 app.use('/enews', express.static('enews'));
+app.use('/footers', express.static('footers'));
 app.use('/assets', express.static('assets'));
 app.use(express.json());
 app.use(helmet());
@@ -250,6 +251,7 @@ app.post('/gp/itt', auth, (req: Request, res: Response) => {
 
 app.post('/pallets', verifyPalletApiToken, (req, res) => {
   const body = req.body as Body;
+  console.log(body);
   updatePallets(body.customer, body.palletType, body.palletQty).then(
     () => res.status(200).json({result: 'Pallet updated successfully.'})
   ).catch(err => {
