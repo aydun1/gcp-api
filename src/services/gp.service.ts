@@ -13,7 +13,9 @@ import { Order } from '../types/order';
 
 import { initChemwatch } from './cw.service';
 
-const storedProcedure = 'usp_PalletUpdate';
+const palletStoredProcedure = 'usp_PalletUpdate';
+const productionStoredProcedure = 'usp_PalletUpdate';
+
 const dct: {[key: string]: {uom: string, divisor: number}} = {
   millilitre: {divisor: 1000, uom: 'L'},
   milliliter: {divisor: 1000, uom: 'L'},
@@ -680,7 +682,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
 
 export function getDeliveries(branch: string, run: string, deliveryType: string, archived: boolean, orderNumberQuery: string) {
   const request = new sqlRequest();
-  const limit = archived ? 'TOP(100)' : ''
+  const limit = archived ? 'TOP(250)' : ''
   let query =
   `
   SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
@@ -946,7 +948,12 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   request.input('Customer', TYPES.Char(15), customer);
   request.input('PalletType', TYPES.Char(15), palletType);
   request.input('Qty', TYPES.Int, qty.toString(10));
-  return request.execute(storedProcedure);
+  return request.execute(palletStoredProcedure);
+}
+
+export function getProduction(): Promise<IProcedureResult<any>> {
+  const request = new sqlRequest();
+  return request.execute(productionStoredProcedure);
 }
 
 export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
