@@ -14,7 +14,7 @@ import { Order } from '../types/order';
 import { initChemwatch } from './cw.service';
 
 const palletStoredProcedure = 'usp_PalletUpdate';
-const productionStoredProcedure = 'usp_PalletUpdate';
+const productionStoredProcedure = 'usp_ProductionReport';
 
 const dct: {[key: string]: {uom: string, divisor: number}} = {
   millilitre: {divisor: 1000, uom: 'L'},
@@ -254,7 +254,11 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ON a.UOMSCHDL = u.UOMSCHDL
 
   -- Get specs
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT *
+    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  ) p
   ON a.ITEMNMBR = p.Product
 
   -- get ITTs
@@ -568,7 +572,11 @@ export function getOrders(branch: string, batch: string, date: string) {
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT *
+    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  ) p
   ON ITEMNMBR = p.Product
   LEFT JOIN (
     SELECT o.SalesOrderCode, u.LineNumber, SUM(u.FulfilledQuantity) FulfilledQuantity, 1 as LinePicked
@@ -633,7 +641,11 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT *
+    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  ) p
   ON ITEMNMBR = p.Product
   LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
@@ -951,9 +963,9 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   return request.execute(palletStoredProcedure);
 }
 
-export function getProduction(): Promise<IProcedureResult<any>> {
+export function getProduction(): Promise<{lines: any[]}> {
   const request = new sqlRequest();
-  return request.execute(productionStoredProcedure);
+  return request.execute(productionStoredProcedure).then(_ => {return {lines: _.recordset}});
 }
 
 export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
