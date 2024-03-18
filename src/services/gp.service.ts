@@ -501,7 +501,7 @@ export function getHistory(itemNmbr: string) {
 export function getOrdersByLine(branch: string, itemNmbr: string) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
-  const query =
+  let query =
   `
   Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, b.ATYALLOC * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT notes
   FROM SOP10100 a
@@ -513,7 +513,11 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
   WHERE b.ITEMNMBR = @itemnmbr
   AND a.SOPTYPE IN (2, 3, 5)
+  `;
+  if (branch) query += `
   AND a.LOCNCODE = @locnCode
+  `;
+  query += `
   ORDER BY a.DOCDATE DESC
   `;
   return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
