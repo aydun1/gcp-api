@@ -12,4 +12,6 @@ export interface Line {
   ToTransfer: number;
   palletSpaces: number;
   lineWeight: number;
+  uom: string;
+  packQty: number;
 }
