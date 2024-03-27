@@ -63,7 +63,8 @@ function handleError(err: any, res: Response) {
       if (err) console.log('Failed to open a SQL Database connection.', err?.message)
     });
   }
-  console.error(err);
+  console.error(new Date());
+  console.error(err?.message);
   return res.status(500).json({'result': 'Internal server error'});
 }
 
@@ -261,7 +262,6 @@ app.post('/gp/itt', auth, (req: Request, res: Response) => {
 
 app.post('/pallets', verifyPalletApiToken, (req, res) => {
   const body = req.body as Body;
-  console.log(body);
   updatePallets(body.customer, body.palletType, body.palletQty).then(
     () => res.status(200).json({result: 'Pallet updated successfully.'})
   ).catch(err => {
