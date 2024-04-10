@@ -853,7 +853,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   LEFT JOIN [MSDS].dbo.Quantities b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
   LEFT JOIN [MSDS].dbo.ProductLinks d WITH (NOLOCK) ON a.ItemNmbr = d.ITEMNMBR
   LEFT JOIN [MSDS].dbo.Materials e WITH (NOLOCK) ON d.CwNo = e.CwNo
-  WHERE b.Site = @locnCode
+  WHERE COALESCE(b.Site, '') = @locnCode
   `;
 
   if (branch) query2 += `
