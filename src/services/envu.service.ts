@@ -193,13 +193,13 @@ export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update')
   await getAccessToken();
   const chemicals = await getChemicalTransactions();
-  const order = groupByProperty([chemicals.sales[0], chemicals.sales[1], chemicals.sales[2]], 'trackingId');
-  const goodsreceipt = groupByProperty([...chemicals.receiving.slice(10)], 'trackingId');
-  const transfers = groupByProperty([chemicals.transfers[0], chemicals.transfers[1], chemicals.transfers[2]], 'trackingId');
-  //sendDocument(order, 'order')
-  //sendDocument(goodsreceipt, 'goodsreceipt')
-  //sendDocument(transfers, 'transfer')
-  return {order, goodsreceipt, transfers};
+  const orders = groupByProperty([...chemicals.sales.slice(0, 3)], 'trackingId');
+  const goodsreceipts = groupByProperty([...chemicals.receiving.slice(0, 3)], 'trackingId');
+  const transfers = groupByProperty([...chemicals.transfers.slice(0, 3)], 'trackingId');
+  //sendDocument(orders, 'orders')
+  //sendDocument(goodsreceipts, 'goodsreceipts')
+  //sendDocument(transfers, 'transfers')
+  return {orders, goodsreceipts, transfers};
 }
 
 export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfer[], receiving: EnvuReceipt[], sales: EnvuSale[]}> {
