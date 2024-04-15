@@ -65,7 +65,7 @@ function createIttId(branch: string): Promise<string> {
 }
 
 function parseBranch(branch: string): string {
-  return branch === 'VIC' ? 'MAIN' : branch;
+  return branch === 'VIC' ? 'MAIN' : branch.substring(0, 3);
 }
 
 function getNextDay(): Date {
@@ -527,6 +527,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   const now = date || getNextDay().toLocaleDateString('fr-CA');
   const dt = `${now} 00:00:00.000`;
   branch = parseBranch(branch);
+  const branchList = `('${branch}'${branch === 'MAIN' ? ',\'HEA\'': ''})`;
   const request = new sqlRequest();
   const query =
   `
@@ -542,7 +543,7 @@ export function getOrders(branch: string, batch: string, date: string) {
     SELECT BACHNUMB, DOCDATE, DOCID, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
     FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
     WHERE ReqShipDate = @date
-    AND LOCNCODE = @locnCode
+    AND LOCNCODE IN ${branchList}
     AND SOPTYPE = 2
     UNION
     SELECT BACHNUMB, DOCDATE, a.DOCID, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
@@ -551,19 +552,19 @@ export function getOrders(branch: string, batch: string, date: string) {
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, DOCID, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
       FROM [GCP].[dbo].SOP10100 WITH (NOLOCK)
       WHERE ReqShipDate = @date
-      AND LOCNCODE = @locnCode
+      AND LOCNCODE IN ${branchList}
       AND SOPTYPE = 3
       UNION
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, DOCID, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
       FROM [GCP].[dbo].SOP30200 WITH (NOLOCK)
       WHERE ReqShipDate = @date
-      AND LOCNCODE = @locnCode
+      AND LOCNCODE IN ${branchList}
       AND SOPTYPE = 3
     ) c
     ON a.SOPTYPE = c.ORIGTYPE
     AND a.SOPNUMBE = c.ORIGNUMB
     WHERE a.SOPTYPE = 2
-    AND LOCNCODE = @locnCode
+    AND LOCNCODE IN ${branchList}
   ) a
   LEFT JOIN [GCP].[dbo].SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
@@ -591,13 +592,13 @@ export function getOrders(branch: string, batch: string, date: string) {
   ) pt
   ON a.SOPNUMBE = pt.SalesOrderCode AND LNITMSEQ = pt.LineNumber
   WHERE a.reqShipDate = @date
-  AND a.locnCode = @locnCode
+  AND a.locnCode IN ${branchList}
   AND DOCID <> 'MAINFO'
   AND (d.Status <> 'Archived' OR d.Status IS NULL)
   GROUP BY a.SOPTYPE, a.SOPNUMBE, CUSTNAME
   ORDER BY CUSTNAME
   `;
-  return request.input('date', TYPES.VarChar(23), dt).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<Order>) => {
+  return request.input('date', TYPES.VarChar(23), dt).query(query).then((_: IResult<Order>) => {
     _.recordset.forEach(o => {
       o['note'] = [...(o.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
       o['pickStatus'] = o['posted'] || o['batchNumber'] === 'FULFILLED' ? 2 : o['batchNumber'] === 'INTERVENE' ? 1 : 0;
