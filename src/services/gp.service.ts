@@ -1041,6 +1041,17 @@ export async function addNonInventoryChemical(itemNmbr: string, itemDesc: string
   return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), `${itemNmbr}${containerSize}`).input('itemDesc', TYPES.VarChar(101), itemDesc).input('containerSize', TYPES.Numeric(19, 5), containerSize).input('units', TYPES.VarChar(50), units).query(updateQuery).then(() => true);
 }
 
+export async function removeNonInventoryChemical(itemNmbr: string): Promise<boolean> {
+  if (!itemNmbr) return false;
+  const deleteQuery1 = `DELETE FROM [MSDS].[dbo].Consumables WHERE ItemNmbr = @itemNmbr`;
+  const deleteQuery2 = `DELETE FROM [MSDS].[dbo].Quantities WHERE ItemNmbr = @itemNmbr`;
+  const deleteQuery3 = `DELETE FROM [MSDS].[dbo].ProductLinks WHERE ITEMNMBR = @itemNmbr`;
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery3).then(() => true);
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery2).then(() => true);
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery1).then(() => true);
+  return true;
+}
+
 export async function updateNonInventoryChemicalQuantity(itemNmbr: string, quantity: number, branch: string): Promise<boolean> {
   const entryExists = await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('branch', TYPES.VarChar(31), branch).query(
     'SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = @branch'

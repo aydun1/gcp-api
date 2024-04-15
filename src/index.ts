@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -53,6 +53,7 @@ passport.use(bearerStrategy);
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Authorization, Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE');
   next();
 });
 
@@ -346,6 +347,13 @@ app.get('/gp/non-inventory-chemicals', auth, (req, res) => {
 app.post('/gp/non-inventory-chemicals', auth, (req: Request, res: Response) => {
   const body = req.body as {itemNmbr: string, itemDesc: string, size: number, units: string};
   addNonInventoryChemical(body.itemNmbr, body.itemDesc, body.size, body.units).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    return handleError(err, res);
+  });
+});
+
+app.delete('/gp/non-inventory-chemicals/:id(*)', auth, (req: Request, res: Response) => {
+  const itemNmbr = req.params.id;
+  removeNonInventoryChemical(itemNmbr).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
     return handleError(err, res);
   });
 });
