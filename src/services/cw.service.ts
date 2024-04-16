@@ -30,3 +30,8 @@ export async function initChemwatch(): Promise<{fileInstance: AxiosInstance, jso
   isLoggedOn = true;
   return {fileInstance, jsonInstance};
 }
+
+export async function getChemwatchSds(sdsUrl: string): Promise<ArrayBuffer> {
+  const res = axios.get<ArrayBuffer>(sdsUrl).then(_ => _.data);
+  return res;
+}

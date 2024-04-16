@@ -11,7 +11,7 @@ import { CwFolder } from '../types/CwFolder';
 import { CwRow } from '../types/CwRow';
 import { Order } from '../types/order';
 
-import { initChemwatch } from './cw.service';
+import { getChemwatchSds, initChemwatch } from './cw.service';
 
 const palletStoredProcedure = 'usp_PalletUpdate';
 const productionStoredProcedure = 'usp_ProductionReport';
@@ -1145,12 +1145,20 @@ async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
     throw e;
   });
   const fileBuffer = await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).catch((e: {request: {path: string}, response: {statusText: string, path: string}}) => {
-    throw new Error(e.response.statusText);
+    console.error(Error(e.response.statusText));
+    return null;
   });
-  const buffer = Buffer.from(fileBuffer.data);
-  entries.map(_ => _.ItemNmbr).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
-  fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
-  return buffer;
+  if (fileBuffer) {
+    const buffer = Buffer.from(fileBuffer.data);
+    entries.map(_ => _.ItemNmbr).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
+    fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
+    return buffer;
+  } else {
+    return cw.jsonInstance.get<{Rows: Array<{DocNo: string, ExternalUrl: string}>}>(`json/documents?CwNo=${cwNo}&countryIds=82&languageIds=340700&pagesize=100`).then(_ => {
+      const externalUrl = _.data.Rows.find(d => d.DocNo === docNo)?.ExternalUrl;
+      return getChemwatchSds(externalUrl || '').then(_ => Buffer.from(_));
+    })
+  };
 }
 
 export async function getSdsPdf(docNo: string, cwNo: string): Promise<Buffer> {
