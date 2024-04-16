@@ -32,6 +32,6 @@ export async function initChemwatch(): Promise<{fileInstance: AxiosInstance, jso
 }
 
 export async function getChemwatchSds(sdsUrl: string): Promise<ArrayBuffer> {
-  const res = axios.get<ArrayBuffer>(sdsUrl, {responseType: 'blob'}).then(_ => _.data);
+  const res = axios.get<ArrayBuffer>(sdsUrl, {responseType: 'arraybuffer'}).then(_ => _.data);
   return res;
 }
