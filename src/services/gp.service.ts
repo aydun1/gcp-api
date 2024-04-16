@@ -1150,7 +1150,7 @@ async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
   });
   if (fileBuffer) {
     const buffer = Buffer.from(fileBuffer.data);
-    entries.map(_ => _.ItemNmbr).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
+    entries.map(_ => _.ItemNmbr).filter(_ => _).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
     fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
     return buffer;
   } else {
