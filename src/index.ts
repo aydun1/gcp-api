@@ -44,7 +44,7 @@ app.use('/enews', express.static('enews'));
 app.use('/footers', express.static('footers'));
 app.use('/assets', express.static('assets'));
 app.use(express.json());
-app.use(helmet());
+app.use(helmet({contentSecurityPolicy: {directives: {'script-src': ['\'sha256-wZ87u4GRc1HGC1rEw9a/fxf1TpJzksmFGhr+Xd2brJU=\'']}}}));
 app.use(morgan('combined', { stream: accessLogStream }));
 app.use(passport.initialize());
 app.use(compression());
@@ -422,18 +422,34 @@ app.get('/chemicals/lookup', (req, res) => {
 app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getChemicals(branch, '', '', '', 'Name').then(
-    chemicals => {
-      res.status(200).send(
-        '<html><head><title>GCP SDS List</title></head><body><ul><li>' +
-        chemicals.chemicals.filter(_ => _.sdsExists)
-          .filter((v,i,a)=>a.findIndex(v2=>(v2.DocNo===v.DocNo))===i)
-          .map(c => `<a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
-        '</li></ul></body></html>'
-      )
-    }
-  ).catch(err => {
-    return handleError(err, res);
+  const type = params['category'] as string || '';
+  getChemicals(branch, '', type, '', 'Name').then(chemicals => {res.status(200).send(
+    `<html>
+  <head>
+    <title>GCP SDS List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>#chem-input{font-size:16px;padding: 12px 20px 12px 20px;border:1px solid #ddd;max-width:100%;} #chem-list{padding: 0px 20px;}</style>
+  </head>
+  <body>
+    <h2>Chemical Registry</h2>
+    <input type="text" id="chem-input" placeholder="Search..." title="Type in a name">
+    <ul id="chem-list">
+      ${chemicals.chemicals.filter(_ => _.sdsExists)
+        .filter((v,i,a)=>a.findIndex(v2=>(v2.DocNo===v.DocNo))===i)
+        .map(c => `<li><a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a></li>`).join('\n      ') || '<li>Nothing here...</li>'}
+    </ul>
+  </body>
+</html>
+<script>
+  addEventListener('input', (event) => {
+    const filter = event.target.value.toUpperCase();
+    const list = document.getElementById('chem-list').getElementsByTagName('li');
+    Array.from(list).forEach(_ => _.style.display = _.textContent.toUpperCase().includes(filter) ? '' : 'none');
+  });
+</script>
+      `
+    )}).catch(err => {
+      return handleError(err, res);
   });
 });
 
