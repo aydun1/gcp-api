@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical } from './services/gp.service';
 import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import config from '../config.json';
 import { Transfer } from './types/transfer';
@@ -42,9 +42,10 @@ const bearerStrategy = new BearerStrategy(options, (token: ITokenPayload, done: 
 
 const app = express();
 app.use('/enews', express.static('enews'));
+app.use('/footers', express.static('footers'));
 app.use('/assets', express.static('assets'));
 app.use(express.json());
-app.use(helmet());
+app.use(helmet({contentSecurityPolicy: {directives: {'script-src': ['\'sha256-wZ87u4GRc1HGC1rEw9a/fxf1TpJzksmFGhr+Xd2brJU=\'']}}}));
 app.use(morgan('combined', { stream: accessLogStream }));
 app.use(passport.initialize());
 app.use(compression());
@@ -53,6 +54,7 @@ passport.use(bearerStrategy);
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Authorization, Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE');
   next();
 });
 
@@ -63,7 +65,8 @@ function handleError(err: any, res: Response) {
       if (err) console.log('Failed to open a SQL Database connection.', err?.message)
     });
   }
-  console.error(err);
+  console.error(new Date());
+  console.error(err?.message);
   return res.status(500).json({'result': 'Internal server error'});
 }
 
@@ -159,6 +162,16 @@ app.get('/gp/inventory', auth, (req: Request, res: Response) => {
   const branch = params['branch'] as string || '';
   const search = params['search'] as string || '';
   getItems(branch, [], search).then(
+    result => {
+      res.status(200).send(result)
+    }
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.get('/gp/inventory/required', auth, (req: Request, res: Response) => {
+  getProduction().then(
     result => {
       res.status(200).send(result)
     }
@@ -339,6 +352,13 @@ app.post('/gp/non-inventory-chemicals', auth, (req: Request, res: Response) => {
   });
 });
 
+app.delete('/gp/non-inventory-chemicals/:id(*)', auth, (req: Request, res: Response) => {
+  const itemNmbr = req.params.id;
+  removeNonInventoryChemical(itemNmbr).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
+    return handleError(err, res);
+  });
+});
+
 app.post('/gp/non-inventory-chemical-qty', auth, (req: Request, res: Response) => {
   const body = req.body as {itemNmbr: string, quantity: number, branch: string};
   updateNonInventoryChemicalQuantity(body.itemNmbr, body.quantity, body.branch).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
@@ -403,18 +423,34 @@ app.get('/chemicals/lookup', (req, res) => {
 app.get('/chemicals/list', verifyChemicalListToken, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getChemicals(branch, '', '', '', 'Name').then(
-    chemicals => {
-      res.status(200).send(
-        '<html><head><title>GCP SDS List</title></head><body><ul><li>' +
-        chemicals.chemicals.filter(_ => _.sdsExists)
-          .filter((v,i,a)=>a.findIndex(v2=>(v2.DocNo===v.DocNo))===i)
-          .map(c => `<a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a>`).join('</li>\n<li>') +
-        '</li></ul></body></html>'
-      )
-    }
-  ).catch(err => {
-    return handleError(err, res);
+  const type = params['category'] as string || '';
+  getChemicals(branch, '', type, '', 'Name').then(chemicals => {res.status(200).send(
+    `<html>
+  <head>
+    <title>GCP SDS List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>#chem-input{font-size:16px;padding: 12px 20px 12px 20px;border:1px solid #ddd;max-width:100%;} #chem-list{padding: 0px 20px;}</style>
+  </head>
+  <body>
+    <h2>Chemical Registry</h2>
+    <input type="text" id="chem-input" placeholder="Search..." title="Type in a name">
+    <ul id="chem-list">
+      ${chemicals.chemicals.filter(_ => _.sdsExists)
+        .filter((v,i,a)=>a.findIndex(v2=>(v2.DocNo===v.DocNo))===i)
+        .map(c => `<li><a href="/public/sds/${c.ItemNmbr}.pdf" target="_blank">${c.Name || ''}</a></li>`).join('\n      ') || '<li>Nothing here...</li>'}
+    </ul>
+  </body>
+</html>
+<script>
+  addEventListener('input', (event) => {
+    const filter = event.target.value.toUpperCase();
+    const list = document.getElementById('chem-list').getElementsByTagName('li');
+    Array.from(list).forEach(_ => _.style.display = _.textContent.toUpperCase().includes(filter) ? '' : 'none');
+  });
+</script>
+      `
+    )}).catch(err => {
+      return handleError(err, res);
   });
 });
 

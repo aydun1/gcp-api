@@ -11,9 +11,11 @@ import { CwFolder } from '../types/CwFolder';
 import { CwRow } from '../types/CwRow';
 import { Order } from '../types/order';
 
-import { initChemwatch } from './cw.service';
+import { getChemwatchSds, initChemwatch } from './cw.service';
 
-const storedProcedure = 'usp_PalletUpdate';
+const palletStoredProcedure = 'usp_PalletUpdate';
+const productionStoredProcedure = 'usp_ProductionReport';
+
 const dct: {[key: string]: {uom: string, divisor: number}} = {
   millilitre: {divisor: 1000, uom: 'L'},
   milliliter: {divisor: 1000, uom: 'L'},
@@ -31,7 +33,7 @@ const fileExists = (path: string) => fs.promises.stat(path).then(() => true, () 
 const sizeRegexp = new RegExp(`([0-9.,]+)\\s*(${Object.keys(dct).join('|')})\\b`);
 const ignoreRegexp = /2g|4g|5g|80g|g\/l|g\/kg/;
 const cartonRegexp = /\[ctn([0-9]+)\]/;
-const driverNoteRegexp = /\*(.+)\*/g;
+const driverNoteRegexp = /\*([a-zA-Z0-9\s,./\\!@#$%^&()\-=]+)\*/g;
 const cwFolderId = '4006663';
 
 interface gpRes {
@@ -63,7 +65,7 @@ function createIttId(branch: string): Promise<string> {
 }
 
 function parseBranch(branch: string): string {
-  return branch === 'VIC' ? 'MAIN' : branch;
+  return branch === 'VIC' ? 'MAIN' : branch.substring(0, 3);
 }
 
 function getNextDay(): Date {
@@ -252,7 +254,11 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ON a.UOMSCHDL = u.UOMSCHDL
 
   -- Get specs
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT *
+    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  ) p
   ON a.ITEMNMBR = p.Product
 
   -- get ITTs
@@ -495,7 +501,7 @@ export function getHistory(itemNmbr: string) {
 export function getOrdersByLine(branch: string, itemNmbr: string) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
-  const query =
+  let query =
   `
   Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, b.ATYALLOC * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT notes
   FROM SOP10100 a
@@ -507,7 +513,11 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
   WHERE b.ITEMNMBR = @itemnmbr
   AND a.SOPTYPE IN (2, 3, 5)
+  `;
+  if (branch) query += `
   AND a.LOCNCODE = @locnCode
+  `;
+  query += `
   ORDER BY a.DOCDATE DESC
   `;
   return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
@@ -517,6 +527,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   const now = date || getNextDay().toLocaleDateString('fr-CA');
   const dt = `${now} 00:00:00.000`;
   branch = parseBranch(branch);
+  const branchList = `('${branch}'${branch === 'MAIN' ? ',\'HEA\'': ''})`;
   const request = new sqlRequest();
   const query =
   `
@@ -529,31 +540,31 @@ export function getOrders(branch: string, batch: string, date: string) {
   SUM(CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty)) palletSpaces,
   SUM(p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / COALESCE(p.PackQty, 1)) orderWeight, MAX(CONVERT (varchar(max), TXTFIELD )) note
   FROM (
-    SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
+    SELECT BACHNUMB, DOCDATE, DOCID, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
     FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
     WHERE ReqShipDate = @date
-    AND LOCNCODE = @locnCode
+    AND LOCNCODE IN ${branchList}
     AND SOPTYPE = 2
     UNION
-    SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
+    SELECT BACHNUMB, DOCDATE, a.DOCID, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
     FROM [GCP].[dbo].SOP30200 a WITH (NOLOCK)
     LEFT JOIN (
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, DOCID, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
       FROM [GCP].[dbo].SOP10100 WITH (NOLOCK)
       WHERE ReqShipDate = @date
-      AND LOCNCODE = @locnCode
+      AND LOCNCODE IN ${branchList}
       AND SOPTYPE = 3
       UNION
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, DOCID, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
       FROM [GCP].[dbo].SOP30200 WITH (NOLOCK)
       WHERE ReqShipDate = @date
-      AND LOCNCODE = @locnCode
+      AND LOCNCODE IN ${branchList}
       AND SOPTYPE = 3
     ) c
     ON a.SOPTYPE = c.ORIGTYPE
     AND a.SOPNUMBE = c.ORIGNUMB
     WHERE a.SOPTYPE = 2
-    AND LOCNCODE = @locnCode
+    AND LOCNCODE IN ${branchList}
   ) a
   LEFT JOIN [GCP].[dbo].SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
@@ -566,7 +577,11 @@ export function getOrders(branch: string, batch: string, date: string) {
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT *
+    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  ) p
   ON ITEMNMBR = p.Product
   LEFT JOIN (
     SELECT o.SalesOrderCode, u.LineNumber, SUM(u.FulfilledQuantity) FulfilledQuantity, 1 as LinePicked
@@ -577,12 +592,13 @@ export function getOrders(branch: string, batch: string, date: string) {
   ) pt
   ON a.SOPNUMBE = pt.SalesOrderCode AND LNITMSEQ = pt.LineNumber
   WHERE a.reqShipDate = @date
-  AND a.locnCode = @locnCode
+  AND a.locnCode IN ${branchList}
+  AND DOCID <> 'MAINFO'
   AND (d.Status <> 'Archived' OR d.Status IS NULL)
   GROUP BY a.SOPTYPE, a.SOPNUMBE, CUSTNAME
   ORDER BY CUSTNAME
   `;
-  return request.input('date', TYPES.VarChar(23), dt).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<Order>) => {
+  return request.input('date', TYPES.VarChar(23), dt).query(query).then((_: IResult<Order>) => {
     _.recordset.forEach(o => {
       o['note'] = [...(o.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
       o['pickStatus'] = o['posted'] || o['batchNumber'] === 'FULFILLED' ? 2 : o['batchNumber'] === 'INTERVENE' ? 1 : 0;
@@ -597,8 +613,8 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   `
   SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
-  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight,
-  d.Status deliveryStatus, d.Run deliveryRun
+  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight, 
+  d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty
 
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
@@ -624,13 +640,17 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   LEFT JOIN [GCP].[dbo].SY03900 n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
   left join (
-    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, UOFM, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK)
     UNION
-    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, UOFM, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK)
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs p WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT *
+    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  ) p
   ON ITEMNMBR = p.Product
   LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
@@ -670,7 +690,9 @@ export function getOrderLines(sopType: number, sopNumber: string) {
           qtyPrInv: l.qtyPrInv,
           qtyToInv: l.qtyToInv,
           palletSpaces: l.palletSpaces,
-          lineWeight: l.lineWeight
+          lineWeight: l.lineWeight,
+          uom: l.uom.replace('EACH', 'Each'),
+          packQty: l.packQty
         }
       })
     }
@@ -679,7 +701,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
 
 export function getDeliveries(branch: string, run: string, deliveryType: string, archived: boolean, orderNumberQuery: string) {
   const request = new sqlRequest();
-  const limit = archived ? 'TOP(100)' : ''
+  const limit = archived ? 'TOP(250)' : ''
   let query =
   `
   SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
@@ -789,7 +811,8 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(ITEMDESC) ItemDesc,
   b.QTYONHND onHand,
-  rtrim(c.BIN) Bin,
+  (SELECT TOP 1 BIN FROM IV00112 WHERE ITEMNMBR = a.ITEMNMBR and LOCNCODE = b.LOCNCODE AND QUANTITY > 0 ORDER BY QUANTITY DESC) Bin,
+  rtrim(c.BIN) PriorityBin,
   Coalesce(Pkg, '') packingGroup,
   Coalesce(Dgc, '') class,
   Coalesce(Replace(HazardRating, -1, ''), '') hazardRating,
@@ -820,6 +843,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
     CONCAT(a.ItemDesc, ' - ', CAST(ContainerSize AS float), ' ', Units) AS ItemDesc,
     b.Quantity onHand,
     '' Bin,
+    '' PriorityBin,
     Coalesce(e.Pkg, '') packingGroup,
     Coalesce(Dgc, '') class,
     Coalesce(Replace(HazardRating, -1, ''), '') hazardRating,
@@ -830,7 +854,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   LEFT JOIN [MSDS].dbo.Quantities b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
   LEFT JOIN [MSDS].dbo.ProductLinks d WITH (NOLOCK) ON a.ItemNmbr = d.ITEMNMBR
   LEFT JOIN [MSDS].dbo.Materials e WITH (NOLOCK) ON d.CwNo = e.CwNo
-  WHERE b.Site = @locnCode
+  WHERE COALESCE(b.Site, '') = @locnCode
   `;
 
   if (branch) query2 += `
@@ -943,7 +967,12 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
   request.input('Customer', TYPES.Char(15), customer);
   request.input('PalletType', TYPES.Char(15), palletType);
   request.input('Qty', TYPES.Int, qty.toString(10));
-  return request.execute(storedProcedure);
+  return request.execute(palletStoredProcedure);
+}
+
+export function getProduction(): Promise<{lines: any[]}> {
+  const request = new sqlRequest();
+  return request.execute(productionStoredProcedure).then(_ => {return {lines: _.recordset}});
 }
 
 export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
@@ -1011,6 +1040,17 @@ export async function addNonInventoryChemical(itemNmbr: string, itemDesc: string
   INSERT INTO [MSDS].dbo.Consumables (ItemNmbr, ItemDesc, ContainerSize, Units)
   VALUES (@itemNmbr, @itemDesc, @containerSize, @units)`;
   return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), `${itemNmbr}${containerSize}`).input('itemDesc', TYPES.VarChar(101), itemDesc).input('containerSize', TYPES.Numeric(19, 5), containerSize).input('units', TYPES.VarChar(50), units).query(updateQuery).then(() => true);
+}
+
+export async function removeNonInventoryChemical(itemNmbr: string): Promise<boolean> {
+  if (!itemNmbr) return false;
+  const deleteQuery1 = `DELETE FROM [MSDS].[dbo].Consumables WHERE ItemNmbr = @itemNmbr`;
+  const deleteQuery2 = `DELETE FROM [MSDS].[dbo].Quantities WHERE ItemNmbr = @itemNmbr`;
+  const deleteQuery3 = `DELETE FROM [MSDS].[dbo].ProductLinks WHERE ITEMNMBR = @itemNmbr`;
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery3).then(() => true);
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery2).then(() => true);
+  await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery1).then(() => true);
+  return true;
 }
 
 export async function updateNonInventoryChemicalQuantity(itemNmbr: string, quantity: number, branch: string): Promise<boolean> {
@@ -1105,12 +1145,20 @@ async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
     throw e;
   });
   const fileBuffer = await cw.fileInstance.get<ArrayBuffer>(`document?fileName=pd${docNo}.pdf`).catch((e: {request: {path: string}, response: {statusText: string, path: string}}) => {
-    throw new Error(e.response.statusText);
+    console.error(Error(e.response.statusText));
+    return null;
   });
-  const buffer = Buffer.from(fileBuffer.data);
-  entries.map(_ => _.ItemNmbr).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
-  fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
-  return buffer;
+  if (fileBuffer) {
+    const buffer = Buffer.from(fileBuffer.data);
+    entries.map(_ => _.ItemNmbr).filter(_ => _).forEach(_ => fs.writeFileSync(`pdfs/gp/${_}.pdf`, buffer));
+    fs.writeFileSync(`pdfs/pd${docNo}.pdf`, buffer);
+    return buffer;
+  } else {
+    return cw.jsonInstance.get<{Rows: Array<{DocNo: string, ExternalUrl: string}>}>(`json/documents?CwNo=${cwNo}&countryIds=82&languageIds=340700&pagesize=100`).then(_ => {
+      const externalUrl = _.data.Rows.find(d => d.DocNo === docNo)?.ExternalUrl;
+      return getChemwatchSds(externalUrl || '').then(_ => Buffer.from(_));
+    })
+  };
 }
 
 export async function getSdsPdf(docNo: string, cwNo: string): Promise<Buffer> {

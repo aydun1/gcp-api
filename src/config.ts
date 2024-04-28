@@ -14,7 +14,8 @@ export const sqlConfig = {
   },
   options: {
     port: 1433,
-    trustServerCertificate: true
+    trustServerCertificate: true,
+    encrypt: false
   }
 };
 
