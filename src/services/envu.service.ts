@@ -196,9 +196,9 @@ export async function sendChemicalSalesToEnvu() {
   const orders = groupByProperty([...chemicals.sales.slice(0, 3)], 'trackingId');
   const goodsreceipts = groupByProperty([...chemicals.receiving.slice(0, 3)], 'trackingId');
   const transfers = groupByProperty([...chemicals.transfers.slice(0, 3)], 'trackingId');
-  //sendDocument(orders, 'orders')
-  //sendDocument(goodsreceipts, 'goodsreceipts')
-  //sendDocument(transfers, 'transfers')
+  //sendDocument(orders, 'order')
+  //sendDocument(goodsreceipts, 'goodsreceipt')
+  //sendDocument(transfers, 'transfer')
   return {orders, goodsreceipts, transfers};
 }
 
