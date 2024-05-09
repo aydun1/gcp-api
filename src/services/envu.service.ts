@@ -19,11 +19,11 @@ let authRes!: AuthRes;
 let authDate!: Date;
 
 const locations = [
-  {envuCode: 'AUC-GCP001', gpCode: 'NSW'},
-  {envuCode: 'AUC-GCP002', gpCode: 'MAIN'},
-  {envuCode: 'AUC-GCP003', gpCode: 'SA'},
-  {envuCode: 'AUC-GCP004', gpCode: 'QLD'},
-  {envuCode: 'AUC-GCP005', gpCode: 'WA'}
+  {envuCode: 'AUC-GCP001', gpCode: 'NSW', address1: '4 - 6 Pinnacle Place', city: 'Somersby', state: 'New South Wales', postcode: '2250', countryCode: 'AU'},
+  {envuCode: 'AUC-GCP002', gpCode: 'MAIN', address1: 'EJ Court (off Assembly Drive)', city: 'Dandenong South', state: 'Victoria', postcode: '3175', countryCode: 'AU'},
+  {envuCode: 'AUC-GCP003', gpCode: 'SA', address1: '10-12 Hakkinen Road', city: 'Wingfield', state: 'South Australia', postcode: '5013', countryCode: 'AU'},
+  {envuCode: 'AUC-GCP004', gpCode: 'QLD', address1: '19 Eastern Service Road', city: 'Stapylton', state: 'Queesnland', postcode: '4207', countryCode: 'AU'},
+  {envuCode: 'AUC-GCP005', gpCode: 'WA', address1: '2 Turley Street', city: 'Forrestdale', state: 'Western Australia', postcode: '6112', countryCode: 'AU'}
 ];
 
 const products = [
@@ -195,7 +195,7 @@ export async function sendChemicalSalesToEnvu() {
   const chemicals = await getChemicalTransactions();
   const orders = groupByProperty([...chemicals.sales.slice(0, 3)], 'trackingId');
   const goodsreceipts = groupByProperty([...chemicals.receiving.slice(0, 3)], 'trackingId');
-  const transfers = [...chemicals.transfers.slice(0, 3)];
+  const transfers = groupByProperty([...chemicals.transfers.slice(0, 3)], 'trackingId');
   //sendDocument(orders, 'order')
   //sendDocument(goodsreceipts, 'goodsreceipt')
   //sendDocument(transfers, 'transfer')
@@ -287,6 +287,8 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
     const transfers = _.recordset.filter(_ => [3].includes(_.DOCTYPE)).map((r, i, a) => {
       const docIdField = 'DOCNUMBR';
       const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
+      const transferFrom = locations.find(_ => _.gpCode === r['TRXLOCTN']);
+      const transferTo = locations.find(_ => _.gpCode === r['TRNSTLOC']);
       return {
         orderDate: new Date(r.DOCDATE),
         orderType: 'Standalone Order',
@@ -301,8 +303,13 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
         requestedDispatchDate: dateString(),
         buyerCompanyName: 'Garden City Plastics',
         sellerCompanyName: 'Garden City Plastics',
-        vendorCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
-        soldToCode: locations.find(_ => _.gpCode === r['TRNSTLOC'])?.envuCode || '' + r['TRNSTLOC'],
+        vendorCode: transferFrom?.envuCode || '',
+        soldToCode: transferTo?.envuCode || '' + r['TRNSTLOC'],
+        shipToAddress1: transferTo?.address1,
+        shipToPostcode: transferTo?.postcode,
+        shipToSuburb: transferTo?.city,
+        shipToState: transferTo?.state,
+        shipToCountry: transferTo?.countryCode,
         totalLines: sopLines.length,
         totalQuantity: sopLines.reduce((a, b) => a += b.TRXQTY, 0),
         // Line
