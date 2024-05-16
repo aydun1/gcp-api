@@ -578,7 +578,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN (
-    SELECT *
+    SELECT Product, PalletHeight, PalletQty, PackQty, PackWeight, ROW_NUMBER() OVER(PARTITION BY Product ORDER BY Product DESC) rn
     FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
     WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
   ) p
@@ -592,6 +592,7 @@ export function getOrders(branch: string, batch: string, date: string) {
   ) pt
   ON a.SOPNUMBE = pt.SalesOrderCode AND LNITMSEQ = pt.LineNumber
   WHERE a.reqShipDate = @date
+  AND (rn = 1 OR rn IS null)
   AND a.locnCode IN ${branchList}
   AND DOCID <> 'MAINFO'
   AND (d.Status <> 'Archived' OR d.Status IS NULL)
@@ -647,7 +648,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN (
-    SELECT *
+    SELECT Product, PalletQty, PalletHeight, PackWeight, PackQty, ROW_NUMBER() OVER(PARTITION BY Product ORDER BY Product DESC) rn
     FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
     WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
   ) p
@@ -655,6 +656,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
   WHERE a.SOPNUMBE = @sopNumber
+  AND (rn = 1 OR rn IS NULL)
   ORDER BY LNITMSEQ
   `;
   const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
