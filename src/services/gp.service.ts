@@ -504,12 +504,12 @@ export function getOrdersByLine(branch: string, itemNmbr: string, components = f
   let query =
   `
   Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, (b.ATYALLOC) * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT note
-  FROM SOP10100 a
-  LEFT JOIN SOP10200 b
+  FROM SOP10100 a WITH (NOLOCK)
+  LEFT JOIN SOP10200 b WITH (NOLOCK)
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
-  LEFT JOIN RM00101 c
+  LEFT JOIN RM00101 c WITH (NOLOCK)
   ON a.CUSTNMBR = c.CUSTNMBR
-  LEFT JOIN SOP10106 d
+  LEFT JOIN SOP10106 d WITH (NOLOCK)
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
   WHERE ${components ? '(b.ITEMNMBR = @itemnmbr OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM BM00111 WHERE CMPTITNM = @itemnmbr))' : ' b.ITEMNMBR = @itemnmbr'}
   AND a.SOPTYPE IN (2, 3, 5)
