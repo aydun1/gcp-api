@@ -65,7 +65,7 @@ function createIttId(branch: string): Promise<string> {
 }
 
 function parseBranch(branch: string): string {
-  return branch === 'VIC' ? 'MAIN' : branch.substring(0, 3);
+  return branch === 'VIC' ? 'MAIN' : branch.substring(0, 4);
 }
 
 function getNextDay(): Date {
@@ -498,12 +498,12 @@ export function getHistory(itemNmbr: string) {
   });
 }
 
-export function getOrdersByLine(branch: string, itemNmbr: string) {
+export function getOrdersByLine(branch: string, itemNmbr: string, components = false) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
   let query =
   `
-  Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, b.ATYALLOC * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT notes
+  Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, (b.ATYALLOC) * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT note
   FROM SOP10100 a
   LEFT JOIN SOP10200 b
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
@@ -511,16 +511,16 @@ export function getOrdersByLine(branch: string, itemNmbr: string) {
   ON a.CUSTNMBR = c.CUSTNMBR
   LEFT JOIN SOP10106 d
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
-  WHERE b.ITEMNMBR = @itemnmbr
+  WHERE ${components ? '(b.ITEMNMBR = @itemnmbr OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM BM00111 WHERE CMPTITNM = @itemnmbr))' : ' b.ITEMNMBR = @itemnmbr'}
   AND a.SOPTYPE IN (2, 3, 5)
   `;
   if (branch) query += `
   AND a.LOCNCODE = @locnCode
   `;
   query += `
-  ORDER BY a.DOCDATE DESC
+  ORDER BY a.ReqShipDate ASC
   `;
-  return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+  return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
 
 export function getOrders(branch: string, batch: string, date: string) {

@@ -190,7 +190,8 @@ app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
 app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
-  getOrdersByLine(branch, req.params.id).then(
+  const components = params['comp'] === '1';
+  getOrdersByLine(branch, req.params.id, components).then(
     result => res.status(200).send(result)
   ).catch(err => {
     return handleError(err, res);
