@@ -769,6 +769,7 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   if ('CustomerNumber' in delivery) updates.push('CustomerNumber = @CustomerNumber');
   if ('CustomerName' in delivery) updates.push('CustomerName = @CustomerName');
   if ('Address' in delivery) updates.push('Address = @Address');
+  if ('Site' in delivery) updates.push('Site = @Site');
   const updateQuery = `
   UPDATE [MSDS].[dbo].Deliveries
   SET ${updates.join()}
@@ -786,6 +787,7 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   request.input('CustomerNumber', TYPES.Char(15), delivery.CustomerNumber);
   request.input('CustomerName', TYPES.VarChar(65), delivery.CustomerName);
   request.input('Address', TYPES.NVarChar(MAX), delivery.Address);
+  request.input('Site', TYPES.NVarChar(50), delivery.Site);
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), delivery.Status);
   request.input('id', TYPES.Int, id);
