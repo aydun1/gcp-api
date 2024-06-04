@@ -503,7 +503,11 @@ export function getOrdersByLine(branch: string, itemNmbr: string, components = f
   const request = new sqlRequest();
   let query =
   `
-  Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, (b.ATYALLOC) * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, rtrim(c.CUSTNMBR) custNmbr, d.CMMTTEXT note
+  Select a.DOCDATE date,
+  CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate,
+  a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr,
+  rtrim(a.LOCNCODE) locnCode, (b.ATYALLOC) * b.QTYBSUOM quantity,
+  rtrim(c.CUSTNAME) customer, rtrim(c.CUSTNMBR) custNmbr, d.CMMTTEXT note, e.CMMTTEXT lineNote
   FROM SOP10100 a WITH (NOLOCK)
   LEFT JOIN SOP10200 b WITH (NOLOCK)
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
@@ -511,6 +515,8 @@ export function getOrdersByLine(branch: string, itemNmbr: string, components = f
   ON a.CUSTNMBR = c.CUSTNMBR
   LEFT JOIN SOP10106 d WITH (NOLOCK)
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
+  LEFT JOIN SOP10202 e WITH (NOLOCK)
+  ON b.SOPTYPE = e.SOPTYPE AND b.SOPNUMBE = e.SOPNUMBE AND b.LNITMSEQ = e.LNITMSEQ
   WHERE ${components ? '(b.ITEMNMBR = @itemnmbr OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM BM00111 WHERE CMPTITNM = @itemnmbr))' : ' b.ITEMNMBR = @itemnmbr'}
   AND a.SOPTYPE IN (2, 3, 5)
   `;
