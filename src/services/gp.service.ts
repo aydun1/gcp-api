@@ -65,7 +65,7 @@ function createIttId(branch: string): Promise<string> {
 }
 
 function parseBranch(branch: string): string {
-  return branch === 'VIC' ? 'MAIN' : branch.substring(0, 3);
+  return branch === 'VIC' ? 'MAIN' : branch.substring(0, 4);
 }
 
 function getNextDay(): Date {
@@ -498,29 +498,35 @@ export function getHistory(itemNmbr: string) {
   });
 }
 
-export function getOrdersByLine(branch: string, itemNmbr: string) {
+export function getOrdersByLine(branch: string, itemNmbr: string, components = false) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
   let query =
   `
-  Select a.DOCDATE date, CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate, a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr, rtrim(a.LOCNCODE) locnCode, b.ATYALLOC * b.QTYBSUOM quantity, rtrim(c.CUSTNAME) customer, d.CMMTTEXT notes
-  FROM SOP10100 a
-  LEFT JOIN SOP10200 b
+  Select a.DOCDATE date,
+  CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate,
+  a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr,
+  rtrim(a.LOCNCODE) locnCode, (b.ATYALLOC) * b.QTYBSUOM quantity,
+  rtrim(c.CUSTNAME) customer, rtrim(c.CUSTNMBR) custNmbr, d.CMMTTEXT note, e.CMMTTEXT lineNote
+  FROM SOP10100 a WITH (NOLOCK)
+  LEFT JOIN SOP10200 b WITH (NOLOCK)
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
-  LEFT JOIN RM00101 c
+  LEFT JOIN RM00101 c WITH (NOLOCK)
   ON a.CUSTNMBR = c.CUSTNMBR
-  LEFT JOIN SOP10106 d
+  LEFT JOIN SOP10106 d WITH (NOLOCK)
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
-  WHERE b.ITEMNMBR = @itemnmbr
+  LEFT JOIN SOP10202 e WITH (NOLOCK)
+  ON b.SOPTYPE = e.SOPTYPE AND b.SOPNUMBE = e.SOPNUMBE AND b.LNITMSEQ = e.LNITMSEQ
+  WHERE ${components ? '(b.ITEMNMBR = @itemnmbr OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM BM00111 WHERE CMPTITNM = @itemnmbr))' : ' b.ITEMNMBR = @itemnmbr'}
   AND a.SOPTYPE IN (2, 3, 5)
   `;
   if (branch) query += `
   AND a.LOCNCODE = @locnCode
   `;
   query += `
-  ORDER BY a.DOCDATE DESC
+  ORDER BY a.ReqShipDate ASC
   `;
-  return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {invoices: _.recordset}});
+  return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
 
 export function getOrders(branch: string, batch: string, date: string) {
@@ -769,6 +775,7 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   if ('CustomerNumber' in delivery) updates.push('CustomerNumber = @CustomerNumber');
   if ('CustomerName' in delivery) updates.push('CustomerName = @CustomerName');
   if ('Address' in delivery) updates.push('Address = @Address');
+  if ('Site' in delivery) updates.push('Site = @Site');
   const updateQuery = `
   UPDATE [MSDS].[dbo].Deliveries
   SET ${updates.join()}
@@ -786,6 +793,7 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   request.input('CustomerNumber', TYPES.Char(15), delivery.CustomerNumber);
   request.input('CustomerName', TYPES.VarChar(65), delivery.CustomerName);
   request.input('Address', TYPES.NVarChar(MAX), delivery.Address);
+  request.input('Site', TYPES.NVarChar(50), delivery.Site);
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), delivery.Status);
   request.input('id', TYPES.Int, id);
