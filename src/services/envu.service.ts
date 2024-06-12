@@ -193,14 +193,15 @@ export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update')
   await getAccessToken();
   const chemicals = await getChemicalTransactions();
-  const orders = groupByProperty([...chemicals.sales.slice(0, 100).filter(_ => ['NINV167064', 'MPU060694'].includes(_.trackingId))], 'trackingId');
-  const goodsreceipts = groupByProperty([...chemicals.receiving.slice(0, 100).filter(_ => ['SA102107', 'SA104418'].includes(_.trackingId))], 'trackingId');
-  const transfers = groupByProperty([...chemicals.transfers.slice(0, 100).filter(_ => ['074842', 'XFR00013507'].includes(_.trackingId))], 'trackingId');
-  //sendDocument(orders, 'order')
+  let orders = groupByProperty([...chemicals.sales], 'trackingId');
+  orders = [orders[orders.length - 1]];
+  const goodsreceipts = groupByProperty([...chemicals.receiving], 'trackingId')[0];
+  const transfers = groupByProperty([...chemicals.transfers], 'trackingId')[0];
+  sendDocument(orders, 'order')
   //sendDocument(goodsreceipts, 'goodsreceipt')
-  sendDocument(transfers, 'transfer')
+  //sendDocument(transfers, 'transfer')
   //return {orders, goodsreceipts, transfers};
-  return {transfers};
+  return {orders};
 
 }
 
@@ -211,6 +212,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
   SELECT
   trx.DOCTYPE,
   RTRIM(trx.ITEMNMBR) AS ITEMNMBR,
+  RTRIM(hea.BACHNUMB) AS BACHNUMB,
   RTRIM(trx.TRXLOCTN) AS TRXLOCTN,
   RTRIM(REPLACE(trx.TRNSTLOC, 'TRANS', '')) AS TRNSTLOC,
   trx.TRXQTY AS TRXQTY,
@@ -240,14 +242,16 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
   sop.QTYBSUOM AS QTYBSUOM,
   sop.UNITPRCE AS UNITPRCE,
   sop.QUANTITY AS QUANTITY
-  FROM IV30300 trx
-  LEFT JOIN IV30301 rct
+  FROM IV30300 trx WITH (NOLOCK)
+  LEFT JOIN IV30200 hea WITH (NOLOCK)
+  on hea.IVDOCTYP = trx.DOCTYPE AND hea.DOCNUMBR = trx.DOCNUMBR
+  LEFT JOIN IV30301 rct WITH (NOLOCK)
   ON trx.DOCTYPE = rct.DOCTYPE AND trx.DOCNUMBR = rct.DOCNUMBR AND trx.LNSEQNBR = rct.LNSEQNBR
-  LEFT JOIN IV40700 loc
+  LEFT JOIN IV40700 loc WITH (NOLOCK)
   ON trx.TRXLOCTN = loc.LOCNCODE
-  LEFT JOIN SOP30300 sop
+  LEFT JOIN SOP30300 sop WITH (NOLOCK)
   ON trx.DOCTYPE IN (5, 6) AND trx.DOCNUMBR = sop.SOPNUMBE AND trx.ITEMNMBR = sop.ITEMNMBR AND trx.LNSEQNBR = sop.LNITMSEQ
-  LEFT JOIN SOP30200 soh
+  LEFT JOIN SOP30200 soh WITH (NOLOCK)
   ON trx.DOCTYPE IN (5, 6) AND sop.SOPNUMBE = soh.SOPNUMBE AND sop.SOPTYPE = soh.SOPTYPE
   WHERE trx.DOCTYPE IN (2, 3, 5, 6)
   AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
@@ -258,7 +262,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
 
   return await request.query(query).then((_: IResult<EnvuQuery[]>) => {
 
-    // Receiving
+    // Receiving from Envu
     const receiving = _.recordset.filter(_ => [2].includes(_.DOCTYPE)).map((r, i, a) => {
       const docIdField = 'DOCNUMBR';
       const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
@@ -268,6 +272,7 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
         documentCreated: new Date(r.DOCDATE),
         trackingId: r.DOCNUMBR,
         revisionNumber: 1,
+        poNumber: r.BACHNUMB,
         expectedDeliveryDate: new Date(r.DOCDATE),
         dateDispatched: new Date(r.DOCDATE),
         soldToCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
