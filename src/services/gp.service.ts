@@ -13,8 +13,8 @@ import { Order } from '../types/order';
 
 import { getChemwatchSds, initChemwatch } from './cw.service';
 
-const palletStoredProcedure = 'usp_PalletUpdate';
-const productionStoredProcedure = 'usp_ProductionReport';
+const palletStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_PalletUpdate]';
+const productionStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_ProductionReport]';
 
 const dct: {[key: string]: {uom: string, divisor: number}} = {
   millilitre: {divisor: 1000, uom: 'L'},
@@ -51,9 +51,9 @@ function createIttId(branch: string): Promise<string> {
   const query =
   `
   SELECT TOP(1) * FROM (
-    SELECT ORDDOCID FROM SVC00700 WHERE ORDDOCID LIKE @lookup
+    SELECT ORDDOCID FROM [GPLIVE].[GCP].[dbo].[SVC00700] WHERE ORDDOCID LIKE @lookup
     UNION
-    SELECT ORDDOCID FROM SVC30700 WHERE ORDDOCID LIKE @lookup
+    SELECT ORDDOCID FROM [GPLIVE].[GCP].[dbo].[SVC30700] WHERE ORDDOCID LIKE @lookup
   ) u
   ORDER BY ORDDOCID DESC
   `;
@@ -86,7 +86,7 @@ export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
          ETADTE EtaDate,
          rtrim(TRNSFLOC) fromSite,
          rtrim(LOCNCODE) toSite
-  FROM SVC00700
+  FROM [GPLIVE].[GCP].[dbo].[SVC00700] WITH (NOLOCK)
   WHERE ORDDOCID = @doc_id
   `;
   return request.input('doc_id', TYPES.VarChar(15), id).query(query).then((_: IResult<InTransitTransfer>) =>  {return _.recordset[0]});
@@ -115,14 +115,14 @@ export function getInTransitTransfers(id: string, from: string, to: string): Pro
          d.QTYONHND QtyOnHand,
          d.QTYONHND - d.ATYALLOC QtyAvailable,
          b.UOFM UOFM
-  FROM SVC00700 a
-  INNER JOIN SVC00701 b
+  FROM [GPLIVE].[GCP].[dbo].[SVC00700] a WITH (NOLOCK)
+  INNER JOIN [GPLIVE].[GCP].[dbo].[SVC00701] b WITH (NOLOCK)
   ON a.ORDDOCID = b.ORDDOCID
-  INNER JOIN IV00101 c
+  INNER JOIN [GPLIVE].[GCP].[dbo].[IV00101] c WITH (NOLOCK)
   ON b.ITEMNMBR = c.ITEMNMBR
-  LEFT JOIN IV00102 d
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV00102] d WITH (NOLOCK)
   ON b.ITEMNMBR = d.ITEMNMBR AND b.TRNSFLOC = d.LOCNCODE
-  LEFT JOIN (SELECT * FROM IV00117 WHERE PRIORITY = 1) e
+  LEFT JOIN (SELECT * FROM [GPLIVE].[GCP].[dbo].[IV00117] WITH (NOLOCK) WHERE PRIORITY = 1) e
   ON b.ITEMNMBR = e.ITEMNMBR AND b.TRNSFLOC = e.LOCNCODE
   WHERE b.TRNSFQTY > 0
   AND b.TRNSFQTY - b.QTYSHPPD > 0
@@ -153,12 +153,12 @@ export function getPurchaseOrderNumbers(from: string, to: string): Promise<{line
          b.DEX_ROW_ID Id,
          d.QTYONHND QtyOnHand,
          d.QTYONHND - d.ATYALLOC QtyAvailable
-  FROM POP10100 a
-  INNER JOIN POP10110 b
+  FROM [GPLIVE].[GCP].[dbo].[POP10100] a WITH (NOLOCK)
+  INNER JOIN [GPLIVE].[GCP].[dbo].[POP10110] b WITH (NOLOCK)
   ON a.PONUMBER = b.PONUMBER
-  INNER JOIN IV00101 c
+  INNER JOIN [GPLIVE].[GCP].[dbo].[IV00101] c WITH (NOLOCK)
   ON b.ITEMNMBR = c.ITEMNMBR
-  LEFT JOIN IV00102 d
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV00102] d WITH (NOLOCK)
   ON b.ITEMNMBR = d.ITEMNMBR AND d.LOCNCODE = @from_state
   WHERE a.VENDORID in('100241', '164403', '164802', '200001', '200113', '200231', '200387', '300298', '300299', '300310', '300365', '404562', '404631', '404632','404633','404634','502014')
   AND b.QTYCANCE < b.QTYORDER
@@ -179,8 +179,8 @@ export function getPurchaseOrder(poNumber: string): Promise<{lines: object[]}> {
   a.QTYORDER OrderQty,
   a.QTYCANCE CancelledQty,
   a.EXTDCOST ExtendedCost
-  FROM POP10110 a
-  INNER JOIN IV00101 b
+  FROM [GPLIVE].[GCP].[dbo].[POP10110] a WITH (NOLOCK)
+  INNER JOIN [GPLIVE].[GCP].[dbo].[IV00101] b WITH (NOLOCK)
   ON a.ITEMNMBR = b.ITEMNMBR
   AND a.PONUMBER = '${poNumber}'
   `;
@@ -243,20 +243,20 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   COALESCE(c.QTYONHND, 0) InTransit,
   COALESCE(h.IttRemaining, 0) PreTransit,
   b.QTYONHND + COALESCE(c.QTYONHND, 0) + COALESCE(h.IttRemaining, 0) - b.ATYALLOC - b.QTYBKORD QtyAvailable
-  FROM IV00101 a WITH (NOLOCK)
+  FROM [GPLIVE].[GCP].[dbo].[IV00101] a WITH (NOLOCK)
 
   -- Get quantities and shiz
-  INNER JOIN IV00102 b WITH (NOLOCK)
+  INNER JOIN [GPLIVE].[GCP].[dbo].[IV00102] b WITH (NOLOCK)
   ON a.ITEMNMBR = b.ITEMNMBR
 
   -- Get UofM
-  LEFT JOIN IV40201 u WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV40201] u WITH (NOLOCK)
   ON a.UOMSCHDL = u.UOMSCHDL
 
   -- Get specs
   LEFT JOIN (
     SELECT *
-    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    FROM [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] WITH (NOLOCK)
     WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
   ) p
   ON a.ITEMNMBR = p.Product
@@ -264,7 +264,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   -- get ITTs
   LEFT JOIN (
     SELECT ITEMNMBR, TRNSTLOC, SUM(TRNSFQTY) - SUM(QTYSHPPD) IttRemaining
-    FROM SVC00701 WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SVC00701] WITH (NOLOCK)
     GROUP BY ITEMNMBR, TRNSTLOC
   ) h
   ON a.ITEMNMBR = h.ITEMNMBR AND b.LOCNCODE = h.TRNSTLOC
@@ -274,7 +274,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     SELECT ITEMNMBR,
     REPLACE(LOCNCODE, 'TRANS', '') lcn,
     QTYONHND
-    FROM IV00102 WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[IV00102] WITH (NOLOCK)
     WHERE LOCNCODE LIKE '%TRANS'
     AND QTYONHND > 0
   ) c
@@ -288,8 +288,8 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
     SUM(CASE WHEN b.ReqShipDate <=  DATEADD(DAY, +7, CONVERT(VARCHAR, GETDATE(), 23)) THEN b.ATYALLOC * b.QTYBSUOM else 0 END) Week,
     SUM(CASE WHEN b.ReqShipDate <=  DATEADD(DAY, +30, CONVERT(VARCHAR, GETDATE(), 23))  THEN b.ATYALLOC * b.QTYBSUOM else 0 END) Month,
     SUM(CASE WHEN b.ReqShipDate <=  DATEADD(DAY, +365, CONVERT(VARCHAR, GETDATE(), 23))  THEN b.ATYALLOC * b.QTYBSUOM else 0 END) Year
-    FROM SOP10100 a WITH (NOLOCK)
-    INNER JOIN SOP10200 b WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
+    INNER JOIN [GPLIVE].[GCP].[dbo].[SOP10200] b WITH (NOLOCK)
     ON a.SOPNUMBE = b.SOPNUMBE AND a.SOPTYPE = b.SOPTYPE
     WHERE b.SOPTYPE = 2
     GROUP BY b.ITEMNMBR, b.LOCNCODE
@@ -297,24 +297,18 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ON b.ITEMNMBR = m.ITEMNMBR AND b.LOCNCODE = m.LOCNCODE
 
   -- Get Vic stock from Paperless
-  LEFT JOIN (
-    SELECT a.[PROD.NO] ITEMNMBR, SUM([PAL.TOT.QTY]) OnHand
-    FROM [PAPERLESSDW01\\SQLEXPRESS].PWSdw.dbo.STOCK_DW a WITH (NOLOCK)
-    LEFT JOIN (SELECT * FROM [PAPERLESSDW01\\SQLEXPRESS].[PWSdw].dbo.PALLET_DW WITH (NOLOCK) WHERE [PAL.STATUS] = '02') b
-    ON a.[PROD.NO] = b.[PROD.NO]
-    GROUP BY a.[PROD.NO]
-  ) pw
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IMS_Main_Stock] pw
   ON a.ITEMNMBR COLLATE DATABASE_DEFAULT = pw.ITEMNMBR COLLATE DATABASE_DEFAULT
 
   -- Get bin allocations
-  --LEFT JOIN IV00117 d WITH (NOLOCK)
+  --LEFT JOIN [GPLIVE].[GCP].[dbo].[IV00117] d WITH (NOLOCK)
   --ON a.ITEMNMBR = d.ITEMNMBR AND b.LOCNCODE = d.LOCNCODE
 
   -- Get branch SOHs
   LEFT JOIN (
     SELECT * FROM (
       SELECT ITEMNMBR, LOCNCODE, QTYONHND
-      FROM IV00102 WITH (NOLOCK)
+      FROM [GPLIVE].[GCP].[dbo].[IV00102] WITH (NOLOCK)
       WHERE QTYONHND <> 0
     ) a
     PIVOT (
@@ -328,7 +322,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   LEFT JOIN (
     SELECT * FROM (
       SELECT ITEMNMBR, LOCNCODE, ATYALLOC
-      FROM IV00102 WITH (NOLOCK)
+      FROM [GPLIVE].[GCP].[dbo].[IV00102] WITH (NOLOCK)
       WHERE ATYALLOC <> 0
     ) a
     PIVOT (
@@ -340,7 +334,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
 
   -- Get branch backorders
   LEFT JOIN (
-    SELECT * FROM (SELECT ITEMNMBR, LOCNCODE, QTYBKORD FROM IV00102 WITH (NOLOCK) WHERE QTYBKORD <> 0) a
+    SELECT * FROM (SELECT ITEMNMBR, LOCNCODE, QTYBKORD FROM [GPLIVE].[GCP].[dbo].[IV00102] WITH (NOLOCK) WHERE QTYBKORD <> 0) a
     PIVOT (
       SUM(QTYBKORD)
       FOR LOCNCODE IN (HEA, NSW, QLD, WA, SA, MAIN)
@@ -374,17 +368,17 @@ export function getCustomers(branches: Array<string>, sort: string, orderby: str
   let query =
   `
   SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plain, 0) plain, COALESCE(c.gcp, 0) gcp
-  FROM RM00101 a
+  FROM [GPLIVE].[GCP].[dbo].[RM00101] a WITH (NOLOCK)
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plain
-    FROM SY90000
+    FROM [GPLIVE].[GCP].[dbo].[SY90000] WITH (NOLOCK)
     WHERE ObjectType = 'Customer'
     AND PropertyName = 'PLAINQty'
     AND PropertyValue != 0
   ) b ON a.CUSTNMBR = b.CUSTNMBR
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) gcp
-    FROM SY90000
+    FROM [GPLIVE].[GCP].[dbo].[SY90000] WITH (NOLOCK)
     WHERE ObjectType = 'Customer'
     AND PropertyName = 'GCPQty'
     AND PropertyValue != 0
@@ -411,17 +405,17 @@ export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
   const query =
   `
   SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plain, 0) plain, COALESCE(c.gcp, 0) gcp
-  FROM RM00101 a
+  FROM [GPLIVE].[GCP].[dbo].[RM00101] a WITH (NOLOCK)
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plain
-    FROM SY90000
+    FROM [GPLIVE].[GCP].[dbo].[SY90000] WITH (NOLOCK)
     WHERE ObjectType = 'Customer'
     AND PropertyName = 'PLAINQty'
     AND PropertyValue != 0
   ) b ON a.CUSTNMBR = b.CUSTNMBR
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) gcp
-    FROM SY90000
+    FROM [GPLIVE].[GCP].[dbo].[SY90000] WITH (NOLOCK)
     WHERE ObjectType = 'Customer'
     AND PropertyName = 'GCPQty'
     AND PropertyValue != 0
@@ -436,7 +430,7 @@ export function getCustomerAddresses(custNmbr: string) {
   const query =
   `
   SELECT rtrim(ADRSCODE) name, rtrim(CNTCPRSN) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIP) postcode, RTRIM(PHONE1) phoneNumber1, RTRIM(PHONE2) phoneNumber2
-  FROM RM00102
+  FROM [GPLIVE].[GCP].[dbo].[RM00102] WITH (NOLOCK)
   WHERE CUSTNMBR = @custnmbr
   ORDER BY ADRSCODE ASC
   `;
@@ -449,7 +443,7 @@ export function getVendors(search: string, page: number): Promise<{vendors: gpRe
   let query =
   `
   SELECT rtrim(a.VENDORID) vendId, rtrim(a.VENDNAME) name
-  FROM PM00200 a
+  FROM [GPLIVE].[GCP].[dbo].[PM00200] a WITH (NOLOCK)
   `;
   const filterConditions = [];
   filterConditions.push(`a.VENDSTTS = 1`);
@@ -465,7 +459,7 @@ export function getVendorAddresses(vendNmbr: string) {
   const query =
   `
   SELECT rtrim(ADRSCODE) name, rtrim(VNDCNTCT) contact, rtrim(ADDRESS1) address1, rtrim(ADDRESS2) address2, rtrim(ADDRESS3) address3, rtrim(CITY) city, rtrim(STATE) state, rtrim(ZIPCODE) postcode, RTRIM(PHNUMBR1) phoneNumber1, RTRIM(PHNUMBR2) phoneNumber2
-  FROM PM00300
+  FROM [GPLIVE].[GCP].[dbo].[PM00300] WITH (NOLOCK)
   WHERE VENDORID = @vendnmbr
   ORDER BY ADRSCODE ASC
   `;
@@ -478,8 +472,8 @@ export function getHistory(itemNmbr: string) {
   `
   SELECT * FROM (
     SELECT s.LOCNCODE, SUM(CASE t.SOPTYPE WHEN 3 THEN QUANTITY * QTYBSUOM WHEN 4 THEN QUANTITY * -QTYBSUOM END) / 12 TOTALS
-    FROM SOP30200 s WITH (NOLOCK)
-    LEFT JOIN SOP30300 t WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP30200] s WITH (NOLOCK)
+    LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP30300] t WITH (NOLOCK)
     ON s.SOPTYPE = t.SOPTYPE
     AND s.SOPNUMBE = t.SOPNUMBE
     WHERE s.DOCDATE > DATEADD(year,-1,GETDATE())
@@ -508,16 +502,16 @@ export function getOrdersByLine(branch: string, itemNmbr: string, components = f
   a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr,
   rtrim(a.LOCNCODE) locnCode, (b.ATYALLOC) * b.QTYBSUOM quantity,
   rtrim(c.CUSTNAME) customer, rtrim(c.CUSTNMBR) custNmbr, d.CMMTTEXT note, e.CMMTTEXT lineNote
-  FROM SOP10100 a WITH (NOLOCK)
-  LEFT JOIN SOP10200 b WITH (NOLOCK)
+  FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP10200] b WITH (NOLOCK)
   ON a.SOPTYPE = b.SOPTYPE AND b.SOPNUMBE = a.SOPNUMBE
-  LEFT JOIN RM00101 c WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[RM00101] c WITH (NOLOCK)
   ON a.CUSTNMBR = c.CUSTNMBR
-  LEFT JOIN SOP10106 d WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP10106] d WITH (NOLOCK)
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
-  LEFT JOIN SOP10202 e WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP10202] e WITH (NOLOCK)
   ON b.SOPTYPE = e.SOPTYPE AND b.SOPNUMBE = e.SOPNUMBE AND b.LNITMSEQ = e.LNITMSEQ
-  WHERE ${components ? '(b.ITEMNMBR = @itemnmbr OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM BM00111 WHERE CMPTITNM = @itemnmbr))' : ' b.ITEMNMBR = @itemnmbr'}
+  WHERE ${components ? '(b.ITEMNMBR = @itemnmbr OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM [GPLIVE].[GCP].[dbo].[BM00111] WITH (NOLOCK) WHERE CMPTITNM = @itemnmbr))' : ' b.ITEMNMBR = @itemnmbr'}
   AND a.SOPTYPE IN (2, 3, 5)
   `;
   if (branch) query += `
@@ -547,22 +541,22 @@ export function getOrders(branch: string, batch: string, date: string) {
   SUM(p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / COALESCE(p.PackQty, 1)) orderWeight, MAX(CONVERT (varchar(max), TXTFIELD )) note
   FROM (
     SELECT BACHNUMB, DOCDATE, DOCID, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
-    FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
     WHERE ReqShipDate = @date
     AND LOCNCODE IN ${branchList}
     AND SOPTYPE = 2
     UNION
     SELECT BACHNUMB, DOCDATE, a.DOCID, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
-    FROM [GCP].[dbo].SOP30200 a WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP30200] a WITH (NOLOCK)
     LEFT JOIN (
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, DOCID, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM [GCP].[dbo].SOP10100 WITH (NOLOCK)
+      FROM [GPLIVE].[GCP].[dbo].[SOP10100] WITH (NOLOCK)
       WHERE ReqShipDate = @date
       AND LOCNCODE IN ${branchList}
       AND SOPTYPE = 3
       UNION
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, DOCID, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM [GCP].[dbo].SOP30200 WITH (NOLOCK)
+      FROM [GPLIVE].[GCP].[dbo].[SOP30200] WITH (NOLOCK)
       WHERE ReqShipDate = @date
       AND LOCNCODE IN ${branchList}
       AND SOPTYPE = 3
@@ -572,27 +566,27 @@ export function getOrders(branch: string, batch: string, date: string) {
     WHERE a.SOPTYPE = 2
     AND LOCNCODE IN ${branchList}
   ) a
-  LEFT JOIN [GCP].[dbo].SY03900 n WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[SY03900] n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
-  LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  LEFT JOIN [IMS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
-  left join (
-    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GPLIVE].[GCP].[dbo].[SOP10200] e WITH (NOLOCK)
     UNION
-    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, QTYPRINV, QTYTOINV, QTYBSUOM FROM [GPLIVE].[GCP].[dbo].[SOP30300] f WITH (NOLOCK)
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN (
     SELECT Product, PalletHeight, PalletQty, PackQty, PackWeight, ROW_NUMBER() OVER(PARTITION BY Product ORDER BY Product DESC) rn
-    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    FROM [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] WITH (NOLOCK)
     WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
   ) p
   ON ITEMNMBR = p.Product
-  LEFT JOIN (
+  LEFT JOIN ( 
     SELECT o.SalesOrderCode, u.LineNumber, SUM(u.FulfilledQuantity) FulfilledQuantity, 1 as LinePicked
-    FROM [PanatrackerGP].[dbo].[TrxFulfillOrder] o
-    LEFT JOIN [PanatrackerGP].[dbo].[TrxFulfillOrderUnit] u
+    FROM [GPLIVE].[PanatrackerGP].[dbo].[TrxFulfillOrder] o WITH (NOLOCK)
+    LEFT JOIN [GPLIVE].[PanatrackerGP].[dbo].[TrxFulfillOrderUnit] u
     ON u.TrxFulfillOrderOid = o.Oid
     GROUP BY SalesOrderCode, LineNumber
   ) pt
@@ -625,41 +619,41 @@ export function getOrderLines(sopType: number, sopNumber: string) {
 
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
-    FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
     WHERE SOPTYPE = 2
     UNION
     SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
-    FROM [GCP].[dbo].SOP30200 a WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP30200] a WITH (NOLOCK)
 
     LEFT JOIN (
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM [GCP].[dbo].SOP10100 WITH (NOLOCK)
+      FROM [GPLIVE].[GCP].[dbo].[SOP10100] WITH (NOLOCK)
       WHERE SOPTYPE = 3
       UNION
       SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
-      FROM [GCP].[dbo].SOP30200 WITH (NOLOCK)
+      FROM [GPLIVE].[GCP].[dbo].[SOP30200] WITH (NOLOCK)
       WHERE SOPTYPE = 3
     ) c
     ON a.SOPTYPE = c.ORIGTYPE
     AND a.SOPNUMBE = c.ORIGNUMB
     WHERE a.SOPTYPE = 2
   ) a
-  LEFT JOIN [GCP].[dbo].SY03900 n WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[SY03900] n WITH (NOLOCK)
   ON a.NOTEINDX = n.NOTEINDX
-  left join (
-    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, UOFM, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, UOFM, QTYBSUOM FROM [GPLIVE].[GCP].[dbo].[SOP10200] e WITH (NOLOCK)
     UNION
-    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, UOFM, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK)
+    SELECT SOPNUMBE, SOPTYPE, LNITMSEQ, ITEMNMBR, ITEMDESC, QUANTITY, QTYPRINV, QTYTOINV, UOFM, QTYBSUOM FROM [GPLIVE].[GCP].[dbo].[SOP30300] f WITH (NOLOCK)
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
   LEFT JOIN (
     SELECT Product, PalletQty, PalletHeight, PackWeight, PackQty, ROW_NUMBER() OVER(PARTITION BY Product ORDER BY Product DESC) rn
-    FROM [PERFION].[GCP-Perfion-LIVE].dbo.ProductSpecs WITH (NOLOCK)
+    FROM [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] WITH (NOLOCK)
     WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
   ) p
   ON ITEMNMBR = p.Product
-  LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  LEFT JOIN [IMS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
   WHERE a.SOPNUMBE = @sopNumber
   AND (rn = 1 OR rn IS NULL)
@@ -713,7 +707,7 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   let query =
   `
   SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
-  FROM [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  FROM [IMS].[dbo].[Deliveries] d WITH (NOLOCK)
   WHERE Branch = @branch
   AND Status ${archived ? '=' : '<>'} 'Archived'
   ${run !== undefined ? 'AND Run = @run' : ''}
@@ -726,9 +720,11 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   });
 }
 
-export async function addDelivery(delivery: Delivery): Promise<{id: number, fields: Delivery}> {
+export async function addDelivery(delivery: Delivery, userName: string, userEmail: string): Promise<{id: number, fields: Delivery}> {
   const insertQuery = `
-  INSERT INTO [MSDS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
+  INSERT INTO [IMS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
+  OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
+  INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, toRun, Action, Date)
   VALUES (@Run,@Status,@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Site,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@DeliveryType,@RequestedDate);
   SELECT @id = SCOPE_IDENTITY();
   `;
@@ -756,6 +752,8 @@ export async function addDelivery(delivery: Delivery): Promise<{id: number, fiel
   request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
   request.input('DeliveryType', TYPES.VarChar(50), delivery.DeliveryType);
   request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
+  request.input('userName', TYPES.NVarChar(50), userName);
+  request.input('userEmail', TYPES.NVarChar(320), userEmail);
   request.output('id', TYPES.Int);
   return request.query(insertQuery).then(_ => {
     const id = _['output']['id'] as number;
@@ -763,7 +761,7 @@ export async function addDelivery(delivery: Delivery): Promise<{id: number, fiel
   });
 }
 
-export async function updateDelivery(id: number, delivery: Delivery): Promise<{body: {fields: Delivery, id: number}} | void> {
+export async function updateDelivery(id: number, delivery: Delivery, userName: string, userEmail: string): Promise<{body: {fields: Delivery, id: number}} | void> {
   const updates = [];
   if ('Sequence' in delivery) updates.push('Sequence = @Sequence');
   if ('Run' in delivery) updates.push('Run = @Run');
@@ -776,15 +774,21 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   if ('CustomerName' in delivery) updates.push('CustomerName = @CustomerName');
   if ('Address' in delivery) updates.push('Address = @Address');
   if ('Site' in delivery) updates.push('Site = @Site');
-  const updateQuery = `
-  UPDATE [MSDS].[dbo].Deliveries
+  let updateQuery = `
+  UPDATE [IMS].[dbo].Deliveries
   SET ${updates.join()}
-  WHERE id = @id;
-  SELECT Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
-  FROM [MSDS].[dbo].Deliveries
+  `
+  if ('Run' in delivery) {
+    updateQuery += `
+      OUTPUT @userName, @userEmail, inserted.OrderNumber, inserted.CustomerNumber, inserted.Branch, deleted.Run, inserted.Run, 'moved', getDate()
+      INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, toRun, Action, Date)
+    `;
+  }
+  updateQuery += `
+  OUTPUT inserted.Address, RTRIM(inserted.Branch) Branch, inserted.City, inserted.ContactPerson, inserted.Created, inserted.Creator, inserted.CustomerName, RTRIM(inserted.CustomerNumber) CustomerNumber, inserted.CustomerType, inserted.Date, inserted.Delivered, inserted.DeliveryDate, inserted.DeliveryType, inserted.Notes, RTRIM(inserted.OrderNumber) OrderNumber, inserted.PhoneNumber, inserted.PickStatus, inserted.Postcode, inserted.RequestedDate, inserted.Run, inserted.Sequence, inserted.Site, inserted.Spaces, inserted.State, inserted.Status, inserted.Weight, inserted.id
   WHERE id = @id
   `;
-  const request = new sqlRequest()
+  const request = new sqlRequest();
   request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
   request.input('DeliveryDate', TYPES.Date, delivery.DeliveryDate);
   request.input('PickStatus', TYPES.TinyInt, delivery.PickStatus);
@@ -797,20 +801,27 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), delivery.Status);
   request.input('id', TYPES.Int, id);
+  request.input('userName', TYPES.NVarChar(50), userName);
+  request.input('userEmail', TYPES.NVarChar(320), userEmail);
   return request.query(updateQuery).then(_ => {
     const delivery = _.recordset[0] as Delivery;
     return {body: {fields: delivery, id}};
   }).catch(
-    () => {
+    e => {
       if (updates.length === 0) throw 'No fields to update.';
       throw 'Unknown error';
     }
   );
 }
 
-export function removeDelivery(id: number): Promise<IResult<any>> {
-  const deleteQuery = `DELETE FROM [MSDS].[dbo].Deliveries WHERE id = @id`;
-  return new sqlRequest().input('id', TYPES.Int, id).query(deleteQuery).then((_) => _);
+export function removeDelivery(id: number, userName: string, userEmail: string): Promise<IResult<any>> {
+  const deleteQuery = `
+  DELETE FROM [IMS].[dbo].[Deliveries]
+  OUTPUT @userName, @userEmail, deleted.OrderNumber, deleted.CustomerNumber, deleted.Branch, deleted.Run, 'deleted', getDate()
+  INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, Action, Date)
+  WHERE id = @id
+  `;
+  return new sqlRequest().input('id', TYPES.Int, id).input('userName', TYPES.NVarChar(50), userName).input('userEmail', TYPES.NVarChar(320), userEmail).query(deleteQuery).then((_) => _);
 }
 
 export function getChemicals(branch: string, itemNumber: string, type: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
@@ -821,7 +832,7 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   SELECT RTRIM(a.ITEMNMBR) ItemNmbr,
   RTRIM(ITEMDESC) ItemDesc,
   b.QTYONHND onHand,
-  (SELECT TOP 1 BIN FROM IV00112 WHERE ITEMNMBR = a.ITEMNMBR and LOCNCODE = b.LOCNCODE AND QUANTITY > 0 ORDER BY QUANTITY DESC) Bin,
+  (SELECT TOP 1 BIN FROM [GPLIVE].[GCP].[dbo].[IV00112] WITH (NOLOCK) WHERE ITEMNMBR = a.ITEMNMBR and LOCNCODE = b.LOCNCODE AND QUANTITY > 0 ORDER BY QUANTITY DESC) Bin,
   rtrim(c.BIN) PriorityBin,
   Coalesce(Pkg, '') packingGroup,
   Coalesce(Dgc, '') class,
@@ -829,12 +840,12 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
   Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language, DocNo,
   CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
   1 Inventory
-  FROM IV00101 a WITH (NOLOCK)
-  LEFT JOIN IV00102 b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN (SELECT * FROM IV00117 WITH (NOLOCK) WHERE PRIORITY = 1) c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
-  LEFT JOIN [MSDS].dbo.ProductLinks d WITH (NOLOCK) ON a.ITEMNMBR = d.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.Materials e WITH (NOLOCK) ON d.CwNo = e.CwNo
-  LEFT JOIN (SELECT PropertyValue, ObjectID FROM SY90000 WITH (NOLOCK) WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
+  FROM [GPLIVE].[GCP].[dbo].[IV00101] a WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV00102] b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN (SELECT * FROM [GPLIVE].[GCP].[dbo].[IV00117] WITH (NOLOCK) WHERE PRIORITY = 1) c ON a.ITEMNMBR = c.ITEMNMBR AND b.LOCNCODE = c.LOCNCODE
+  LEFT JOIN [IMS].[dbo].[ProductLinks] d WITH (NOLOCK) ON a.ITEMNMBR = d.ITEMNMBR
+  LEFT JOIN [IMS].[dbo].[Materials] e WITH (NOLOCK) ON d.CwNo = e.CwNo
+  LEFT JOIN (SELECT PropertyValue, ObjectID FROM [GPLIVE].[GCP].[dbo].[SY90000] WITH (NOLOCK) WHERE ObjectType = 'ItemCatDesc') f ON a.ITEMNMBR = f.ObjectID
   WHERE a.ITMCLSCD IN ('ADDITIVE', 'BASACOTE', 'CHEMICALS', 'FERTILIZER', 'NUTRICOTE', 'OCP', 'OSMOCOTE', 'SEASOL')
   AND b.LOCNCODE = @locnCode
   AND f.PropertyValue != 'Hardware & Accessories'
@@ -860,10 +871,10 @@ export function getChemicals(branch: string, itemNumber: string, type: string, o
     Name, HCodes, OnChemwatch, IssueDate, ExtractionDate, VendorName, Country, Language, DocNo,
     CASE WHEN e.CwNo IS NOT NULL THEN 1 ELSE 0 END sdsExists,
     0 Inventory
-  FROM [MSDS].dbo.Consumables a WITH (NOLOCK)
-  LEFT JOIN [MSDS].dbo.Quantities b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.ProductLinks d WITH (NOLOCK) ON a.ItemNmbr = d.ITEMNMBR
-  LEFT JOIN [MSDS].dbo.Materials e WITH (NOLOCK) ON d.CwNo = e.CwNo
+  FROM [IMS].[dbo].[Consumables] a WITH (NOLOCK)
+  LEFT JOIN [IMS].[dbo].[Quantities] b WITH (NOLOCK) ON a.ITEMNMBR = b.ITEMNMBR
+  LEFT JOIN [IMS].[dbo].[ProductLinks] d WITH (NOLOCK) ON a.ItemNmbr = d.ITEMNMBR
+  LEFT JOIN [IMS].[dbo].[Materials] e WITH (NOLOCK) ON d.CwNo = e.CwNo
   WHERE COALESCE(b.Site, '') = @locnCode
   `;
 
@@ -910,33 +921,33 @@ export function getChemicalsOnRun(branch: string, run: string) {
   SELECT d.Run, RTRIM(b.ITEMNMBR) ItemNmbr, MAX(m.pkg) packingGroup, MAX(m.[HazardRating]) [hazardRating], MAX(m.[Dgc]) [Dgc], RTRIM(MAX(b.ITEMDESC)) ItemDesc, MAX(m.Name) itemName, SUM(QTYPRINV * QTYBSUOM) quantity
   FROM (
     SELECT SOPTYPE, SOPNUMBE
-    FROM [GCP].[dbo].SOP10100 a WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
     WHERE SOPTYPE = 2
     UNION ALL
     SELECT a.SOPTYPE, SOPNUMBE
-    FROM [GCP].[dbo].SOP30200 a WITH (NOLOCK)
+    FROM [GPLIVE].[GCP].[dbo].[SOP30200] a WITH (NOLOCK)
     LEFT JOIN (
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB FROM [GCP].[dbo].SOP10100 WITH (NOLOCK) WHERE SOPTYPE = 3
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB FROM [GPLIVE].[GCP].[dbo].[SOP10100] WITH (NOLOCK) WHERE SOPTYPE = 3
       UNION
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB FROM [GCP].[dbo].SOP30200 WITH (NOLOCK) WHERE SOPTYPE = 3
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB FROM [GPLIVE].[GCP].[dbo].[SOP30200] WITH (NOLOCK) WHERE SOPTYPE = 3
     ) c
     ON a.SOPTYPE = c.ORIGTYPE AND a.SOPNUMBE = c.ORIGNUMB
     WHERE a.SOPTYPE = 2
   ) a
-  left join (
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYBSUOM FROM [GCP].[dbo].SOP10200 e WITH (NOLOCK) WHERE QTYPRINV * QTYBSUOM > 0
+  LEFT JOIN (
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYBSUOM FROM [GPLIVE].[GCP].[dbo].[SOP10200] e WITH (NOLOCK) WHERE QTYPRINV * QTYBSUOM > 0
     UNION
-    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYBSUOM FROM [GCP].[dbo].SOP30300 f WITH (NOLOCK) WHERE QTYPRINV * QTYBSUOM > 0
+    SELECT SOPNUMBE, SOPTYPE, ITEMNMBR, ITEMDESC, QTYPRINV, QTYBSUOM FROM [GPLIVE].[GCP].[dbo].[SOP30300] f WITH (NOLOCK) WHERE QTYPRINV * QTYBSUOM > 0
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
-  LEFT JOIN [GCP].[dbo].IV00101 i WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV00101] i WITH (NOLOCK)
   ON i.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN [MSDS].[dbo].ProductLinks l WITH (NOLOCK)
+  LEFT JOIN [IMS].[dbo].ProductLinks l WITH (NOLOCK)
   ON l.ITEMNMBR = b.ITEMNMBR
-  LEFT JOIN [MSDS].[dbo].Materials m WITH (NOLOCK)
+  LEFT JOIN [IMS].[dbo].Materials m WITH (NOLOCK)
   ON l.CwNo = m.CwNo
-  LEFT JOIN [MSDS].[dbo].Deliveries d WITH (NOLOCK)
+  LEFT JOIN [IMS].[dbo].Deliveries d WITH (NOLOCK)
   ON d.OrderNumber = a.SOPNUMBE
   WHERE d.Branch = @branch
   AND d.Status = 'Active'
@@ -959,8 +970,8 @@ export function getBasicChemicalInfo(itemNumber: string): Promise<{docNo: string
   const query = 
   `
   SELECT DocNo docNo, b.CwNo cwNo
-  FROM [MSDS].dbo.ProductLinks a
-  LEFT JOIN [MSDS].dbo.Materials b ON a.CwNo = b.CwNo
+  FROM [IMS].[dbo].[ProductLinks] a
+  LEFT JOIN [IMS].[dbo].[Materials] b ON a.CwNo = b.CwNo
   WHERE a.ITEMNMBR = @itemNumber
   `;
   return request.input('itemNumber', TYPES.VarChar(31), itemNumber).query(query).then((_: IResult<{docNo: string, cwNo: string}[]>) => _.recordset[0] ? _.recordset[0] : {docNo: '', cwNo: ''});
@@ -1001,11 +1012,11 @@ export async function writeInTransitTransferFile(id: string | null, fromSite: st
 }
 
 export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRow> {
-  const getQuery = 'SELECT ITEMNMBR, CwNo FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr';
+  const getQuery = 'SELECT ITEMNMBR, CwNo FROM [IMS].[dbo].[ProductLinks] WHERE ITEMNMBR = @itemNmbr';
   const currentCount = await new sqlRequest().input('itemNmbr', TYPES.VarChar(31), itemNmbr).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
   const updateQuery = currentCount === 0 ?
-  `INSERT INTO [MSDS].dbo.ProductLinks (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)` :
-  `UPDATE [MSDS].dbo.ProductLinks SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
+  `INSERT INTO [IMS].[dbo].[ProductLinks] (ITEMNMBR, CwNo) VALUES (@itemNmbr, @cwNo)` :
+  `UPDATE [IMS].[dbo].[ProductLinks] SET CwNo = @cwNo WHERE ITEMNMBR = @itemNmbr`;
   await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('cwNo', TYPES.VarChar(50), cwNo).query(updateQuery);
   await copyPdfToItem(itemNmbr).catch(async _ => {
     await unlinkChemical(itemNmbr);
@@ -1015,7 +1026,7 @@ export async function linkChemical(itemNmbr: string, cwNo: string): Promise<CwRo
 }
 
 export async function unlinkChemical(itemNmbr: string): Promise<CwRow> {
-  const deleteQuery = `DELETE FROM [MSDS].dbo.ProductLinks WHERE ITEMNMBR = @itemNmbr`
+  const deleteQuery = `DELETE FROM [IMS].[dbo].[ProductLinks] WHERE ITEMNMBR = @itemNmbr`
   await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery);
   await removePdfFromItem(itemNmbr);
   return await getChemicals('', itemNmbr, '', '', '').then(c => c['chemicals'][0]);
@@ -1023,7 +1034,7 @@ export async function unlinkChemical(itemNmbr: string): Promise<CwRow> {
 
 export function getSyncedChemicals(): Promise<{chemicals: IRecordSet<CwRow>}> {
   const request = new sqlRequest();
-  const query = 'SELECT CwNo, Name FROM [MSDS].dbo.Materials WHERE onchemwatch = 1 ORDER BY Name ASC';
+  const query = 'SELECT CwNo, Name FROM [IMS].[dbo].[Materials] WHERE onchemwatch = 1 ORDER BY Name ASC';
   return request.query(query).then((_: IResult<CwRow>) => {return {chemicals: _.recordset}});
 }
 
@@ -1035,8 +1046,8 @@ export function getNonInventoryChemicals(site: string): Promise<{chemicals: IRec
   ContainerSize,
   Units,
   b.Quantity quantity
-  FROM [MSDS].dbo.Consumables a
-  LEFT JOIN ( SELECT * FROM [MSDS].dbo.Quantities WHERE Site = @site) b
+  FROM [IMS].[dbo].[Consumables] a
+  LEFT JOIN (SELECT * FROM [IMS].[dbo].[Quantities] WHERE Site = @site) b
   ON a.ItemNmbr = b.ItemNmbr
   ORDER BY ItemDesc ASC
   `;
@@ -1047,16 +1058,16 @@ export function getNonInventoryChemicals(site: string): Promise<{chemicals: IRec
 
 export async function addNonInventoryChemical(itemNmbr: string, itemDesc: string, containerSize: number, units: string): Promise<boolean> {
   const updateQuery = `
-  INSERT INTO [MSDS].dbo.Consumables (ItemNmbr, ItemDesc, ContainerSize, Units)
+  INSERT INTO [IMS].[dbo].[Consumables] (ItemNmbr, ItemDesc, ContainerSize, Units)
   VALUES (@itemNmbr, @itemDesc, @containerSize, @units)`;
   return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), `${itemNmbr}${containerSize}`).input('itemDesc', TYPES.VarChar(101), itemDesc).input('containerSize', TYPES.Numeric(19, 5), containerSize).input('units', TYPES.VarChar(50), units).query(updateQuery).then(() => true);
 }
 
 export async function removeNonInventoryChemical(itemNmbr: string): Promise<boolean> {
   if (!itemNmbr) return false;
-  const deleteQuery1 = `DELETE FROM [MSDS].[dbo].Consumables WHERE ItemNmbr = @itemNmbr`;
-  const deleteQuery2 = `DELETE FROM [MSDS].[dbo].Quantities WHERE ItemNmbr = @itemNmbr`;
-  const deleteQuery3 = `DELETE FROM [MSDS].[dbo].ProductLinks WHERE ITEMNMBR = @itemNmbr`;
+  const deleteQuery1 = `DELETE FROM [IMS].[dbo].[Consumables] WHERE ItemNmbr = @itemNmbr`;
+  const deleteQuery2 = `DELETE FROM [IMS].[dbo].[Quantities] WHERE ItemNmbr = @itemNmbr`;
+  const deleteQuery3 = `DELETE FROM [IMS].[dbo].[ProductLinks] WHERE ITEMNMBR = @itemNmbr`;
   await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery3).then(() => true);
   await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery2).then(() => true);
   await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(deleteQuery1).then(() => true);
@@ -1065,38 +1076,38 @@ export async function removeNonInventoryChemical(itemNmbr: string): Promise<bool
 
 export async function updateNonInventoryChemicalQuantity(itemNmbr: string, quantity: number, branch: string): Promise<boolean> {
   const entryExists = await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('branch', TYPES.VarChar(31), branch).query(
-    'SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = @branch'
+    'SELECT Quantity FROM [IMS].[dbo].[Quantities] WHERE ItemNmbr = @itemNmbr AND Site = @branch'
   ).then((_: IResult<gpRes>) => _.recordset.length) === 0;
 
   const updateQuery = entryExists ?
-    `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, @site, @quantity)` :
-    `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = @Site`;
+    `INSERT INTO [IMS].[dbo].[Quantities] (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, @site, @quantity)` :
+    `UPDATE [IMS].[dbo].[Quantities] SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = @Site`;
 
   return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('site', TYPES.Char(11), branch).input('quantity', TYPES.Int, quantity).query(updateQuery).then(async () => {
     const totalQuantity = await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(
-      `SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site <> ''`
+      `SELECT Quantity FROM [IMS].[dbo].[Quantities] WHERE ItemNmbr = @itemNmbr AND Site <> ''`
     ).then((_: IResult<{Quantity: number}[]>) => _.recordset.reduce((acc, cur) => acc += cur.Quantity, 0));
     const totalResCount = await new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).query(
-      `SELECT Quantity FROM [MSDS].dbo.Quantities WHERE ItemNmbr = @itemNmbr AND Site = ''`
+      `SELECT Quantity FROM [IMS].[dbo].[Quantities] WHERE ItemNmbr = @itemNmbr AND Site = ''`
     ).then((_: IResult<gpRes>) => _.recordset.length);
     const updateTotalQuery = totalResCount === 0 ?
-      `INSERT INTO [MSDS].dbo.Quantities (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, '', @quantity)` :
-      `UPDATE [MSDS].dbo.Quantities SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = ''`;
+      `INSERT INTO [IMS].[dbo].[Quantities] (ItemNmbr, Site, Quantity) VALUES (@itemNmbr, '', @quantity)` :
+      `UPDATE [IMS].[dbo].[Quantities] SET Quantity = @quantity WHERE ItemNmbr = @itemNmbr AND Site = ''`;
     return new sqlRequest().input('itemNmbr', TYPES.VarChar(50), itemNmbr).input('quantity', TYPES.Int, totalQuantity).query(updateTotalQuery);
   }).then(() => true);
 }
 
 export async function updateSDS(cwChemicals: Array<CwRow>) {
   const currentChemicals = await new sqlRequest()
-    .query('SELECT CwNo, ExtractionDate, DocNo FROM [MSDS].dbo.Materials')
+    .query('SELECT CwNo, ExtractionDate, DocNo FROM [IMS].[dbo].[Materials]')
     .then(_ => _.recordset as IRecordSet<{CwNo: string, DocNo: string, ItemNmbr: string}>);
   const missingChemicals = cwChemicals.filter(m => !currentChemicals.find(_ => _.CwNo === m.CwNo)).map(c => {
-    const query = `INSERT INTO [MSDS].dbo.Materials (CwNo) VALUES (@cwNo)`;
+    const query = `INSERT INTO [IMS].[dbo].[Materials] (CwNo) VALUES (@cwNo)`;
     return new sqlRequest().input('cwNo', TYPES.VarChar(50), c.CwNo).query(query);
   });
 
   const removedChemicals = currentChemicals.filter(c => !cwChemicals.find(_ => _.CwNo === c.CwNo)).map(m => {
-    const query = `UPDATE [MSDS].dbo.Materials SET OnChemwatch = 0 WHERE CwNo = @cwNo`;
+    const query = `UPDATE [IMS].[dbo].[Materials] SET OnChemwatch = 0 WHERE CwNo = @cwNo`;
     return new sqlRequest().input('cwNo', TYPES.VarChar(50), m.CwNo).query(query);
   });
 
@@ -1127,7 +1138,7 @@ export async function updateSDS(cwChemicals: Array<CwRow>) {
     if (c.IssueDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('issueDate', TYPES.Date, c.IssueDate);
     if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') sets.push('ExtractionDate = @extractionDate');
     if (c.ExtractionDate.toISOString() !== '0000-12-31T13:47:52.000Z') request.input('extractionDate', TYPES.Date, c.ExtractionDate);
-    const query = `UPDATE [MSDS].dbo.Materials SET ${sets.join(', ')} WHERE CwNo = @cwNo`;
+    const query = `UPDATE [IMS].[dbo].[Materials] SET ${sets.join(', ')} WHERE CwNo = @cwNo`;
     return request.query(query);
   });
 
@@ -1144,8 +1155,8 @@ export async function updateSDS(cwChemicals: Array<CwRow>) {
 
 async function aquirePdfForCwNo(cwNo: string): Promise<Buffer> {
   const getQuery = `
-  SELECT a.DocNo, RTRIM(ITEMNMBR) ItemNmbr FROM [MSDS].dbo.Materials a
-  LEFT JOIN [MSDS].dbo.ProductLinks b ON a.CwNo = b.CwNo
+  SELECT a.DocNo, RTRIM(ITEMNMBR) ItemNmbr FROM [IMS].[dbo].[Materials] a
+  LEFT JOIN [IMS].[dbo].[ProductLinks] b ON a.CwNo = b.CwNo
   WHERE a.CwNo = @cwNo
   `;
   const entries = await new sqlRequest().input('cwNo', TYPES.VarChar(31), cwNo).query(getQuery)

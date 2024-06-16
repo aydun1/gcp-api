@@ -282,16 +282,20 @@ app.get('/gp/deliveries', auth, (req, res) => {
 });
 
 app.post('/gp/deliveries', auth, (req, res) => {
+  const userName = (req.authInfo as any)['name'];
+  const userEmail = (req.authInfo as any)['preferred_username'];
   const body = req.body as {fields: Delivery};
-  addDelivery(body.fields).then(_ => res.status(200).json(_)).catch(err => {
+  addDelivery(body.fields, userName, userEmail).then(_ => res.status(200).json(_)).catch(err => {
     return handleError(err, res);
   });
 });
 
 app.post('/gp/deliveries/batch', auth, (req, res) => {
+  const userName = (req.authInfo as any)['name'];
+  const userEmail = (req.authInfo as any)['preferred_username'];
   const body = req.body as {requests: [{id: number, method: string, body: {fields: Delivery}}]};
-  const updates = body.requests.filter(_ => _.method.toUpperCase() === 'PATCH').map(_ => updateDelivery(_.id, _.body.fields));
-  const deletes = body.requests.filter(_ => _.method.toUpperCase() === 'DELETE').map(_ => removeDelivery(_.id));
+  const updates = body.requests.filter(_ => _.method.toUpperCase() === 'PATCH').map(_ => updateDelivery(_.id, _.body.fields, userName, userEmail));
+  const deletes = body.requests.filter(_ => _.method.toUpperCase() === 'DELETE').map(_ => removeDelivery(_.id, userName, userEmail));
   Promise.all([...updates, ...deletes]).then(_ => {
     res.status(200).json({responses: _})
   }).catch(err => {
