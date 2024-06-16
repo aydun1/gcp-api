@@ -720,9 +720,11 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   });
 }
 
-export async function addDelivery(delivery: Delivery): Promise<{id: number, fields: Delivery}> {
+export async function addDelivery(delivery: Delivery, userName: string, userEmail: string): Promise<{id: number, fields: Delivery}> {
   const insertQuery = `
   INSERT INTO [IMS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
+  OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
+  INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, toRun, Action, Date)
   VALUES (@Run,@Status,@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Site,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@DeliveryType,@RequestedDate);
   SELECT @id = SCOPE_IDENTITY();
   `;
@@ -750,6 +752,8 @@ export async function addDelivery(delivery: Delivery): Promise<{id: number, fiel
   request.input('Notes', TYPES.NVarChar(MAX), delivery.Notes);
   request.input('DeliveryType', TYPES.VarChar(50), delivery.DeliveryType);
   request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
+  request.input('userName', TYPES.NVarChar(50), userName);
+  request.input('userEmail', TYPES.NVarChar(320), userEmail);
   request.output('id', TYPES.Int);
   return request.query(insertQuery).then(_ => {
     const id = _['output']['id'] as number;
@@ -757,7 +761,7 @@ export async function addDelivery(delivery: Delivery): Promise<{id: number, fiel
   });
 }
 
-export async function updateDelivery(id: number, delivery: Delivery): Promise<{body: {fields: Delivery, id: number}} | void> {
+export async function updateDelivery(id: number, delivery: Delivery, userName: string, userEmail: string): Promise<{body: {fields: Delivery, id: number}} | void> {
   const updates = [];
   if ('Sequence' in delivery) updates.push('Sequence = @Sequence');
   if ('Run' in delivery) updates.push('Run = @Run');
@@ -770,15 +774,21 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   if ('CustomerName' in delivery) updates.push('CustomerName = @CustomerName');
   if ('Address' in delivery) updates.push('Address = @Address');
   if ('Site' in delivery) updates.push('Site = @Site');
-  const updateQuery = `
+  let updateQuery = `
   UPDATE [IMS].[dbo].Deliveries
   SET ${updates.join()}
-  WHERE id = @id;
-  SELECT Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
-  FROM [IMS].[dbo].Deliveries
+  `
+  if ('Run' in delivery) {
+    updateQuery += `
+      OUTPUT @userName, @userEmail, inserted.OrderNumber, inserted.CustomerNumber, inserted.Branch, deleted.Run, inserted.Run, 'moved', getDate()
+      INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, toRun, Action, Date)
+    `;
+  }
+  updateQuery += `
+  OUTPUT inserted.Address, RTRIM(inserted.Branch) Branch, inserted.City, inserted.ContactPerson, inserted.Created, inserted.Creator, inserted.CustomerName, RTRIM(inserted.CustomerNumber) CustomerNumber, inserted.CustomerType, inserted.Date, inserted.Delivered, inserted.DeliveryDate, inserted.DeliveryType, inserted.Notes, RTRIM(inserted.OrderNumber) OrderNumber, inserted.PhoneNumber, inserted.PickStatus, inserted.Postcode, inserted.RequestedDate, inserted.Run, inserted.Sequence, inserted.Site, inserted.Spaces, inserted.State, inserted.Status, inserted.Weight, inserted.id
   WHERE id = @id
   `;
-  const request = new sqlRequest()
+  const request = new sqlRequest();
   request.input('RequestedDate', TYPES.Date, delivery.RequestedDate);
   request.input('DeliveryDate', TYPES.Date, delivery.DeliveryDate);
   request.input('PickStatus', TYPES.TinyInt, delivery.PickStatus);
@@ -791,20 +801,27 @@ export async function updateDelivery(id: number, delivery: Delivery): Promise<{b
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), delivery.Status);
   request.input('id', TYPES.Int, id);
+  request.input('userName', TYPES.NVarChar(50), userName);
+  request.input('userEmail', TYPES.NVarChar(320), userEmail);
   return request.query(updateQuery).then(_ => {
     const delivery = _.recordset[0] as Delivery;
     return {body: {fields: delivery, id}};
   }).catch(
-    () => {
+    e => {
       if (updates.length === 0) throw 'No fields to update.';
       throw 'Unknown error';
     }
   );
 }
 
-export function removeDelivery(id: number): Promise<IResult<any>> {
-  const deleteQuery = `DELETE FROM [IMS].[dbo].[Deliveries] WHERE id = @id`;
-  return new sqlRequest().input('id', TYPES.Int, id).query(deleteQuery).then((_) => _);
+export function removeDelivery(id: number, userName: string, userEmail: string): Promise<IResult<any>> {
+  const deleteQuery = `
+  DELETE FROM [IMS].[dbo].[Deliveries]
+  OUTPUT @userName, @userEmail, deleted.OrderNumber, deleted.CustomerNumber, deleted.Branch, deleted.Run, 'deleted', getDate()
+  INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, Action, Date)
+  WHERE id = @id
+  `;
+  return new sqlRequest().input('id', TYPES.Int, id).input('userName', TYPES.NVarChar(50), userName).input('userEmail', TYPES.NVarChar(320), userEmail).query(deleteQuery).then((_) => _);
 }
 
 export function getChemicals(branch: string, itemNumber: string, type: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
