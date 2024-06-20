@@ -784,6 +784,12 @@ export async function updateDelivery(id: number, delivery: Delivery, userName: s
       INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, toRun, Action, Date)
     `;
   }
+  if ('Status' in delivery) {
+    updateQuery += `
+      OUTPUT @userName, @userEmail, inserted.OrderNumber, inserted.CustomerNumber, inserted.Branch, inserted.Run, inserted.Run, @statusSmall, getDate()
+      INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, toRun, Action, Date)
+    `;
+  }
   updateQuery += `
   OUTPUT inserted.Address, RTRIM(inserted.Branch) Branch, inserted.City, inserted.ContactPerson, inserted.Created, inserted.Creator, inserted.CustomerName, RTRIM(inserted.CustomerNumber) CustomerNumber, inserted.CustomerType, inserted.Date, inserted.Delivered, inserted.DeliveryDate, inserted.DeliveryType, inserted.Notes, RTRIM(inserted.OrderNumber) OrderNumber, inserted.PhoneNumber, inserted.PickStatus, inserted.Postcode, inserted.RequestedDate, inserted.Run, inserted.Sequence, inserted.Site, inserted.Spaces, inserted.State, inserted.Status, inserted.Weight, inserted.id
   WHERE id = @id
@@ -800,6 +806,7 @@ export async function updateDelivery(id: number, delivery: Delivery, userName: s
   request.input('Site', TYPES.NVarChar(50), delivery.Site);
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), delivery.Status);
+  request.input('StatusSmall', TYPES.VarChar(50), delivery.Status?.toLocaleLowerCase() || '');
   request.input('id', TYPES.Int, id);
   request.input('userName', TYPES.NVarChar(50), userName);
   request.input('userEmail', TYPES.NVarChar(320), userEmail);
