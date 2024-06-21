@@ -25,6 +25,13 @@ export const cwConfig = {
   password: process.env.CW_PASSWORD,
 }
 
+export const envuConfig = {
+  authEndpoint: process.env.ENVU_AUTH_ENDPOINT || '',
+  clientId: process.env.ENVU_CLIENT_ID,
+  clientSecret: process.env.ENVU_CLIENT_SECRET,
+  sendEndpoint: process.env.ENVU_SEND_ENDPOINT || ''
+}
+
 export const webConfig = {
   ip: '0.0.0.0',
   port: process.env.PORT || '3000',

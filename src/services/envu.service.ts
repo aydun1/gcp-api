@@ -5,6 +5,7 @@ import { EnvuSale } from '../types/envu-sale';
 import { EnvuReceipt } from '../types/envu-receipt';
 import { EnvuQuery } from '../types/envu-query';
 import { EnvuTransfer } from '../types/envu-transfer';
+import { envuConfig } from '../config';
 
 interface AuthRes {
   access_token: string;
@@ -53,7 +54,6 @@ function dateString(): string {
 
 async function getAccessToken(): Promise<void> {
   console.log('Getting auth token')
-
   const now = new Date();
   const expires = authRes ? new Date(authDate.getTime() + authRes.expires_in * 1000) : 0;
   if (now < expires) {
@@ -61,13 +61,10 @@ async function getAccessToken(): Promise<void> {
     return Promise.resolve()
   };
   try {
-    const client_id = 'HJvrEjhzk0NvlNEW2EUVffGslaYt7ljK';
-    const client_secret = 'JjGIXHXl4TiRIMzsLVDmx3HG_OnuDsVqpr_SGCkSwiud27AJBTFzyq8sPRf_23xm';
     const grant_type = 'client_credentials'
-    const auth_endpoint = 'https://auth0-proxy-oat.apac.proagrica.com/auth/token/apigateway';
     const headers = {'Content-Type': 'application/json'};
-    const body = {client_id, client_secret, grant_type};
-    const res = await axios.post<AuthRes>(auth_endpoint, body, {headers});
+    const body = {client_id: envuConfig.clientId, client_secret: envuConfig.clientSecret, grant_type};
+    const res = await axios.post<AuthRes>(envuConfig.authEndpoint, body, {headers});
     if (res.status !== 200 || res.data.error) throw new Error(res.data.error_description);
     authDate = new Date();
     authRes = res.data;
@@ -82,10 +79,9 @@ async function sendDocument(data: EnvuReceipt[] | EnvuSale[] | EnvuTransfer[], p
   console.log('Sending data')
   const pn_source = 'gcp';
   const Authorization = authRes.access_token;
-  const send_endpoint = 'https://apigateway-oat.apac.proagrica.com/oauth/network/sendDocument';
   const headers = {'Content-Type': 'application/json', pn_source, pn_messagetype, Authorization: `Bearer ${Authorization}`};
   try {
-    const res = await axios.post<AuthRes>(send_endpoint, data, {headers});
+    const res = await axios.post<AuthRes>(envuConfig.sendEndpoint, data, {headers});
     console.log('Data sent 👌')
     return res.data;
   } catch (error: any) {
@@ -154,8 +150,8 @@ export function getChemicalSales(): Promise<{lines: EnvuSale[]}> {
   sd.TAXAMNT AS lineTax,
   sd.XTNDPRCE + sd.TAXAMNT AS lineGross,
   'AUD' as currency
-  FROM SOP30200 sh
-  INNER JOIN SOP30300 sd
+  FROM [GPLIVE].[GCP].[dbo].[SOP30200] sh
+  INNER JOIN [GPLIVE].[GCP].[dbo].[SOP30300] sd
   ON sd.SOPNUMBE = sh.SOPNUMBE
   AND sd.SOPTYPE = sh.SOPTYPE
   WHERE sh.VOIDSTTS = 0
@@ -197,7 +193,7 @@ export async function sendChemicalSalesToEnvu() {
   orders = [orders[orders.length - 1]];
   const goodsreceipts = groupByProperty([...chemicals.receiving], 'trackingId')[0];
   const transfers = groupByProperty([...chemicals.transfers], 'trackingId')[0];
-  sendDocument(orders, 'order')
+  //sendDocument(orders, 'order')
   //sendDocument(goodsreceipts, 'goodsreceipt')
   //sendDocument(transfers, 'transfer')
   //return {orders, goodsreceipts, transfers};
@@ -242,16 +238,16 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
   sop.QTYBSUOM AS QTYBSUOM,
   sop.UNITPRCE AS UNITPRCE,
   sop.QUANTITY AS QUANTITY
-  FROM IV30300 trx WITH (NOLOCK)
-  LEFT JOIN IV30200 hea WITH (NOLOCK)
+  FROM [GPLIVE].[GCP].[dbo].[IV30300] trx WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV30200] hea WITH (NOLOCK)
   on hea.IVDOCTYP = trx.DOCTYPE AND hea.DOCNUMBR = trx.DOCNUMBR
-  LEFT JOIN IV30301 rct WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV30301] rct WITH (NOLOCK)
   ON trx.DOCTYPE = rct.DOCTYPE AND trx.DOCNUMBR = rct.DOCNUMBR AND trx.LNSEQNBR = rct.LNSEQNBR
-  LEFT JOIN IV40700 loc WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV40700] loc WITH (NOLOCK)
   ON trx.TRXLOCTN = loc.LOCNCODE
-  LEFT JOIN SOP30300 sop WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP30300] sop WITH (NOLOCK)
   ON trx.DOCTYPE IN (5, 6) AND trx.DOCNUMBR = sop.SOPNUMBE AND trx.ITEMNMBR = sop.ITEMNMBR AND trx.LNSEQNBR = sop.LNITMSEQ
-  LEFT JOIN SOP30200 soh WITH (NOLOCK)
+  LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP30200] soh WITH (NOLOCK)
   ON trx.DOCTYPE IN (5, 6) AND sop.SOPNUMBE = soh.SOPNUMBE AND sop.SOPTYPE = soh.SOPTYPE
   WHERE trx.DOCTYPE IN (2, 3, 5, 6)
   AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
