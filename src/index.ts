@@ -191,7 +191,18 @@ app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const components = params['comp'] === '1';
-  getOrdersByLine(branch, req.params.id, components).then(
+  getOrdersByLine(branch, [req.params.id], components).then(
+    result => res.status(200).send(result)
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.post('/gp/inventory/orders', auth, (req: Request, res: Response) => {
+  const params = req.query;
+  const branch = params['branch'] as string || '';
+  const components = params['comp'] === '1';
+  getOrdersByLine(branch, req.body.itemNmbrs, components).then(
     result => res.status(200).send(result)
   ).catch(err => {
     return handleError(err, res);
