@@ -492,9 +492,10 @@ export function getHistory(itemNmbr: string) {
   });
 }
 
-export function getOrdersByLine(branch: string, itemNmbr: string, components = false) {
+export function getOrdersByLine(branch: string, itemNmbrs: string[], components = false) {
   branch = parseBranch(branch);
   const request = new sqlRequest();
+  const items = itemNmbrs.map(_ => `'${_}'`).join(',');
   let query =
   `
   Select a.DOCDATE date,
@@ -511,7 +512,7 @@ export function getOrdersByLine(branch: string, itemNmbr: string, components = f
   ON a.SOPTYPE = d.SOPTYPE AND a.SOPNUMBE = d.SOPNUMBE
   LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP10202] e WITH (NOLOCK)
   ON b.SOPTYPE = e.SOPTYPE AND b.SOPNUMBE = e.SOPNUMBE AND b.LNITMSEQ = e.LNITMSEQ
-  WHERE ${components ? '(b.ITEMNMBR = @itemnmbr OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM [GPLIVE].[GCP].[dbo].[BM00111] WITH (NOLOCK) WHERE CMPTITNM = @itemnmbr))' : ' b.ITEMNMBR = @itemnmbr'}
+  WHERE ${components ? `(b.ITEMNMBR IN (${items}) OR b.ITEMNMBR IN (SELECT ITEMNMBR FROM [GPLIVE].[GCP].[dbo].[BM00111] WITH (NOLOCK) WHERE CMPTITNM IN (${items})))` : `b.ITEMNMBR IN (${items})`}
   AND a.SOPTYPE IN (2, 3, 5)
   `;
   if (branch) query += `
@@ -520,7 +521,7 @@ export function getOrdersByLine(branch: string, itemNmbr: string, components = f
   query += `
   ORDER BY a.ReqShipDate ASC
   `;
-  return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
+  return request.input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
 
 export function getOrders(branch: string, batch: string, date: string) {
