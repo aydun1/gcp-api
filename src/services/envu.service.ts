@@ -1,51 +1,16 @@
-import { Request as sqlRequest, IResult } from 'mssql';
+import { Request as sqlRequest } from 'mssql';
 import axios from 'axios';
 
+import { EnvuAuth } from '../types/envu-auth';
 import { EnvuSale } from '../types/envu-sale';
 import { EnvuReceipt } from '../types/envu-receipt';
 import { EnvuQuery } from '../types/envu-query';
 import { EnvuTransfer } from '../types/envu-transfer';
 import { envuConfig } from '../config';
+import { locations, products } from '../definitions';
 
-interface AuthRes {
-  access_token: string;
-  scope: string;
-  expires_in: number;
-  token_type: string;
-  error?: string;
-  error_description?: string;
-}
-
-let authRes!: AuthRes;
+let authRes!: EnvuAuth;
 let authDate!: Date;
-
-const locations = [
-  {envuCode: 'AUC-GCP001', gpCode: 'NSW', address1: '4 - 6 Pinnacle Place', city: 'Somersby', state: 'New South Wales', postcode: '2250', countryCode: 'AU'},
-  {envuCode: 'AUC-GCP002', gpCode: 'MAIN', address1: 'EJ Court (off Assembly Drive)', city: 'Dandenong South', state: 'Victoria', postcode: '3175', countryCode: 'AU'},
-  {envuCode: 'AUC-GCP003', gpCode: 'SA', address1: '10-12 Hakkinen Road', city: 'Wingfield', state: 'South Australia', postcode: '5013', countryCode: 'AU'},
-  {envuCode: 'AUC-GCP004', gpCode: 'QLD', address1: '19 Eastern Service Road', city: 'Stapylton', state: 'Queesnland', postcode: '4207', countryCode: 'AU'},
-  {envuCode: 'AUC-GCP005', gpCode: 'WA', address1: '2 Turley Street', city: 'Forrestdale', state: 'Western Australia', postcode: '6112', countryCode: 'AU'}
-];
-
-const products = [
-  {envuCode: '84504815', gpCode: 'BANOL1', name: 'BANOL (SL) SL722 12X1L BOT AU'},
-  {envuCode: '84487031', gpCode: 'DEDIC1', name: 'DEDICATE (SL) SC300 12X1L BOT AU'},
-  {envuCode: '87291316', gpCode: 'NA', name: 'DEDICATE FORTE STRSGRD SC240 4X1L BOT AU'},
-  {envuCode: '79636954', gpCode: 'DESTINY250', name: 'DESTINY WG10 20X(5X50GR) BAG AU'},
-  {envuCode: '86282178', gpCode: 'NA', name: 'ESPLANADE SC500 4X1L BOT AU'},
-  {envuCode: '87284603', gpCode: 'NA', name: 'ESPLANADE SC500 4X5L BOT AU'},
-  {envuCode: '85767097', gpCode: 'NA', name: 'EXTERIS STRESSGARD TURF SC25 4X5L BOT AU'},
-  {envuCode: '86720930', gpCode: 'NA', name: 'INDEMNIFY TURF NEMT SC400 4X500ML BOT AU'},
-  {envuCode: '84427624', gpCode: 'NA', name: 'INTERFACE STRESSGARD (SL) 4X5L BOT AU'},
-  {envuCode: '84984671', gpCode: 'NA', name: 'RESERVE FUNGICIDE SC720 2X10L BOT AU'},
-  {envuCode: '85785265', gpCode: 'NA', name: 'SIGNATURE XTRA STGD WG60 4X2.75KG BOT AU'},
-  {envuCode: '84937770', gpCode: 'SPEAR10', name: 'SPEARHEAD (SL) SC398,4 2X10L BOT AU'},
-  {envuCode: '88406214', gpCode: 'SPECTICLE250', name: 'SC200 12X250ML BOT AU'},
-  {envuCode: '86711990', gpCode: 'SPECTICLE1', name: 'SPECTICLE SC200 4X1L BOT AU'},
-  {envuCode: '84474347', gpCode: 'NA', name: 'TEMPO XTRA (SL) SC75 4X5L BOT AU'},
-  {envuCode: '87354520', gpCode: 'NA', name: 'TETRINO SC42.8 4X3L BOT AU'},
-  {envuCode: '80204353', gpCode: 'TRIBUTE1', name: 'TRIBUTE OD22,5 12X1L BOT AU'}
-];
 
 function dateString(): string {
   const date = new Date();
@@ -64,7 +29,7 @@ async function getAccessToken(): Promise<void> {
     const grant_type = 'client_credentials'
     const headers = {'Content-Type': 'application/json'};
     const body = {client_id: envuConfig.clientId, client_secret: envuConfig.clientSecret, grant_type};
-    const res = await axios.post<AuthRes>(envuConfig.authEndpoint, body, {headers});
+    const res = await axios.post<EnvuAuth>(envuConfig.authEndpoint, body, {headers});
     if (res.status !== 200 || res.data.error) throw new Error(res.data.error_description);
     authDate = new Date();
     authRes = res.data;
@@ -75,14 +40,14 @@ async function getAccessToken(): Promise<void> {
   }
 }
 
-async function sendDocument(data: EnvuReceipt[] | EnvuSale[] | EnvuTransfer[], pn_messagetype: 'goodsreceipt' | 'order' | 'transfer') {
+async function sendDocument(data: {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[], pn_messagetype: 'goodsreceipt' | 'order' | 'transfer') {
   console.log('Sending data')
   const pn_source = 'gcp';
   const Authorization = authRes.access_token;
   const headers = {'Content-Type': 'application/json', pn_source, pn_messagetype, Authorization: `Bearer ${Authorization}`};
   try {
-    const res = await axios.post<AuthRes>(envuConfig.sendEndpoint, data, {headers});
-    console.log('Data sent 👌')
+    const res = await axios.post<EnvuAuth>(envuConfig.sendEndpoint, data, {headers});
+    console.log(`Data sent: ${data.length} ${pn_messagetype}s  👌`)
     return res.data;
   } catch (error: any) {
     console.log('Error sending data:', error.response.status)
@@ -90,8 +55,8 @@ async function sendDocument(data: EnvuReceipt[] | EnvuSale[] | EnvuTransfer[], p
   }
 }
 
-function groupByProperty(collection: any[], property: string): {key: string, lines: any[]}[] {
-  if(!collection || collection.length === 0) return [{key: 'undefined', lines: []}];
+function groupByProperty(collection: any[], property: string): {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[] {
+  if(!collection || collection.length === 0) return [];
   const groupedCollection = collection.reduce((previous, current)=> {
     if(!previous[current[property]]) {
       previous[current[property]] = [current];
@@ -100,108 +65,10 @@ function groupByProperty(collection: any[], property: string): {key: string, lin
     }
     return previous;
   }, {});
-  return Object.keys(groupedCollection).map(key => ({ key, lines: groupedCollection[key] })).sort((a, b) =>
-    a.key === '' ? 1 : b.key === '' ? -1 : a.key.localeCompare(b.key)
-  );
+  return Object.keys(groupedCollection).map(key => ({ key, lines: groupedCollection[key] })).sort((a, b) => b.lines[0].orderDate - a.lines[0].orderDate);
 }
 
-export function getChemicalSales(): Promise<{lines: EnvuSale[]}> {
-  const request = new sqlRequest();
-  const query =
-  `
-  SELECT sh.DOCDATE AS orderDate,
-  'Standalone Order' AS orderType,
-  'New' AS documentType,
-  '' AS sourcePartnerId,
-  '' AS destinationPartnerId,
-
-  sh.DOCDATE AS documentCreated,
-  RTRIM(sh.SOPNUMBE) AS trackingId,
-  '1' AS revisionNumber,
-  RTRIM(CSTPONBR) AS poNumber,
-  '' AS requestedDeliveryDate,
-  '' AS requestedDispatchDate,
-  '' AS buyerCompanyName,
-  'Garden City Plastics' AS sellerCompanyName,
-  RTRIM(sd.LOCNCODE) AS vendorCode,
-  RTRIM(sh.CUSTNMBR) AS soldToCode,
-  RTRIM(sh.CUSTNAME) AS soldToName,
-  RTRIM(sd.ADDRESS1) AS soldToAddress1,
-  RTRIM(sd.ADDRESS2) AS soldToAddress2,
-  RTRIM(sd.ADDRESS3) AS soldToAddress3,
-  RTRIM(sd.CITY) AS soldToSuburb,
-  RTRIM(sd.STATE) AS soldToState,
-  RTRIM(sd.ZIPCODE) AS soldToPostcode,
-  0 as totalNet,
-  0 as totalTax,
-  0 as totalLines,
-  0 as totalQuantity,
-  0 as totalGross,
-  -- Lines
-  RTRIM(sd.ITEMNMBR) AS sellerProductCode,
-  RTRIM(sd.ITEMNMBR) AS productDescription,
-  0 AS lineNumber,
-  'New' as lineStatus,
-  CASE sd.SOPTYPE WHEN 3 THEN sd.QTYFULFI*sd.QTYBSUOM WHEN 4 THEN sd.QUANTITY*sd.QTYBSUOM*-1 END AS orderQuantity,
-  'Each' as uom,
-  sd.UNITPRCE AS unitPrice,
-  0.10 AS taxRate,
-  sd.XTNDPRCE AS lineNet,
-  sd.TAXAMNT AS lineTax,
-  sd.XTNDPRCE + sd.TAXAMNT AS lineGross,
-  'AUD' as currency
-  FROM [GPLIVE].[GCP].[dbo].[SOP30200] sh
-  INNER JOIN [GPLIVE].[GCP].[dbo].[SOP30300] sd
-  ON sd.SOPNUMBE = sh.SOPNUMBE
-  AND sd.SOPTYPE = sh.SOPTYPE
-  WHERE sh.VOIDSTTS = 0
-  AND sh.SOPTYPE in (3,4)
-  AND sd.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
-  AND DOCDATE > '2023-11-01T00:00:00.000Z'
-  ORDER BY sh.SOPNUMBE DESC
-  `;
-
-  return request.query(query).then((_: IResult<EnvuSale[]>) => {
-    const docIdField = 'trackingId';
-    _.recordset.forEach((r, i, a) => {
-      const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
-      r['totalTax'] = sopLines.reduce((a, b) => a += b.lineTax, 0);
-      r['totalNet'] = sopLines.reduce((a, b) => a += b.lineNet, 0);
-      r['totalLines'] = sopLines.length;
-      r['totalQuantity'] = sopLines.reduce((a, b) => a += b.orderQuantity, 0);
-      r['totalGross'] = sopLines.reduce((a, b) => a += b.lineGross, 0);
-      r['lineNumber'] = a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length;
-      r['vendorCode'] = locations.find(_ => _.gpCode === r['vendorCode'])?.envuCode || '';
-      r['sellerProductCode'] = products.find(_ => _.gpCode === r['sellerProductCode'])?.envuCode || '';
-      r['productDescription'] = products.find(_ => _.gpCode === r['productDescription'])?.name || '';
-      r['requestedDeliveryDate'] = dateString();
-      r['requestedDispatchDate'] = dateString();
-      r['soldToName'] = '';
-      r['soldToAddress1'] = '';
-      r['soldToAddress2'] = '';
-      r['soldToAddress3'] = '';
-    });
-    return {lines: _.recordset}
-  });
-}
-
-export async function sendChemicalSalesToEnvu() {
-  console.log('Starting envu sales update')
-  await getAccessToken();
-  const chemicals = await getChemicalTransactions();
-  let orders = groupByProperty([...chemicals.sales], 'trackingId');
-  orders = [orders[orders.length - 1]];
-  const goodsreceipts = groupByProperty([...chemicals.receiving], 'trackingId')[0];
-  const transfers = groupByProperty([...chemicals.transfers], 'trackingId')[0];
-  //sendDocument(orders, 'order')
-  //sendDocument(goodsreceipts, 'goodsreceipt')
-  //sendDocument(transfers, 'transfer')
-  //return {orders, goodsreceipts, transfers};
-  return {orders};
-
-}
-
-export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfer[], receiving: EnvuReceipt[], sales: EnvuSale[]}> {
+async function getChemicalTransactions(): Promise<EnvuQuery[]> {
   const request = new sqlRequest();
   const query =
   `
@@ -252,132 +119,145 @@ export async function getChemicalTransactions(): Promise<{transfers: EnvuTransfe
   WHERE trx.DOCTYPE IN (2, 3, 5, 6)
   AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
   AND TRXLOCTN NOT LIKE '%TRANS'
-  ORDER BY DOCDATE DESC
+  AND trx.DOCDATE >= '${'2024-07-02'}'
+  ORDER BY trx.DOCDATE DESC
   `;
+  return request.query<EnvuQuery[]>(query).then(_ => _.recordset);
+}
 
-
-  return await request.query(query).then((_: IResult<EnvuQuery[]>) => {
-
-    // Receiving from Envu
-    const receiving = _.recordset.filter(_ => [2].includes(_.DOCTYPE)).map((r, i, a) => {
-      const docIdField = 'DOCNUMBR';
-      const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
-      return {
-        shipmentNoteNumber: new Date(r.DOCDATE),
-        shipmentNoteDate: r.DOCNUMBR,
-        documentCreated: new Date(r.DOCDATE),
-        trackingId: r.DOCNUMBR,
-        revisionNumber: 1,
-        poNumber: r.BACHNUMB,
-        expectedDeliveryDate: new Date(r.DOCDATE),
-        dateDispatched: new Date(r.DOCDATE),
-        soldToCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
-        sellerCompanyName: 'Envu',
-        buyerCompanyName: 'Garden City Plastics',
-        totalLines: sopLines.length,
-        totalQuantity: sopLines.reduce((a, b) => a += b.TRXQTY, 0),
-        // Line item detail
-        lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
-        destinationPartnerId: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
-        sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
-        productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
-        dispatchedQuantity: r.TRXQTY,
-        uom: 'Each'
-      } as unknown as EnvuReceipt;
-    });
-
-    // Transfers
-    const transfers = _.recordset.filter(_ => [3].includes(_.DOCTYPE)).map((r, i, a) => {
-      const docIdField = 'DOCNUMBR';
-      const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
-      const transferFrom = locations.find(_ => _.gpCode === r['TRXLOCTN']);
-      const transferTo = locations.find(_ => _.gpCode === r['TRNSTLOC']);
-      return {
-        orderDate: new Date(r.DOCDATE),
-        orderType: 'Standalone Order',
-        documentType: 'New',
-        sourcePartnerId: '',
-        destinationPartnerId: '',
-        documentCreated: new Date(r.DOCDATE),
-        trackingId: r.DOCNUMBR,
-        revisionNumber: '1',
-        poNumber: r.DOCNUMBR,
-        requestedDeliveryDate: dateString(),
-        requestedDispatchDate: dateString(),
-        buyerCompanyName: 'Garden City Plastics',
-        sellerCompanyName: 'Garden City Plastics',
-        vendorCode: transferFrom?.envuCode || '',
-        soldToCode: transferTo?.envuCode || '' + r['TRNSTLOC'],
-        shipToAddress1: transferTo?.address1,
-        shipToPostcode: transferTo?.postcode,
-        shipToSuburb: transferTo?.city,
-        shipToState: transferTo?.state,
-        shipToCountry: transferTo?.countryCode,
-        totalLines: sopLines.length,
-        totalQuantity: sopLines.reduce((a, b) => a += b.TRXQTY, 0),
-        // Line
-        lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
-        lineStatus: 'New',
-        sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
-        productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
-        orderQuantity: r.TRXQTY,
-        uom: 'Each'
-      } as EnvuTransfer;
-    });
-
-    // Sold
-    const sales = _.recordset.filter(_ => [5, 6].includes(_.DOCTYPE)).map((r, i, a) => {
-      const docIdField = 'DOCNUMBR';
-      const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
-      return {
-        orderDate: new Date(r.DOCDATE),
-        orderType: 'Standalone Order',
-        documentType: 'New',
-        sourcePartnerId: '',
-        destinationPartnerId: '',
-        documentCreated: new Date(r.DOCDATE),
-        trackingId: r.DOCNUMBR,
-        revisionNumber: '1',
-        poNumber: '', // r.CSTPONBR,
-        requestedDeliveryDate: dateString(),
-        requestedDispatchDate: dateString(),
-        buyerCompanyName: '',
-        sellerCompanyName: 'Garden City Plastics',
-        vendorCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
-        soldToCode: r.CUSTNMBR,
-        soldToName: '', // r.CUSTNAME,
-        soldToSuburb: '', // r.CITY,
-        soldToState: '', // r.STATE,
-        soldToPostcode: '', // r.ZIPCODE,
-        soldToCountry: '', // 'Australia',
-        shipToName: '',
-        shipToCode: '',
-        shipToAddress1: '',
-        shipToPostcode: '',
-        shipToSuburb: '',
-        shipToState: '',
-        shipToCountry: '',
-        totalNet: sopLines.reduce((a, b) => a += b.XTNDPRCE, 0),
-        totalTax: sopLines.reduce((a, b) => a += b.TAXAMNT, 0),
-        totalLines: sopLines.length,
-        totalQuantity: sopLines.reduce((a, b) => a += b.DOCTYPE === 6 ? b.QTYFULFI * b.QTYBSUOM : b.QUANTITY * b.QTYBSUOM * -1, 0),
-        totalGross: sopLines.reduce((a, b) => a += b.XTNDPRCE + b.TAXAMNT, 0),
-        // Line
-        lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
-        lineStatus: 'New',
-        sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
-        productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
-        orderQuantity: r.DOCTYPE === 6 ? r.QTYFULFI * r.QTYBSUOM : r.QUANTITY * r.QTYBSUOM * -1,
-        uom: 'Each',
-        unitPrice: r.UNITPRCE,
-        taxRate: 0.10,
-        lineNet: r.XTNDPRCE,
-        lineTax: r.TAXAMNT,
-        lineGross: r.XTNDPRCE + r.TAXAMNT,
-        currency: 'AUD'
-      } as EnvuSale;
-    });
-    
-    return {transfers, receiving, sales}
+function parseReceiving(result: EnvuQuery[]): EnvuReceipt[] {
+  return result.filter(_ => [2].includes(_.DOCTYPE)).map((r, i, a) => {
+    const docIdField = 'DOCNUMBR';
+    const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
+    return {
+      shipmentNoteNumber: new Date(r.DOCDATE),
+      shipmentNoteDate: r.DOCNUMBR,
+      documentCreated: new Date(r.DOCDATE),
+      trackingId: r.DOCNUMBR,
+      revisionNumber: 1,
+      poNumber: r.BACHNUMB,
+      expectedDeliveryDate: new Date(r.DOCDATE),
+      dateDispatched: new Date(r.DOCDATE),
+      soldToCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
+      sellerCompanyName: 'Envu',
+      buyerCompanyName: 'Garden City Plastics',
+      totalLines: sopLines.length,
+      totalQuantity: sopLines.reduce((a, b) => a += b.TRXQTY, 0),
+      // Line item detail
+      lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
+      destinationPartnerId: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
+      sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
+      productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
+      dispatchedQuantity: r.TRXQTY,
+      uom: 'Each'
+    } as unknown as EnvuReceipt;
   });
+}
+
+function parseOrders(result: EnvuQuery[]): EnvuSale[] {
+  return result.filter(_ => [5, 6].includes(_.DOCTYPE)).map((r, i, a) => {
+    const docIdField = 'DOCNUMBR';
+    const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
+    return {
+      orderDate: new Date(r.DOCDATE),
+      orderType: 'Standalone Order',
+      documentType: 'New',
+      sourcePartnerId: '',
+      destinationPartnerId: '',
+      documentCreated: new Date(r.DOCDATE),
+      trackingId: r.DOCNUMBR,
+      revisionNumber: '1',
+      poNumber: '', // r.CSTPONBR,
+      requestedDeliveryDate: dateString(),
+      requestedDispatchDate: dateString(),
+      buyerCompanyName: '',
+      sellerCompanyName: 'Garden City Plastics',
+      vendorCode: locations.find(_ => _.gpCode === r['TRXLOCTN'])?.envuCode || '',
+      soldToCode: r.CUSTNMBR,
+      soldToName: '', // r.CUSTNAME,
+      soldToSuburb: '', // r.CITY,
+      soldToState: '', // r.STATE,
+      soldToPostcode: '', // r.ZIPCODE,
+      soldToCountry: '', // 'Australia',
+      shipToName: '',
+      shipToCode: '',
+      shipToAddress1: '',
+      shipToPostcode: '',
+      shipToSuburb: '',
+      shipToState: '',
+      shipToCountry: '',
+      totalNet: sopLines.reduce((a, b) => a += b.XTNDPRCE, 0),
+      totalTax: sopLines.reduce((a, b) => a += b.TAXAMNT, 0),
+      totalLines: sopLines.length,
+      totalQuantity: sopLines.reduce((a, b) => a += b.DOCTYPE === 6 ? b.QTYFULFI * b.QTYBSUOM : b.QUANTITY * b.QTYBSUOM * -1, 0),
+      totalGross: sopLines.reduce((a, b) => a += b.XTNDPRCE + b.TAXAMNT, 0),
+      // Line
+      lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
+      lineStatus: 'New',
+      sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
+      productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
+      orderQuantity: r.DOCTYPE === 6 ? r.QTYFULFI * r.QTYBSUOM : r.QUANTITY * r.QTYBSUOM * -1,
+      uom: 'Each',
+      unitPrice: r.UNITPRCE,
+      taxRate: 0.10,
+      lineNet: r.XTNDPRCE,
+      lineTax: r.TAXAMNT,
+      lineGross: r.XTNDPRCE + r.TAXAMNT,
+      currency: 'AUD'
+    } as EnvuSale;
+  });
+}
+
+function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
+  return result.filter(_ => [3].includes(_.DOCTYPE)).map((r, i, a) => {
+    const docIdField = 'DOCNUMBR';
+    const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
+    const transferFrom = locations.find(_ => _.gpCode === r['TRXLOCTN']);
+    const transferTo = locations.find(_ => _.gpCode === r['TRNSTLOC']);
+    return {
+      orderDate: new Date(r.DOCDATE),
+      orderType: 'Standalone Order',
+      documentType: 'New',
+      sourcePartnerId: '',
+      destinationPartnerId: '',
+      documentCreated: new Date(r.DOCDATE),
+      trackingId: r.DOCNUMBR,
+      revisionNumber: '1',
+      poNumber: r.DOCNUMBR,
+      requestedDeliveryDate: dateString(),
+      requestedDispatchDate: dateString(),
+      buyerCompanyName: 'Garden City Plastics',
+      sellerCompanyName: 'Garden City Plastics',
+      vendorCode: transferFrom?.envuCode || '',
+      soldToCode: transferTo?.envuCode || '' + r['TRNSTLOC'],
+      shipToAddress1: transferTo?.address1,
+      shipToPostcode: transferTo?.postcode,
+      shipToSuburb: transferTo?.city,
+      shipToState: transferTo?.state,
+      shipToCountry: transferTo?.countryCode,
+      totalLines: sopLines.length,
+      totalQuantity: sopLines.reduce((a, b) => a += b.TRXQTY, 0),
+      // Line
+      lineNumber: a.slice(0, i + 1).filter(_ => r[docIdField] === _[docIdField]).length,
+      lineStatus: 'New',
+      sellerProductCode: products.find(_ => _.gpCode === r['ITEMNMBR'])?.envuCode || '',
+      productDescription: products.find(_ => _.gpCode === r['ITEMNMBR'])?.name || '',
+      orderQuantity: r.TRXQTY,
+      uom: 'Each'
+    } as EnvuTransfer;
+  });
+}
+
+export async function sendChemicalSalesToEnvu() {
+  console.log('Starting envu sales update');
+  const shouldSend = false;
+  await getAccessToken();
+  const queryRes = await getChemicalTransactions();
+  const orders = groupByProperty(parseOrders(queryRes), 'trackingId');
+  const transfers = groupByProperty(parseTransfers(queryRes), 'trackingId');
+  const goodsReceipts = groupByProperty(parseReceiving(queryRes), 'trackingId');
+  if (shouldSend && orders.length > 0) await sendDocument(orders, 'order');
+  if (shouldSend && transfers.length > 0) await sendDocument(transfers, 'transfer');
+  //if (shouldSend && goodsReceipts.length > 0) await sendDocument(goodsReceipts, 'goodsreceipt');
+  return {orders, transfers, goodsReceipts};
 }

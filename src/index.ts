@@ -525,15 +525,6 @@ app.get('/public/chemical-sales', (req, res) => {
   });
 });
 
-app.get('/public/chemical-receiving', (req, res) => {
-  getChemicalReceivings().then(_ => {
-    res.status(200).send(_);
-  }).catch((err: {code: number, message: string}) => {
-    console.log(err);
-    return res.status(err.code || 404).send(``);
-  });
-});
-
 connect(sqlConfig, err => {
   if (err) {
     console.log('Failed to open a SQL Database connection.', err.message);
