@@ -119,7 +119,7 @@ async function getChemicalTransactions(): Promise<EnvuQuery[]> {
   WHERE trx.DOCTYPE IN (2, 3, 5, 6)
   AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
   AND TRXLOCTN NOT LIKE '%TRANS'
-  AND trx.DOCDATE >= '${'2024-07-02'}'
+  AND trx.DOCDATE >= '${'2024-07-11'}'
   ORDER BY trx.DOCDATE DESC
   `;
   return request.query<EnvuQuery[]>(query).then(_ => _.recordset);
@@ -250,7 +250,7 @@ function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
 
 export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update');
-  const shouldSend = false;
+  const shouldSend = true;
   await getAccessToken();
   const queryRes = await getChemicalTransactions();
   const orders = groupByProperty(parseOrders(queryRes), 'trackingId');
@@ -259,5 +259,5 @@ export async function sendChemicalSalesToEnvu() {
   if (shouldSend && orders.length > 0) await sendDocument(orders, 'order');
   if (shouldSend && transfers.length > 0) await sendDocument(transfers, 'transfer');
   //if (shouldSend && goodsReceipts.length > 0) await sendDocument(goodsReceipts, 'goodsreceipt');
-  return {orders, transfers, goodsReceipts};
+  return { orders, transfers};
 }
