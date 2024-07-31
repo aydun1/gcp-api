@@ -4,7 +4,7 @@ export interface EnvuTransfer {
   documentType: 'New' | 'Amendment' | 'Cancellation' | 'Rejection';
   sourcePartnerId: string;
   destinationPartnerId: string;
-  documentCreated: Date
+  documentCreated: Date;
   trackingId: string;
   revisionNumber: string;
   poNumber: string;

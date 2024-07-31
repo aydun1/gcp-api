@@ -106,8 +106,10 @@ async function getChemicalTransactions(): Promise<EnvuQuery[]> {
   sop.UNITPRCE AS UNITPRCE,
   sop.QUANTITY AS QUANTITY
   FROM [GPLIVE].[GCP].[dbo].[IV30300] trx WITH (NOLOCK)
+  LEFT JOIN [IMS].[dbo].Consignments c WITH (NOLOCK)
+  ON c.DOCNUMBR = trx.DOCNUMBR
   LEFT JOIN [GPLIVE].[GCP].[dbo].[IV30200] hea WITH (NOLOCK)
-  on hea.IVDOCTYP = trx.DOCTYPE AND hea.DOCNUMBR = trx.DOCNUMBR
+  ON hea.IVDOCTYP = trx.DOCTYPE AND hea.DOCNUMBR = trx.DOCNUMBR
   LEFT JOIN [GPLIVE].[GCP].[dbo].[IV30301] rct WITH (NOLOCK)
   ON trx.DOCTYPE = rct.DOCTYPE AND trx.DOCNUMBR = rct.DOCNUMBR AND trx.LNSEQNBR = rct.LNSEQNBR
   LEFT JOIN [GPLIVE].[GCP].[dbo].[IV40700] loc WITH (NOLOCK)
@@ -120,6 +122,7 @@ async function getChemicalTransactions(): Promise<EnvuQuery[]> {
   AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
   AND TRXLOCTN NOT LIKE '%TRANS'
   AND trx.DOCDATE >= '${'2024-07-11'}'
+  AND c.SendDate IS NULL
   ORDER BY trx.DOCDATE DESC
   `;
   return request.query<EnvuQuery[]>(query).then(_ => _.recordset);
@@ -248,16 +251,25 @@ function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
   });
 }
 
+async function saveTransferToDb(data: {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[], messageType: 'goodsreceipt' | 'order' | 'transfer') {
+  const v = data.map(_ => `('Envu','${_.lines[0].trackingId}','${_.lines[0].documentCreated.toISOString().slice(0, 19).replace('T', ' ')}', '${new Date().toISOString().slice(0, 19).replace('T', ' ')}','${_.lines[0].vendorCode}','${_.lines[0].soldToCode}','${messageType}',1)`)
+  const insertQuery = `
+  INSERT INTO [IMS].[dbo].Consignments (Vendor,DOCNUMBR,OrderDate,SendDate,VendorCode,SoldToCode,MessageType,Sent)
+  VALUES ${v.join(',\n')};
+  `;
+  return v.length > 0 ? await new sqlRequest().query(insertQuery) : '';
+}
+
 export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update');
-  const shouldSend = true;
+  const shouldSend = false;
   await getAccessToken();
   const queryRes = await getChemicalTransactions();
   const orders = groupByProperty(parseOrders(queryRes), 'trackingId');
   const transfers = groupByProperty(parseTransfers(queryRes), 'trackingId');
   const goodsReceipts = groupByProperty(parseReceiving(queryRes), 'trackingId');
-  if (shouldSend && orders.length > 0) await sendDocument(orders, 'order');
-  if (shouldSend && transfers.length > 0) await sendDocument(transfers, 'transfer');
+  if (shouldSend && orders.length > 0) await sendDocument(orders, 'order').then(() => saveTransferToDb(orders, 'order'));
+  if (shouldSend && transfers.length > 0) await sendDocument(transfers, 'transfer').then(() => saveTransferToDb(transfers, 'transfer'));
   //if (shouldSend && goodsReceipts.length > 0) await sendDocument(goodsReceipts, 'goodsreceipt');
-  return { orders, transfers};
+  return {orders, transfers};
 }

@@ -7,7 +7,7 @@ export interface EnvuReceipt {
   destinationDivisionId: string;
   schemaVersion: string;
   trackingId: string;
-  docCreated: Date
+  documentCreated: Date;
   docTrackingId: string;
   docRevisionNumber: string;
   purchaseOrderNumber: string;
