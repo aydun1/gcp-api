@@ -1,11 +1,12 @@
 export interface EnvuQuery {
   ITEMNMBR: string;
+  LNSEQNBR: number;
   DOCTYPE: number;
   BACHNUMB: string;
   TRXLOCTN: string;
   TRNSTLOC: string;
   TRXQTY: number;
-  DOCDATE: string;
+  DOCDATE: Date;
   DOCNUMBR: string;
   CSTPONBR: string;
   QUANTITY: number;

@@ -55,7 +55,8 @@ async function sendDocument(data: {key: string, lines: EnvuSale[] | EnvuReceipt[
   }
 }
 
-function groupByProperty(collection: any[], property: string): {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[] {
+function groupByProperty(collection: any[]): {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[] {
+  const property = 'trackingId';
   if(!collection || collection.length === 0) return [];
   const groupedCollection = collection.reduce((previous, current)=> {
     if(!previous[current[property]]) {
@@ -68,13 +69,14 @@ function groupByProperty(collection: any[], property: string): {key: string, lin
   return Object.keys(groupedCollection).map(key => ({ key, lines: groupedCollection[key] })).sort((a, b) => b.lines[0].orderDate - a.lines[0].orderDate);
 }
 
-async function getChemicalTransactions(): Promise<EnvuQuery[]> {
+async function getChemicalTransactions(date: string): Promise<EnvuQuery[]> {
   const request = new sqlRequest();
   const query =
   `
   SELECT
   trx.DOCTYPE,
   RTRIM(trx.ITEMNMBR) AS ITEMNMBR,
+  trx.LNSEQNBR,
   RTRIM(hea.BACHNUMB) AS BACHNUMB,
   RTRIM(trx.TRXLOCTN) AS TRXLOCTN,
   RTRIM(REPLACE(trx.TRNSTLOC, 'TRANS', '')) AS TRNSTLOC,
@@ -82,23 +84,12 @@ async function getChemicalTransactions(): Promise<EnvuQuery[]> {
   sop.SOPTYPE AS SOPTYPE,
   trx.DOCDATE AS DOCDATE,
   RTRIM(trx.DOCNUMBR) AS DOCNUMBR,
-  RTRIM(loc.ADDRESS1) AS ADDRESS1_GCP,
-  RTRIM(loc.ADDRESS2) AS ADDRESS2_GCP,
-  RTRIM(loc.ADDRESS3) AS ADDRESS3_GCP,
-  RTRIM(loc.CITY) AS CITY_GCP,
-  RTRIM(loc.STATE) AS STATE_GCP,
-  RTRIM(loc.ZIPCODE) AS ZIPCODE_GCP,
-  RTRIM(loc.COUNTRY) AS COUNTRY_GCP,
+  RTRIM(loc.ADDRESS1) AS ADDRESS1_GCP, RTRIM(loc.ADDRESS2) AS ADDRESS2_GCP, RTRIM(loc.ADDRESS3) AS ADDRESS3_GCP,
+  RTRIM(loc.CITY) AS CITY_GCP, RTRIM(loc.STATE) AS STATE_GCP, RTRIM(loc.ZIPCODE) AS ZIPCODE_GCP, RTRIM(loc.COUNTRY) AS COUNTRY_GCP,
   RTRIM(CSTPONBR) AS CSTPONBR,
-  RTRIM(soh.CUSTNMBR) AS CUSTNMBR,
-  RTRIM(soh.CUSTNAME) AS CUSTNAME,
-  RTRIM(sop.ADDRESS1) AS ADDRESS1,
-  RTRIM(sop.ADDRESS2) AS ADDRESS2,
-  RTRIM(sop.ADDRESS3) AS ADDRESS3,
-  RTRIM(sop.CITY) AS CITY,
-  RTRIM(sop.STATE) AS STATE,
-  RTRIM(sop.ZIPCODE) AS ZIPCODE,
-  RTRIM(sop.COUNTRY) AS COUNTRY,
+  RTRIM(soh.CUSTNMBR) AS CUSTNMBR, RTRIM(soh.CUSTNAME) AS CUSTNAME, RTRIM(sop.ADDRESS1) AS ADDRESS1,
+  RTRIM(sop.ADDRESS2) AS ADDRESS2, RTRIM(sop.ADDRESS3) AS ADDRESS3, RTRIM(sop.CITY) AS CITY,
+  RTRIM(sop.STATE) AS STATE, RTRIM(sop.ZIPCODE) AS ZIPCODE, RTRIM(sop.COUNTRY) AS COUNTRY,
   sop.XTNDPRCE AS XTNDPRCE,
   sop.TAXAMNT AS TAXAMNT,
   sop.QTYFULFI AS QTYFULFI,
@@ -107,11 +98,9 @@ async function getChemicalTransactions(): Promise<EnvuQuery[]> {
   sop.QUANTITY AS QUANTITY
   FROM [GPLIVE].[GCP].[dbo].[IV30300] trx WITH (NOLOCK)
   LEFT JOIN [IMS].[dbo].Consignments c WITH (NOLOCK)
-  ON c.DOCNUMBR = trx.DOCNUMBR
+  ON c.DOCNUMBR = trx.DOCNUMBR AND c.ITEMNMBR = trx.ITEMNMBR AND c.LNSEQNBR = trx.LNSEQNBR
   LEFT JOIN [GPLIVE].[GCP].[dbo].[IV30200] hea WITH (NOLOCK)
   ON hea.IVDOCTYP = trx.DOCTYPE AND hea.DOCNUMBR = trx.DOCNUMBR
-  LEFT JOIN [GPLIVE].[GCP].[dbo].[IV30301] rct WITH (NOLOCK)
-  ON trx.DOCTYPE = rct.DOCTYPE AND trx.DOCNUMBR = rct.DOCNUMBR AND trx.LNSEQNBR = rct.LNSEQNBR
   LEFT JOIN [GPLIVE].[GCP].[dbo].[IV40700] loc WITH (NOLOCK)
   ON trx.TRXLOCTN = loc.LOCNCODE
   LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP30300] sop WITH (NOLOCK)
@@ -120,8 +109,8 @@ async function getChemicalTransactions(): Promise<EnvuQuery[]> {
   ON trx.DOCTYPE IN (5, 6) AND sop.SOPNUMBE = soh.SOPNUMBE AND sop.SOPTYPE = soh.SOPTYPE
   WHERE trx.DOCTYPE IN (2, 3, 5, 6)
   AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
-  AND TRXLOCTN NOT LIKE '%TRANS'
-  AND trx.DOCDATE >= '${'2024-07-11'}'
+  AND trx.TRXLOCTN NOT LIKE '%TRANS'
+  AND trx.DOCDATE >= '${date}'
   AND c.SendDate IS NULL
   ORDER BY trx.DOCDATE DESC
   `;
@@ -129,7 +118,7 @@ async function getChemicalTransactions(): Promise<EnvuQuery[]> {
 }
 
 function parseReceiving(result: EnvuQuery[]): EnvuReceipt[] {
-  return result.filter(_ => [2].includes(_.DOCTYPE)).map((r, i, a) => {
+  return result.map((r, i, a) => {
     const docIdField = 'DOCNUMBR';
     const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
     return {
@@ -158,7 +147,7 @@ function parseReceiving(result: EnvuQuery[]): EnvuReceipt[] {
 }
 
 function parseOrders(result: EnvuQuery[]): EnvuSale[] {
-  return result.filter(_ => [5, 6].includes(_.DOCTYPE)).map((r, i, a) => {
+  return result.map((r, i, a) => {
     const docIdField = 'DOCNUMBR';
     const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
     return {
@@ -212,7 +201,7 @@ function parseOrders(result: EnvuQuery[]): EnvuSale[] {
 }
 
 function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
-  return result.filter(_ => [3].includes(_.DOCTYPE)).map((r, i, a) => {
+  return result.map((r, i, a) => {
     const docIdField = 'DOCNUMBR';
     const sopLines = a.filter(_ => r[docIdField] === _[docIdField]);
     const transferFrom = locations.find(_ => _.gpCode === r['TRXLOCTN']);
@@ -251,10 +240,10 @@ function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
   });
 }
 
-async function saveTransferToDb(data: {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[], messageType: 'goodsreceipt' | 'order' | 'transfer') {
-  const v = data.map(_ => `('Envu','${_.lines[0].trackingId}','${_.lines[0].documentCreated.toISOString().slice(0, 19).replace('T', ' ')}', '${new Date().toISOString().slice(0, 19).replace('T', ' ')}','${_.lines[0].vendorCode}','${_.lines[0].soldToCode}','${messageType}',1)`)
+async function newSaveToDb(result: EnvuQuery[]) {
+  const v = result.map(l => `('Envu',${l.DOCTYPE},'${l.DOCNUMBR}','${l.DOCDATE.toISOString().slice(0, 19).replace('T', ' ')}','${new Date().toISOString().slice(0, 19).replace('T', ' ')}','${l.ITEMNMBR}',${l.LNSEQNBR},${l.TRXQTY},'${l.TRXLOCTN}',${l.QTYFULFI * l.QTYBSUOM})`);
   const insertQuery = `
-  INSERT INTO [IMS].[dbo].Consignments (Vendor,DOCNUMBR,OrderDate,SendDate,VendorCode,SoldToCode,MessageType,Sent)
+  INSERT INTO [IMS].[dbo].Consignments (Vendor,DOCTYPE,DOCNUMBR,OrderDate,SendDate,ITEMNMBR,LNSEQNBR,TRXQTY,TRXLOCTN,QUANTITY)
   VALUES ${v.join(',\n')};
   `;
   return v.length > 0 ? await new sqlRequest().query(insertQuery) : '';
@@ -262,14 +251,23 @@ async function saveTransferToDb(data: {key: string, lines: EnvuSale[] | EnvuRece
 
 export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update');
-  const shouldSend = false;
   await getAccessToken();
-  const queryRes = await getChemicalTransactions();
-  const orders = groupByProperty(parseOrders(queryRes), 'trackingId');
-  const transfers = groupByProperty(parseTransfers(queryRes), 'trackingId');
-  const goodsReceipts = groupByProperty(parseReceiving(queryRes), 'trackingId');
-  if (shouldSend && orders.length > 0) await sendDocument(orders, 'order').then(() => saveTransferToDb(orders, 'order'));
-  if (shouldSend && transfers.length > 0) await sendDocument(transfers, 'transfer').then(() => saveTransferToDb(transfers, 'transfer'));
-  //if (shouldSend && goodsReceipts.length > 0) await sendDocument(goodsReceipts, 'goodsreceipt');
-  return {orders, transfers};
+  const shouldSend = true;
+  const date = '2024-06-28';
+  const queryRes = await getChemicalTransactions(date);
+  const docTypes = ([
+    ['order', [5, 6]],
+    ['transfer', [3]],
+    //['goodsreceipt', [2]]
+  ] as Array<['goodsreceipt' | 'order' | 'transfer', number[]]>);
+
+  const a = docTypes.reduce((acc, cur) => {
+    const lines = queryRes.filter(l => cur[1].includes(l.DOCTYPE));
+    const parsedLines = cur[0] === 'order' ? parseOrders(lines) : cur[0] === 'transfer' ? parseTransfers(lines) : parseReceiving(lines);
+    const grouped = groupByProperty(parsedLines);
+    if (shouldSend && grouped.length > 0) sendDocument(grouped, cur[0]).then(async () => await newSaveToDb(lines));
+    acc[cur[0]] = grouped;
+    return acc;
+  }, {} as {[key:string]: any});
+  return a;
 }
