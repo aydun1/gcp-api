@@ -198,6 +198,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   p.PalletQty PalletQty,
   p.PalletHeight PalletHeight,
   p.PackQty PackSize,
+  p.CustomUom CustomUom,
   RTRIM(b.LOCNCODE) Location,
   --RTRIM(d.BIN) Bin,
   RTRIM(b.PRIMVNDR) Vendor,
