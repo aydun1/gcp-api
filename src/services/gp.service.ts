@@ -717,7 +717,7 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   `;
   if (orderNumberQuery) query += ` AND OrderNumber LIKE '%' + @orderNumberQuery + '%'`;
   query += ` ORDER BY ${archived ? 'DeliveryDate DESC' : 'Sequence ASC'}`;
-  return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.Char(15), run).input('deliveryType', TYPES.VarChar(50), deliveryType).input('orderNumberQuery', TYPES.VarChar(50), orderNumberQuery).query(query).then((_: IResult<Delivery>) => {
+  return request.input('branch', TYPES.Char(15), branch).input('run', TYPES.NVarChar(50), run).input('deliveryType', TYPES.VarChar(50), deliveryType).input('orderNumberQuery', TYPES.VarChar(50), orderNumberQuery).query(query).then((_: IResult<Delivery>) => {
     return {value: _.recordset.map(r =>  {return {id: r.id, fields: r};})}
   });
 }
