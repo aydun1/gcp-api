@@ -252,7 +252,7 @@ async function newSaveToDb(result: EnvuQuery[]) {
 export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update');
   await getAccessToken();
-  const shouldSend = true;
+  const shouldSend = false;
   const date = '2024-06-28';
   const queryRes = await getChemicalTransactions(date);
   const docTypes = ([
