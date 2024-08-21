@@ -405,7 +405,7 @@ export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
   const request = new sqlRequest();
   const query =
   `
-  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plain, 0) plain, COALESCE(c.gcp, 0) gcp
+  SELECT rtrim(a.CUSTNMBR) custNmbr, rtrim(a.CUSTNAME) name, rtrim(ADRSCODE) addressCode, rtrim(PRSTADCD) shippingAddressCode, COALESCE(USERDEF2, 0) loscam, COALESCE(USERDEF1, 0) chep, COALESCE(b.plain, 0) plain, COALESCE(c.gcp, 0) gcp
   FROM [GPLIVE].[GCP].[dbo].[RM00101] a WITH (NOLOCK)
   LEFT JOIN (
     SELECT rtrim(ObjectID) CUSTNMBR, TRY_CAST(PropertyValue AS INT) plain
@@ -423,7 +423,15 @@ export function getCustomer(custNmbr: string): Promise<{customer: gpRes}> {
   ) c ON a.CUSTNMBR = c.CUSTNMBR
   WHERE a.CUSTNMBR = @custnmbr
   `;
-  return request.input('custnmbr', TYPES.VarChar(15), custNmbr).query(query).then((_: IResult<gpRes>) => {return {customer: _.recordset[0]}});
+  const custQuery = request.input('custnmbr', TYPES.VarChar(15), custNmbr).query(query) as Promise<IResult<gpRes>>;
+  const addrQuery = getCustomerAddresses(custNmbr);
+  return Promise.all([custQuery, addrQuery]).then(([c, a]) => {
+    return {
+      customer: {...c.recordset[0],
+        addresses: a.addresses
+      }
+    }
+  });
 }
 
 export function getCustomerAddresses(custNmbr: string) {
