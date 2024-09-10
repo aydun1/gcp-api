@@ -67,7 +67,7 @@ function handleError(err: any, res: Response) {
   }
   console.error(new Date());
   console.error(err?.message);
-  return res.status(500).json({'result': 'Internal server error'});
+  return res.status(500).json({'result': err?.message || 'Internal server error'});
 }
 
 function verifyPalletApiToken(req: Request, res: Response, next: NextFunction) {
@@ -297,6 +297,7 @@ app.post('/gp/deliveries', auth, (req, res) => {
   const userEmail = (req.authInfo as any)['preferred_username'];
   const body = req.body as {fields: Delivery};
   addDelivery(body.fields, userName, userEmail).then(_ => res.status(200).json(_)).catch(err => {
+    console.log(err);
     return handleError(err, res);
   });
 });

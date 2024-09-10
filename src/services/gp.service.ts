@@ -733,6 +733,11 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
 }
 
 export async function addDelivery(delivery: Delivery, userName: string, userEmail: string): Promise<{id: number, fields: Delivery}> {
+  const getQuery = 'SELECT * FROM [IMS].[dbo].Deliveries WHERE OrderNumber = @orderNumber';
+  const getRequest = new sqlRequest()
+  const res = await getRequest.input('OrderNumber', TYPES.Char(21), delivery.OrderNumber).query(getQuery);
+  if (res.recordset.length > 0) throw {message: `Order already on run: ${res.recordset[0].Run}`};
+
   const insertQuery = `
   INSERT INTO [IMS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
   OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
