@@ -2,6 +2,10 @@ import { Request as sqlRequest, IResult } from 'mssql';
 import { EnvuSale } from './types/envu-sale';
 import { locations, products } from './definitions';
 
+function dateString(): string {
+  return '';
+}
+
 export function getChemicalSales(): Promise<{lines: EnvuSale[]}> {
   const request = new sqlRequest();
   const query =
