@@ -1,8 +1,7 @@
 import { TYPES, Request as sqlRequest, IResult, IRecordSet, MAX, IProcedureResult } from 'mssql';
 import fs from 'fs';
 
-import { allowedPallets } from '../../config.json';
-import { targetDir } from '../config';
+import { allowedPallets, targetDir } from '../config';
 import { Delivery } from '../types/delivery';
 import { Line } from '../types/line';
 import { InTransitTransferLine } from '../types/in-transit-transfer-line';

@@ -10,11 +10,11 @@ import passport from 'passport';
 import compression = require('compression');
 
 import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical } from './services/gp.service';
-import { chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
-import config from '../config.json';
+import { sendChemicalSalesToEnvu } from './services/envu.service';
+import { runShellCmd } from './services/helper.service';
+import { adConfig, chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
-import { sendChemicalSalesToEnvu } from './services/envu.service';
 
 interface Body {
   customer: string;
@@ -27,13 +27,13 @@ const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'),
 const auth = passport.authenticate('oauth-bearer', {session: false}) as RequestHandler;
 
 const options: IBearerStrategyOptionWithRequest = {
-  identityMetadata: `https://${config.metadata.authority}/${config.credentials.tenantID}/${config.metadata.version}/${config.metadata.discovery}`,
-  issuer: `https://${config.metadata.authority}/${config.credentials.tenantID}/${config.metadata.version}`,
-  clientID: config.credentials.clientID,
-  audience: config.credentials.clientID,
-  validateIssuer: config.settings.validateIssuer,
+  identityMetadata: `https://${adConfig.metadata.authority}/${adConfig.credentials.tenantID}/${adConfig.metadata.version}/${adConfig.metadata.discovery}`,
+  issuer: `https://${adConfig.metadata.authority}/${adConfig.credentials.tenantID}/${adConfig.metadata.version}`,
+  clientID: adConfig.credentials.clientID,
+  audience: adConfig.credentials.clientID,
+  validateIssuer: adConfig.settings.validateIssuer,
   passReqToCallback: false,
-  scope: config.protectedRoutes.gp.scopes
+  scope: adConfig.protectedRoutes.gp.scopes
 };
 
 const bearerStrategy = new BearerStrategy(options, (token: ITokenPayload, done: CallableFunction) => {
@@ -60,7 +60,6 @@ app.use((req, res, next) => {
 
 function handleError(err: any, res: Response) {
   if (err.code === 'ENOCONN') {
-    sqlConfig['server'] = '10.30.5.70';
     connect(sqlConfig, err => {
       if (err) console.log('Failed to open a SQL Database connection.', err?.message)
     });
@@ -90,6 +89,14 @@ function verifyChemicalListToken(req: Request, res: Response, next: NextFunction
 
 app.get( '/', ( req, res ) => {
   return res.send('');
+});
+
+app.get('/status', auth, (req: Request, res: Response) => {
+  runShellCmd('./debug.sh').then(
+    result => res.status(200).send(result)
+  ).catch(err => {
+    return handleError(err, res);
+  });
 });
 
 app.get('/gp', auth, (req: Request, res: Response) => {
