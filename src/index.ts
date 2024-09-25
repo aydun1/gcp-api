@@ -93,7 +93,7 @@ app.get( '/', ( req, res ) => {
 
 app.get('/status', auth, (req: Request, res: Response) => {
   runShellCmd('./debug.sh').then(
-    result => res.status(200).send(result)
+    result => res.status(200).json({value: result})
   ).catch(err => {
     return handleError(err, res);
   });
