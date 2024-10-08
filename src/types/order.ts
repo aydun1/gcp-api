@@ -4,7 +4,7 @@ export interface Order {
   reqShipDate: Date;
   locnCode: string;
   sopType: number;
-  sopNumber: string;
+  sopNumbe: string;
   origType: number;
   origNumber: string;
   custNumber: string;
@@ -24,4 +24,8 @@ export interface Order {
   palletSpaces: number;
   orderWeight: number;
   note: string;
+  pickStatus: number;
+  custNmbr: string;
+  deliveryStatus: string;
+  deliveryRun: string;
 }

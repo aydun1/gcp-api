@@ -3,7 +3,7 @@
     "module": "commonjs",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "target": "es6",
+    "target": "es2022",
     "noImplicitAny": true,
     "moduleResolution": "node",
     "sourceMap": true,
