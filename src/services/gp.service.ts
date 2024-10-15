@@ -95,7 +95,7 @@ export async function updateAttachmentCount(sopNumber: string, attachments: numb
   const getQuery = 'SELECT OrderNumber FROM [IMS].[dbo].[Deliveries] WHERE OrderNumber = @sopNumber';
   const currentCount = await new sqlRequest().input('sopNumber', TYPES.Char(21), sopNumber).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
   if (currentCount === 0) return 'No delivery to update';
-  const updateQuery = `UPDATE [IMS].[dbo].[Deliveries] SET Attachments = ${increment ? 'Attachments +' : ''} @attachments WHERE OrderNumber = @sopNumber`;
+  const updateQuery = `UPDATE [IMS].[dbo].[Deliveries] SET Attachments = ${increment ? 'COALESCE(Attachments, 0) +' : ''} @attachments WHERE OrderNumber = @sopNumber`;
   await new sqlRequest().input('sopNumber', TYPES.VarChar(21), sopNumber).input('attachments', TYPES.Int, attachments).query(updateQuery);
   return 'Updated';
 }
@@ -753,7 +753,7 @@ export async function addDelivery(delivery: Delivery, userName: string, userEmai
   OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
   INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, toRun, Action, Date)
   WHERE OrderNumber = @orderNumber;
-  SELECT @id = ${res.recordset[0].id};
+  SELECT @id = ${res.recordset[0]?.id};
   `
   const insertQuery = `
   INSERT INTO [IMS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
