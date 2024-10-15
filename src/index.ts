@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical, updateAttachmentCount } from './services/gp.service';
 import { sendChemicalSalesToEnvu } from './services/envu.service';
 import { runShellCmd } from './services/helper.service';
 import { adConfig, chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
@@ -241,6 +241,17 @@ app.get('/gp/orders/:sopType/:sopNumber', auth, (req: Request, res: Response) =>
   const sopNumber = req.params.sopNumber;
   getOrderLines(sopType, sopNumber).then(
     result => res.status(200).send(result)
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.patch('/gp/orders/:sopType/:sopNumber', auth, (req, res) => {
+  const sopNumber = req.params.sopNumber;
+  const attachmentCount = 'attachmentCount' in req.body ? req.body['attachmentCount'] || 0 : 1;
+  const increment = req.body['increment'];
+  updateAttachmentCount(sopNumber, attachmentCount, increment).then(
+    result => res.status(200).send({result})
   ).catch(err => {
     return handleError(err, res);
   });

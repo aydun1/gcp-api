@@ -91,6 +91,15 @@ export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
   return request.input('doc_id', TYPES.VarChar(15), id).query(query).then((_: IResult<InTransitTransfer>) =>  {return _.recordset[0]});
 }
 
+export async function updateAttachmentCount(sopNumber: string, attachments: number, increment: false): Promise<any> {
+  const getQuery = 'SELECT OrderNumber FROM [IMS].[dbo].[Deliveries] WHERE OrderNumber = @sopNumber';
+  const currentCount = await new sqlRequest().input('sopNumber', TYPES.Char(21), sopNumber).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
+  if (currentCount === 0) return 'No delivery to update';
+  const updateQuery = `UPDATE [IMS].[dbo].[Deliveries] SET Attachments = ${increment ? 'Attachments +' : ''} @attachments WHERE OrderNumber = @sopNumber`;
+  await new sqlRequest().input('sopNumber', TYPES.VarChar(21), sopNumber).input('attachments', TYPES.Int, attachments).query(updateQuery);
+  return 'Updated';
+}
+
 export function getInTransitTransfers(id: string, from: string, to: string): Promise<{lines: InTransitTransferLine[]}> {
   from = parseBranch(from);
   to = parseBranch(to);
@@ -626,7 +635,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
   p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight, 
-  d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty
+  d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty, Attachments attachments
 
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
@@ -694,6 +703,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
       pickStatus: pickStatus,
       deliveryStatus: order.deliveryStatus,
       deliveryRun: order.deliveryRun,
+      attachments: order.attachments,
       lines: _.recordset.map(l => {
         return {
           lineNumber: l.lineNumber,
@@ -717,7 +727,7 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   const limit = archived ? 'TOP(250)' : ''
   let query =
   `
-  SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
+  SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, Attachments, id
   FROM [IMS].[dbo].[Deliveries] d WITH (NOLOCK)
   WHERE Branch = @branch
   AND Status ${archived ? '=' : '<>'} 'Archived'
@@ -735,8 +745,16 @@ export async function addDelivery(delivery: Delivery, userName: string, userEmai
   const getQuery = 'SELECT * FROM [IMS].[dbo].Deliveries WHERE OrderNumber = @orderNumber';
   const getRequest = new sqlRequest()
   const res = await getRequest.input('OrderNumber', TYPES.Char(21), delivery.OrderNumber).query(getQuery);
-  if (res.recordset.length > 0) throw {message: `Order already on run: ${res.recordset[0].Run}`};
+  if (res.recordset.length > 0 && res.recordset[0].Status) throw {message: `Order already on run: ${res.recordset[0].Run}`};
 
+  const updateQuery = `
+  UPDATE [IMS].[dbo].Deliveries
+  SET Run=@Run,Status=@Status,CustomerName=@CustomerName,CustomerNumber=@CustomerNumber,City=@City,State=@State,PostCode=@PostCode,Site=@Site,Address=@Address,CustomerType=@CustomerType,ContactPerson=@ContactPerson,DeliveryDate=@DeliveryDate,OrderNumber=@OrderNumber,Spaces=@Spaces,Weight=@Weight,PhoneNumber=@PhoneNumber,Branch=@Branch,Created=@Created,Creator=@Creator,Notes=@Notes,DeliveryType=@DeliveryType,RequestedDate=@RequestedDate
+  OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
+  INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, toRun, Action, Date)
+  WHERE OrderNumber = @orderNumber;
+  SELECT @id = ${res.recordset[0].id};
+  `
   const insertQuery = `
   INSERT INTO [IMS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
   OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
@@ -771,7 +789,7 @@ export async function addDelivery(delivery: Delivery, userName: string, userEmai
   request.input('userName', TYPES.NVarChar(50), userName);
   request.input('userEmail', TYPES.NVarChar(320), userEmail);
   request.output('id', TYPES.Int);
-  return request.query(insertQuery).then(_ => {
+  return request.query(res.recordset.length > 0 ? updateQuery : insertQuery).then(_ => {
     const id = _['output']['id'] as number;
     return {id, fields: {...delivery, id}};
   });
@@ -839,7 +857,8 @@ export async function updateDelivery(id: number, delivery: Delivery, userName: s
 
 export function removeDelivery(id: number, userName: string, userEmail: string): Promise<IResult<any>> {
   const deleteQuery = `
-  DELETE FROM [IMS].[dbo].[Deliveries]
+  UPDATE [IMS].[dbo].[Deliveries]
+  SET Status = NULL, Run = NULL, Sequence = NULL
   OUTPUT @userName, @userEmail, deleted.OrderNumber, deleted.CustomerNumber, deleted.Branch, deleted.Run, 'deleted', getDate()
   INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, Action, Date)
   WHERE id = @id

@@ -28,4 +28,5 @@ export interface Order {
   custNmbr: string;
   deliveryStatus: string;
   deliveryRun: string;
+  attachments: number;
 }
