@@ -94,10 +94,13 @@ export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
 export async function updateAttachmentCount(sopNumber: string, attachments: number, increment: false): Promise<any> {
   const getQuery = 'SELECT OrderNumber FROM [IMS].[dbo].[Deliveries] WHERE OrderNumber = @sopNumber';
   const currentCount = await new sqlRequest().input('sopNumber', TYPES.Char(21), sopNumber).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
-  if (currentCount === 0) return 'No delivery to update';
-  const updateQuery = `UPDATE [IMS].[dbo].[Deliveries] SET Attachments = ${increment ? 'COALESCE(Attachments, 0) +' : ''} @attachments WHERE OrderNumber = @sopNumber`;
-  await new sqlRequest().input('sopNumber', TYPES.VarChar(21), sopNumber).input('attachments', TYPES.Int, attachments).query(updateQuery);
-  return 'Updated';
+  if (currentCount === 0) {
+    return 'No delivery to update';
+  } else {
+    const updateQuery = `UPDATE [IMS].[dbo].[Deliveries] SET Attachments = ${increment ? 'COALESCE(Attachments, 0) +' : ''} @attachments WHERE OrderNumber = @sopNumber`;
+    await new sqlRequest().input('sopNumber', TYPES.VarChar(21), sopNumber).input('attachments', TYPES.Int, attachments).query(updateQuery);
+    return 'Updated';
+  }
 }
 
 export function getInTransitTransfers(id: string, from: string, to: string): Promise<{lines: InTransitTransferLine[]}> {
@@ -704,6 +707,8 @@ export function getOrderLines(sopType: number, sopNumber: string) {
       deliveryStatus: order.deliveryStatus,
       deliveryRun: order.deliveryRun,
       attachments: order.attachments,
+      orderWeight: _.recordset.reduce((acc, cur) => acc += +cur.lineWeight, 0),
+      palletSpaces: _.recordset.reduce((acc, cur) => acc += +cur.palletSpaces, 0),
       lines: _.recordset.map(l => {
         return {
           lineNumber: l.lineNumber,
