@@ -791,7 +791,7 @@ export async function addDelivery(delivery: Delivery, userName: string, userEmai
   request.output('id', TYPES.Int);
   return request.query(res.recordset.length > 0 ? updateQuery : insertQuery).then(_ => {
     const id = _['output']['id'] as number;
-    return {id, fields: {...delivery, id}};
+    return {id, fields: {...delivery, id, Attachments: res.recordset[0]?.Attachments || 0}};
   });
 }
 
@@ -825,7 +825,7 @@ export async function updateDelivery(id: number, delivery: Delivery, userName: s
     `;
   }
   updateQuery += `
-  OUTPUT inserted.Address, RTRIM(inserted.Branch) Branch, inserted.City, inserted.ContactPerson, inserted.Created, inserted.Creator, inserted.CustomerName, RTRIM(inserted.CustomerNumber) CustomerNumber, inserted.CustomerType, inserted.Date, inserted.Delivered, inserted.DeliveryDate, inserted.DeliveryType, inserted.Notes, RTRIM(inserted.OrderNumber) OrderNumber, inserted.PhoneNumber, inserted.PickStatus, inserted.Postcode, inserted.RequestedDate, inserted.Run, inserted.Sequence, inserted.Site, inserted.Spaces, inserted.State, inserted.Status, inserted.Weight, inserted.id
+  OUTPUT inserted.Address, RTRIM(inserted.Branch) Branch, inserted.Attachments Attachments, inserted.City, inserted.ContactPerson, inserted.Created, inserted.Creator, inserted.CustomerName, RTRIM(inserted.CustomerNumber) CustomerNumber, inserted.CustomerType, inserted.Date, inserted.Delivered, inserted.DeliveryDate, inserted.DeliveryType, inserted.Notes, RTRIM(inserted.OrderNumber) OrderNumber, inserted.PhoneNumber, inserted.PickStatus, inserted.Postcode, inserted.RequestedDate, inserted.Run, inserted.Sequence, inserted.Site, inserted.Spaces, inserted.State, inserted.Status, inserted.Weight, inserted.id
   WHERE id = @id
   `;
   const request = new sqlRequest();
