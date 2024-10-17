@@ -250,7 +250,9 @@ app.patch('/gp/orders/:sopType/:sopNumber', auth, (req, res) => {
   const sopNumber = req.params.sopNumber;
   const attachmentCount = 'attachmentCount' in req.body ? req.body['attachmentCount'] || 0 : 1;
   const increment = req.body['increment'];
-  updateAttachmentCount(sopNumber, attachmentCount, increment).then(
+  const creator = req.body['creator'];
+  const branch = req.body['branch'];
+  updateAttachmentCount(sopNumber, creator, branch, attachmentCount, increment).then(
     result => res.status(200).send({result})
   ).catch(err => {
     return handleError(err, res);

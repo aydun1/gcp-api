@@ -17,8 +17,10 @@ export interface Order {
   city: string;
   state: string;
   postCode: string;
+  address: string;
   phoneNumber1: string;
   phoneNumber2: string;
+  phoneNumber3: string;
   shipMethod: string;
   posted: number;
   palletSpaces: number;
@@ -29,4 +31,5 @@ export interface Order {
   deliveryStatus: string;
   deliveryRun: string;
   attachments: number;
+  lines: any[];
 }
