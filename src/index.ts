@@ -9,12 +9,13 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical, updateAttachmentCount } from './services/gp.service';
+import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical, updateAttachmentCount, addComment, getComments } from './services/gp.service';
 import { sendChemicalSalesToEnvu } from './services/envu.service';
 import { runShellCmd } from './services/helper.service';
 import { adConfig, chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
+import { Comment } from './types/comment';
 
 interface Body {
   customer: string;
@@ -252,7 +253,9 @@ app.patch('/gp/orders/:sopType/:sopNumber', auth, (req, res) => {
   const increment = req.body['increment'];
   const creator = req.body['creator'];
   const branch = req.body['branch'];
-  updateAttachmentCount(sopNumber, creator, branch, attachmentCount, increment).then(
+  const id = req.body['id'] || 0;
+  if (!id && !sopNumber) return;
+  updateAttachmentCount(sopNumber, id, creator, branch, attachmentCount, increment).then(
     result => res.status(200).send({result})
   ).catch(err => {
     return handleError(err, res);
@@ -289,6 +292,23 @@ app.post('/gp/itt', auth, (req: Request, res: Response) => {
   const body = req.body as Transfer;
   writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines).then(
     _ => res.status(200).send({docId: _, status: 'Successfully added ITT.'})
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.get('/gp/comments/:id', auth, (req: Request, res: Response) => {
+  getComments(+req.params.id).then(
+    _ => res.status(200).send({comments: _})
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.post('/gp/comments', auth, (req: Request, res: Response) => {
+  const body = req.body as Comment;
+  addComment(body.DeliveryId, body.Comment, body.Commenter).then(
+    _ => res.status(200).send({comments: _})
   ).catch(err => {
     return handleError(err, res);
   });

@@ -1,4 +1,5 @@
 export interface Order {
+  id: number;
   batchNumber: string;
   docDate: Date;
   reqShipDate: Date;
