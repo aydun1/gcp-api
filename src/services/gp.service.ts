@@ -932,24 +932,19 @@ export async function addComment(deliveryId: number, comment: string, commenter:
   const r = await new sqlRequest().input('deliveryId', TYPES.Int, deliveryId).input('comment', TYPES.VarChar(MAX), comment).input('commenter', TYPES.VarChar(50), commenter).input('commented', TYPES.DateTime2, new Date()).query(updateQuery);
   const comments = getComments(deliveryId);
   const delivery = await getDelivery(deliveryId);
-
-  let message = `New comment by ${commenter}`;
-  message += delivery?.OrderNumber ? ` on order ${delivery?.OrderNumber}.` : '.';
-  message += `\n'${comment}'.`;
-
   const deliveryLink = `http://ims.gardencityplastics.com/runs?tab=${delivery?.Run}&opened=${delivery?.id}`;
-
   let htmlMessage = `New comment by ${commenter}`;
   htmlMessage += delivery?.OrderNumber ? ` on order ${delivery?.OrderNumber}.` : '.';
   htmlMessage += `<br>'${comment}'.`;
   htmlMessage += `<br><br>Open run in IMS (if still active): <a href="${deliveryLink}">${deliveryLink}</a>`;
-  htmlMessage += `<br><br><strong>Original note:</strong> ${delivery?.Notes.replace(/\n/gm, '<br>')}`;
-
-
+  htmlMessage += `<br>`;
+  if (delivery?.CustomerName) htmlMessage += `<br><strong>Customer name:</strong> ${delivery.CustomerName}`;
+  if (delivery?.CustomerNumber) htmlMessage += `<br><strong>Customer number:</strong> ${delivery.CustomerNumber}`;
+  if (delivery?.Notes) htmlMessage += `<br><strong>Original note:</strong> ${delivery?.Notes.replace(/\n/gm, '<br>')}`;
   const getQuery = 'SELECT * FROM [IMS].[dbo].[Emails] WITH (NOLOCK) WHERE EmailType = \'runs\' AND Branch = @branch';
   new sqlRequest().input('branch', TYPES.NChar(15), delivery?.Branch).query(getQuery).then((_: IResult<{ToEmail: string}[]>) => {
     const emails = _.recordset.map(_ => _.ToEmail);
-    if (emails.length > 0) sendEmail(emails, 'Delivery comment', message, htmlMessage)
+    if (emails.length > 0) sendEmail(emails, 'Delivery comment', htmlMessage)
   });
   return comments;
 };

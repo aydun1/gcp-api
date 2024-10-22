@@ -13,7 +13,7 @@ export async function runShellCmd(cmd: string): Promise<string> {
   });
 }
 
-export async function sendEmail(to: string[], subject: string, text: string, html: string): Promise<SentMessageInfo> {
+export async function sendEmail(to: string[], subject: string, html: string): Promise<SentMessageInfo> {
   const transporter = createTransport({
     host: 'smtp.office365.com',
     port: 587,
@@ -23,5 +23,5 @@ export async function sendEmail(to: string[], subject: string, text: string, htm
       pass: mailerConfig.password
     }
   });
-  return transporter.sendMail({from: '"IMS" <ims@gardencityplastics.com>', to, subject, text, html});
+  return transporter.sendMail({from: '"IMS" <ims@gardencityplastics.com>', to, subject, text: html.replace(/<br>/gm, '\n'), html});
 }
