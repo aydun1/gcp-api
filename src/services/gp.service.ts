@@ -949,7 +949,7 @@ export async function addComment(deliveryId: number, comment: string, commenter:
   const getQuery = 'SELECT * FROM [IMS].[dbo].[Emails] WITH (NOLOCK) WHERE EmailType = \'runs\' AND Branch = @branch';
   new sqlRequest().input('branch', TYPES.NChar(15), delivery?.Branch).query(getQuery).then((_: IResult<{ToEmail: string}[]>) => {
     const emails = _.recordset.map(_ => _.ToEmail);
-    if (emails.length > 0) sendEmail(['aidan.obrien@gardencityplastics.com'], 'Delivery comment', message, htmlMessage)
+    if (emails.length > 0) sendEmail(emails, 'Delivery comment', message, htmlMessage)
   });
   return comments;
 };
