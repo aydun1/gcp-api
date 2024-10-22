@@ -11,6 +11,7 @@ import { CwRow } from '../types/CwRow';
 import { Order } from '../types/order';
 
 import { getChemwatchSds, initChemwatch } from './cw.service';
+import { sendEmail } from './helper.service';
 
 const palletStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_PalletUpdate]';
 const productionStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_ProductionReport]';
@@ -788,6 +789,12 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   });
 }
 
+export async function getDelivery(deliveryId: number): Promise<Delivery | undefined> {
+  const getQuery = 'SELECT * FROM [IMS].[dbo].[Deliveries] WITH (NOLOCK) WHERE id = @deliveryId';
+  const deliveries: Delivery[] = await new sqlRequest().input('deliveryId', TYPES.Int, deliveryId).query(getQuery).then((_: IResult<Delivery[]>) => _.recordset) || [];
+  return deliveries[0];
+}
+
 export async function addDelivery(delivery: Delivery, userName: string, userEmail: string): Promise<{id: number, fields: Delivery}> {
   const getQuery = 'SELECT * FROM [IMS].[dbo].Deliveries WHERE OrderNumber = @orderNumber';
   const getRequest = new sqlRequest()
@@ -922,10 +929,30 @@ export async function addComment(deliveryId: number, comment: string, commenter:
   const updateQuery = `
   INSERT INTO [IMS].[dbo].[Comments] (DeliveryId, Comment, Commenter, Commented)
   VALUES (@deliveryId, @comment, @commenter, @commented)`;
-  return new sqlRequest().input('deliveryId', TYPES.Int, deliveryId).input('comment', TYPES.VarChar(MAX), comment).input('commenter', TYPES.VarChar(50), commenter).input('commented', TYPES.DateTime2, new Date()).query(updateQuery).then(() => {
-    return getComments(deliveryId);
+  const r = await new sqlRequest().input('deliveryId', TYPES.Int, deliveryId).input('comment', TYPES.VarChar(MAX), comment).input('commenter', TYPES.VarChar(50), commenter).input('commented', TYPES.DateTime2, new Date()).query(updateQuery);
+  const comments = getComments(deliveryId);
+  const delivery = await getDelivery(deliveryId);
+
+  let message = `New comment by ${commenter}`;
+  message += delivery?.OrderNumber ? ` on order ${delivery?.OrderNumber}.` : '.';
+  message += `\n'${comment}'.`;
+
+  const deliveryLink = `http://ims.gardencityplastics.com/runs?tab=${delivery?.Run}&opened=${delivery?.id}`;
+
+  let htmlMessage = `New comment by ${commenter}`;
+  htmlMessage += delivery?.OrderNumber ? ` on order ${delivery?.OrderNumber}.` : '.';
+  htmlMessage += `<br>'${comment}'.`;
+  htmlMessage += `<br><br>Open run in IMS (if still active): <a href="${deliveryLink}">${deliveryLink}</a>`;
+  htmlMessage += `<br><br><strong>Original note:</strong> ${delivery?.Notes.replace(/\n/gm, '<br>')}`;
+
+
+  const getQuery = 'SELECT * FROM [IMS].[dbo].[Emails] WITH (NOLOCK) WHERE EmailType = \'runs\' AND Branch = @branch';
+  new sqlRequest().input('branch', TYPES.NChar(15), delivery?.Branch).query(getQuery).then((_: IResult<{ToEmail}[]>) => {
+    const emails = _.recordset.map(_ => _.ToEmail);
+    if (emails.length > 0) sendEmail(['aidan.obrien@gardencityplastics.com'], 'Delivery comment', message, htmlMessage)
   });
-}
+  return comments;
+};
 
 export function getChemicals(branch: string, itemNumber: string, type: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
   branch = parseBranch(branch);
