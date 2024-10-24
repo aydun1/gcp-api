@@ -797,8 +797,7 @@ export async function getDelivery(deliveryId: number): Promise<Delivery | undefi
 
 export async function addDelivery(delivery: Delivery, userName: string, userEmail: string): Promise<{id: number, fields: Delivery}> {
   const getQuery = 'SELECT * FROM [IMS].[dbo].Deliveries WHERE OrderNumber = @orderNumber';
-  const getRequest = new sqlRequest()
-  const res = await getRequest.input('OrderNumber', TYPES.Char(21), delivery.OrderNumber).query(getQuery);
+  const res = await new sqlRequest().input('OrderNumber', TYPES.Char(21), delivery.OrderNumber).query(getQuery);
   if (res.recordset.length > 0 && res.recordset[0].Status) throw {message: `Order already on run: ${res.recordset[0].Run}`};
 
   const updateQuery = `
