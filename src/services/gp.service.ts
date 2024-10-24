@@ -11,6 +11,7 @@ import { CwRow } from '../types/CwRow';
 import { Order } from '../types/order';
 
 import { getChemwatchSds, initChemwatch } from './cw.service';
+import { sendEmail } from './helper.service';
 
 const palletStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_PalletUpdate]';
 const productionStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_ProductionReport]';
@@ -40,6 +41,12 @@ interface gpRes {
   output: object;
   rowsAffected: Array<number>;
   returnValue: number;
+}
+
+function addressFormatter(order: Order | null): string {
+  if (!order) return '';
+  const lastLine = [order['city'], order['state'], order['postCode']].filter(_ => _).join(' ');
+  return [order['address1'], order['address2'], order['address3'], lastLine].filter(_ => _).join('\r\n');
 }
 
 function createIttId(branch: string): Promise<string> {
@@ -89,6 +96,48 @@ export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
   WHERE ORDDOCID = @doc_id
   `;
   return request.input('doc_id', TYPES.VarChar(15), id).query(query).then((_: IResult<InTransitTransfer>) =>  {return _.recordset[0]});
+}
+
+export async function updateAttachmentCount(sopNumber: string, id: number, creator: string, branch: string, attachments: number, increment: boolean): Promise<any> {
+  const getQuery = `SELECT OrderNumber FROM [IMS].[dbo].[Deliveries] WHERE ${id ? 'id = @id' : 'OrderNumber = @sopNumber'}`;
+  const currentCount = await new sqlRequest().input('sopNumber', TYPES.Char(21), sopNumber).input('id', TYPES.Int, id).query(getQuery).then((_: IResult<gpRes>) => _.recordset.length);
+  if (currentCount === 0) {
+    const order = await getOrderLines(2, sopNumber);
+    const request = new sqlRequest();
+    const insertQuery = `
+    INSERT INTO [IMS].[dbo].Deliveries (CustomerName,CustomerNumber,City,State,PostCode,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,RequestedDate,Attachments)
+    VALUES (@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@RequestedDate,@Attachments);
+    `;
+    request.input('CustomerName', TYPES.VarChar(65), order.custName);
+    request.input('CustomerNumber', TYPES.Char(15), order.custNumber);
+    request.input('City', TYPES.VarChar(35), order.city);
+    request.input('State', TYPES.VarChar(29), order.state);
+    request.input('Postcode', TYPES.VarChar(11), order.postCode);
+    request.input('Address', TYPES.VarChar(MAX), order.address),
+    request.input('CustomerType', TYPES.VarChar(50), 'Debtor');
+    request.input('ContactPerson', TYPES.VarChar(61), order.cntPrsn);
+    request.input('OrderNumber', TYPES.Char(21), sopNumber);
+    request.input('Spaces', TYPES.Numeric(19, 5), order.palletSpaces);
+    request.input('Weight', TYPES.Numeric(19, 5), order.orderWeight);
+    request.input('PhoneNumber', TYPES.VarChar(50), [order.phoneNumber1, order.phoneNumber2, order.phoneNumber3].filter(_ => _).join(',') || null),
+    request.input('Branch', TYPES.Char(15), branch);
+    request.input('Created', TYPES.Date, new Date());
+    request.input('Creator', TYPES.NVarChar(50), creator);  
+    request.input('Notes', TYPES.NVarChar(MAX), order.note);
+    request.input('DeliveryDate', TYPES.Date, order.reqShipDate);
+    request.input('RequestedDate', TYPES.Date, order.reqShipDate);
+    request.input('Attachments', TYPES.Int, increment ? 1 : attachments);
+    await request.query(insertQuery)
+    return 'Created new entry and added attachment';
+  } else {
+    const updateQuery = `
+    UPDATE [IMS].[dbo].[Deliveries]
+    SET Attachments = ${increment ? 'COALESCE(Attachments, 0) +' : ''} @attachments
+    WHERE ${id ? 'id = @id' : 'OrderNumber = @sopNumber'}
+    `;
+    await new sqlRequest().input('sopNumber', TYPES.VarChar(21), sopNumber).input('id', TYPES.Int, id).input('attachments', TYPES.Int, attachments).query(updateQuery);
+    return 'Updated';
+  }
 }
 
 export function getInTransitTransfers(id: string, from: string, to: string): Promise<{lines: InTransitTransferLine[]}> {
@@ -549,7 +598,8 @@ export function getOrders(branch: string, batch: string, date: string) {
   SUM(CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty)) palletSpaces,
   SUM(p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / COALESCE(p.PackQty, 1)) orderWeight,
   CASE WHEN SUM(CASE WHEN p.packWeight IS NULL THEN 1 ELSE 0 END) > 0 THEN 1 ELSE 0 end missingWeight,
-  MAX(CONVERT (varchar(max), TXTFIELD )) note
+  MAX(CONVERT (varchar(max), TXTFIELD )) note,
+  MAX(d.Attachments) attachments, MAX(d.Id) id
   FROM (
     SELECT BACHNUMB, DOCDATE, DOCID, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
     FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
@@ -619,29 +669,29 @@ export function getOrders(branch: string, batch: string, date: string) {
   });
 }
 
-export function getOrderLines(sopType: number, sopNumber: string) {
+export function getOrderLines(sopType: number, sopNumber: string): Promise<Order> {
   const request = new sqlRequest();
   const query =
   `
-  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
+  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.PHNUMBR1) phoneNumber1, RTRIM(a.PHNUMBR2) phoneNumber2, RTRIM(a.PHONE3) phoneNumber3, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
   p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight, 
-  d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty
+  d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty, d.Attachments attachments, d.id id
 
   FROM (
-    SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, a.SHIPMTHD, 0 posted, NOTEINDX
+    SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, a.SHIPMTHD, 0 posted, NOTEINDX
     FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
     WHERE SOPTYPE = 2
     UNION
-    SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
+    SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.PHONE3, a.PHONE3) PHONE3, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
     FROM [GPLIVE].[GCP].[dbo].[SOP30200] a WITH (NOLOCK)
 
     LEFT JOIN (
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, NOTEINDX
       FROM [GPLIVE].[GCP].[dbo].[SOP10100] WITH (NOLOCK)
       WHERE SOPTYPE = 3
       UNION
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, NOTEINDX
+      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, NOTEINDX
       FROM [GPLIVE].[GCP].[dbo].[SOP30200] WITH (NOLOCK)
       WHERE SOPTYPE = 3
     ) c
@@ -673,7 +723,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
   const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
   return lines.then((_: IResult<Array<Line>>) => {
     const order = _.recordset[0] as unknown as Order;
-    if (!order) return {};
+    if (!order) return {} as Order;
     const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
     const pickStatus = (order['posted'] || order['batchNumber'] === 'FULFILLED') ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
     return {
@@ -688,12 +738,20 @@ export function getOrderLines(sopType: number, sopNumber: string) {
       city: order.city,
       state: order.state,
       postCode: order.postCode,
+      address: addressFormatter(order),
+      phoneNumber1: order.phoneNumber1,
+      phoneNumber2: order.phoneNumber2,
+      phoneNumber3: order.phoneNumber3,
       shipMethod: order.shipMethod,
       reqShipDate: new Date(order.reqShipDate),
       note: noteMatch,
       pickStatus: pickStatus,
       deliveryStatus: order.deliveryStatus,
       deliveryRun: order.deliveryRun,
+      attachments: order.attachments,
+      id: order.id,
+      orderWeight: _.recordset.reduce((acc, cur) => acc += +cur.lineWeight, 0),
+      palletSpaces: _.recordset.reduce((acc, cur) => acc += +cur.palletSpaces, 0),
       lines: _.recordset.map(l => {
         return {
           lineNumber: l.lineNumber,
@@ -708,7 +766,7 @@ export function getOrderLines(sopType: number, sopNumber: string) {
           packQty: l.packQty
         }
       })
-    }
+    } as Partial<Order> as Order;
   });
 }
 
@@ -717,7 +775,7 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   const limit = archived ? 'TOP(250)' : ''
   let query =
   `
-  SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, id
+  SELECT ${limit} Address, RTRIM(Branch) Branch, City, ContactPerson, Created, Creator, CustomerName, RTRIM(CustomerNumber) CustomerNumber, CustomerType, Date, Delivered, DeliveryDate, DeliveryType, Notes, RTRIM(OrderNumber) OrderNumber, PhoneNumber, PickStatus, Postcode, RequestedDate, Run, Sequence, Site, Spaces, State, Status, Weight, Attachments, id
   FROM [IMS].[dbo].[Deliveries] d WITH (NOLOCK)
   WHERE Branch = @branch
   AND Status ${archived ? '=' : '<>'} 'Archived'
@@ -731,12 +789,25 @@ export function getDeliveries(branch: string, run: string, deliveryType: string,
   });
 }
 
+export async function getDelivery(deliveryId: number): Promise<Delivery | undefined> {
+  const getQuery = 'SELECT * FROM [IMS].[dbo].[Deliveries] WITH (NOLOCK) WHERE id = @deliveryId';
+  const deliveries: Delivery[] = await new sqlRequest().input('deliveryId', TYPES.Int, deliveryId).query(getQuery).then((_: IResult<Delivery[]>) => _.recordset) || [];
+  return deliveries[0];
+}
+
 export async function addDelivery(delivery: Delivery, userName: string, userEmail: string): Promise<{id: number, fields: Delivery}> {
   const getQuery = 'SELECT * FROM [IMS].[dbo].Deliveries WHERE OrderNumber = @orderNumber';
-  const getRequest = new sqlRequest()
-  const res = await getRequest.input('OrderNumber', TYPES.Char(21), delivery.OrderNumber).query(getQuery);
-  if (res.recordset.length > 0) throw {message: `Order already on run: ${res.recordset[0].Run}`};
+  const res = await new sqlRequest().input('OrderNumber', TYPES.Char(21), delivery.OrderNumber).query(getQuery);
+  if (res.recordset.length > 0 && res.recordset[0].Status) throw {message: `Order already on run: ${res.recordset[0].Run}`};
 
+  const updateQuery = `
+  UPDATE [IMS].[dbo].Deliveries
+  SET Run=@Run,Status=@Status,CustomerName=@CustomerName,CustomerNumber=@CustomerNumber,City=@City,State=@State,PostCode=@PostCode,Site=@Site,Address=@Address,CustomerType=@CustomerType,ContactPerson=@ContactPerson,DeliveryDate=@DeliveryDate,OrderNumber=@OrderNumber,Spaces=@Spaces,Weight=@Weight,PhoneNumber=@PhoneNumber,Branch=@Branch,Created=@Created,Creator=@Creator,Notes=@Notes,DeliveryType=@DeliveryType,RequestedDate=@RequestedDate
+  OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
+  INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, toRun, Action, Date)
+  WHERE OrderNumber = @orderNumber;
+  SELECT @id = ${res.recordset[0]?.id};
+  `
   const insertQuery = `
   INSERT INTO [IMS].[dbo].Deliveries (Run,Status,CustomerName,CustomerNumber,City,State,PostCode,Site,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,DeliveryType,RequestedDate)
   OUTPUT @userName, @userEmail, INSERTED.OrderNumber, INSERTED.CustomerNumber, INSERTED.Branch, INSERTED.Run, 'added', getDate()
@@ -771,9 +842,9 @@ export async function addDelivery(delivery: Delivery, userName: string, userEmai
   request.input('userName', TYPES.NVarChar(50), userName);
   request.input('userEmail', TYPES.NVarChar(320), userEmail);
   request.output('id', TYPES.Int);
-  return request.query(insertQuery).then(_ => {
+  return request.query(res.recordset.length > 0 ? updateQuery : insertQuery).then(_ => {
     const id = _['output']['id'] as number;
-    return {id, fields: {...delivery, id}};
+    return {id, fields: {...delivery, id, Attachments: res.recordset[0]?.Attachments || 0}};
   });
 }
 
@@ -807,7 +878,7 @@ export async function updateDelivery(id: number, delivery: Delivery, userName: s
     `;
   }
   updateQuery += `
-  OUTPUT inserted.Address, RTRIM(inserted.Branch) Branch, inserted.City, inserted.ContactPerson, inserted.Created, inserted.Creator, inserted.CustomerName, RTRIM(inserted.CustomerNumber) CustomerNumber, inserted.CustomerType, inserted.Date, inserted.Delivered, inserted.DeliveryDate, inserted.DeliveryType, inserted.Notes, RTRIM(inserted.OrderNumber) OrderNumber, inserted.PhoneNumber, inserted.PickStatus, inserted.Postcode, inserted.RequestedDate, inserted.Run, inserted.Sequence, inserted.Site, inserted.Spaces, inserted.State, inserted.Status, inserted.Weight, inserted.id
+  OUTPUT inserted.Address, RTRIM(inserted.Branch) Branch, inserted.Attachments Attachments, inserted.City, inserted.ContactPerson, inserted.Created, inserted.Creator, inserted.CustomerName, RTRIM(inserted.CustomerNumber) CustomerNumber, inserted.CustomerType, inserted.Date, inserted.Delivered, inserted.DeliveryDate, inserted.DeliveryType, inserted.Notes, RTRIM(inserted.OrderNumber) OrderNumber, inserted.PhoneNumber, inserted.PickStatus, inserted.Postcode, inserted.RequestedDate, inserted.Run, inserted.Sequence, inserted.Site, inserted.Spaces, inserted.State, inserted.Status, inserted.Weight, inserted.id
   WHERE id = @id
   `;
   const request = new sqlRequest();
@@ -839,13 +910,43 @@ export async function updateDelivery(id: number, delivery: Delivery, userName: s
 
 export function removeDelivery(id: number, userName: string, userEmail: string): Promise<IResult<any>> {
   const deleteQuery = `
-  DELETE FROM [IMS].[dbo].[Deliveries]
+  UPDATE [IMS].[dbo].[Deliveries]
+  SET Status = NULL, Run = NULL, Sequence = NULL
   OUTPUT @userName, @userEmail, deleted.OrderNumber, deleted.CustomerNumber, deleted.Branch, deleted.Run, 'deleted', getDate()
   INTO [IMS].[dbo].[Actions] (UserName, UserEmail, OrderNumber, CustomerNumber, Branch, FromRun, Action, Date)
   WHERE id = @id
   `;
   return new sqlRequest().input('id', TYPES.Int, id).input('userName', TYPES.NVarChar(50), userName).input('userEmail', TYPES.NVarChar(320), userEmail).query(deleteQuery).then((_) => _);
 }
+
+export async function getComments(deliveryId: number): Promise<Comment[]> {
+  const getQuery = 'SELECT * FROM [IMS].[dbo].[Comments] WITH (NOLOCK) WHERE DeliveryId = @deliveryId ORDER BY Commented DESC';
+  return new sqlRequest().input('deliveryId', TYPES.Int, deliveryId).query(getQuery).then((_: IResult<Comment[]>) => _.recordset);
+}
+
+export async function addComment(deliveryId: number, comment: string, commenter: string): Promise<Comment[]> {
+  const updateQuery = `
+  INSERT INTO [IMS].[dbo].[Comments] (DeliveryId, Comment, Commenter, Commented)
+  VALUES (@deliveryId, @comment, @commenter, @commented)`;
+  const r = await new sqlRequest().input('deliveryId', TYPES.Int, deliveryId).input('comment', TYPES.VarChar(MAX), comment).input('commenter', TYPES.VarChar(50), commenter).input('commented', TYPES.DateTime2, new Date()).query(updateQuery);
+  const comments = getComments(deliveryId);
+  const delivery = await getDelivery(deliveryId);
+  const deliveryLink = `http://ims.gardencityplastics.com/runs?tab=${delivery?.Run}&opened=${delivery?.id}`;
+  let htmlMessage = `New comment by ${commenter}`;
+  htmlMessage += delivery?.OrderNumber ? ` on order ${delivery?.OrderNumber}.` : '.';
+  htmlMessage += `<br>'${comment}'.`;
+  htmlMessage += `<br><br>Open run in IMS (if still active): <a href="${deliveryLink}">${deliveryLink}</a>`;
+  htmlMessage += `<br>`;
+  if (delivery?.CustomerName) htmlMessage += `<br><strong>Customer name:</strong> ${delivery.CustomerName}`;
+  if (delivery?.CustomerNumber) htmlMessage += `<br><strong>Customer number:</strong> ${delivery.CustomerNumber}`;
+  if (delivery?.Notes) htmlMessage += `<br><strong>Original note:</strong> ${delivery?.Notes.replace(/\n/gm, '<br>')}`;
+  const getQuery = 'SELECT * FROM [IMS].[dbo].[Emails] WITH (NOLOCK) WHERE EmailType = \'runs\' AND Branch = @branch';
+  new sqlRequest().input('branch', TYPES.NChar(15), delivery?.Branch).query(getQuery).then((_: IResult<{ToEmail: string}[]>) => {
+    const emails = _.recordset.map(_ => _.ToEmail);
+    if (emails.length > 0) sendEmail(emails, 'Delivery comment', htmlMessage)
+  });
+  return comments;
+};
 
 export function getChemicals(branch: string, itemNumber: string, type: string, order: string, orderby: string): Promise<{chemicals: CwRow[]}> {
   branch = parseBranch(branch);

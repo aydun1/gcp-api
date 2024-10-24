@@ -26,6 +26,11 @@ export const cwConfig = {
   password: process.env.CW_PASSWORD,
 }
 
+export const mailerConfig = {
+  username: process.env.MAIL_USERNAME,
+  password: process.env.MAIL_PASSWORD,
+}
+
 export const envuConfig = {
   authEndpoint: process.env.ENVU_AUTH_ENDPOINT || '',
   clientId: process.env.ENVU_CLIENT_ID,

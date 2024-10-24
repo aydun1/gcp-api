@@ -1,4 +1,5 @@
 export interface Order {
+  id: number;
   batchNumber: string;
   docDate: Date;
   reqShipDate: Date;
@@ -17,8 +18,10 @@ export interface Order {
   city: string;
   state: string;
   postCode: string;
+  address: string;
   phoneNumber1: string;
   phoneNumber2: string;
+  phoneNumber3: string;
   shipMethod: string;
   posted: number;
   palletSpaces: number;
@@ -28,4 +31,6 @@ export interface Order {
   custNmbr: string;
   deliveryStatus: string;
   deliveryRun: string;
+  attachments: number;
+  lines: any[];
 }
