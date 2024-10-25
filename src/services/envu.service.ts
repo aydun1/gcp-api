@@ -261,7 +261,7 @@ export async function sendChemicalSalesToEnvu() {
     //['goodsreceipt', [2]]
   ] as Array<['goodsreceipt' | 'order' | 'transfer', number[]]>);
 
-  const a = docTypes.reduce((acc, cur) => {
+  return docTypes.reduce((acc, cur) => {
     const lines = queryRes.filter(l => cur[1].includes(l.DOCTYPE));
     const parsedLines = cur[0] === 'order' ? parseOrders(lines) : cur[0] === 'transfer' ? parseTransfers(lines) : parseReceiving(lines);
     const grouped = groupByProperty(parsedLines);
@@ -269,5 +269,4 @@ export async function sendChemicalSalesToEnvu() {
     acc[cur[0]] = grouped;
     return acc;
   }, {} as {[key:string]: any});
-  return a;
 }

@@ -9,13 +9,15 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression = require('compression');
 
-import { getBasicChemicalInfo, getChemicals, getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getMaterialsInFolder, getOrders, getSdsPdf, getSyncedChemicals, linkChemical, unlinkChemical, updatePallets, updateSDS, writeInTransitTransferFile, getNonInventoryChemicals, addNonInventoryChemical, updateNonInventoryChemicalQuantity, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getChemicalsOnRun, getProduction, removeNonInventoryChemical, updateAttachmentCount, addComment, getComments } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, updatePallets, writeInTransitTransferFile, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getProduction, updateAttachmentCount, addComment, getComments } from './services/gp.service';
+import { addNonInventoryChemical, getBasicChemicalInfo, getChemicals, getChemicalsOnRun, getMaterialsInFolder, getNonInventoryChemicals, getSdsPdf, getSyncedChemicals, linkChemical, removeNonInventoryChemical, unlinkChemical, updateNonInventoryChemicalQuantity, updateSDS } from './services/chemical.service';
 import { sendChemicalSalesToEnvu } from './services/envu.service';
 import { runShellCmd } from './services/helper.service';
 import { adConfig, chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
 import { Comment } from './types/comment';
+import { getSilos } from './services/silos.service';
 
 interface Body {
   customer: string;
@@ -440,6 +442,14 @@ app.get('/gp/unlink-material', auth, (req, res) => {
   unlinkChemical(itemNmbr).then(_ => {
     res.status(200).json(_);
   }).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.get('/materials', auth, (req: Request, res: Response) => {
+  getSilos().then(
+    result => res.status(200).json({value: result})
+  ).catch(err => {
     return handleError(err, res);
   });
 });

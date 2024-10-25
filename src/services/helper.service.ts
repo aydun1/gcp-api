@@ -2,6 +2,10 @@ import { exec } from 'shelljs';
 import { createTransport, SentMessageInfo } from 'nodemailer';
 import { mailerConfig } from '../config';
 
+export function parseBranch(branch: string): string {
+  return branch === 'VIC' ? 'MAIN' : branch.substring(0, 4);
+}
+
 export async function runShellCmd(cmd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     exec(cmd, async (code, stdout, stderr) => {
