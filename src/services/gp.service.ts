@@ -644,7 +644,7 @@ export function getOrderLines(sopType: number, sopNumber: string): Promise<Order
   SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.PHNUMBR1) phoneNumber1, RTRIM(a.PHNUMBR2) phoneNumber2, RTRIM(a.PHONE3) phoneNumber3, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
   p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight, 
-  d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty, d.Attachments attachments, d.id id
+  d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty, d.Attachments attachments, d.id id, e.Comments comments
 
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, a.SHIPMTHD, 0 posted, NOTEINDX
@@ -684,6 +684,9 @@ export function getOrderLines(sopType: number, sopNumber: string): Promise<Order
   ON ITEMNMBR = p.Product
   LEFT JOIN [IMS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
+  LEFT JOIN (
+    SELECT DeliveryId, COUNT(*) as Comments FROM [IMS].[dbo].Comments GROUP BY DeliveryId
+  ) e ON d.id = e.DeliveryId
   WHERE a.SOPNUMBE = @sopNumber
   AND (rn = 1 OR rn IS NULL)
   ORDER BY LNITMSEQ
@@ -720,6 +723,7 @@ export function getOrderLines(sopType: number, sopNumber: string): Promise<Order
       id: order.id,
       orderWeight: _.recordset.reduce((acc, cur) => acc += +cur.lineWeight, 0),
       palletSpaces: _.recordset.reduce((acc, cur) => acc += +cur.palletSpaces, 0),
+      comments: order.comments || 0,
       lines: _.recordset.map(l => {
         return {
           lineNumber: l.lineNumber,

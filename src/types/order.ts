@@ -32,5 +32,6 @@ export interface Order {
   deliveryStatus: string;
   deliveryRun: string;
   attachments: number;
+  comments: number;
   lines: any[];
 }
