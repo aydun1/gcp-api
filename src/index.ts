@@ -17,7 +17,7 @@ import { adConfig, chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from '
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
 import { Comment } from './types/comment';
-import { getSilos } from './services/silos.service';
+import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 
 interface Body {
   customer: string;
@@ -448,6 +448,27 @@ app.get('/gp/unlink-material', auth, (req, res) => {
 
 app.get('/materials', auth, (req: Request, res: Response) => {
   getSilos().then(
+    result => res.status(200).json({value: result})
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.get('/materials/suppliers', auth, (req: Request, res: Response) => {
+  getSuppliers().then(
+    result => res.status(200).json({value: result})
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.patch('/materials/:id', auth, (req: Request, res: Response) => {
+  const reorderLevel = req.body['reorderLevel'];
+  const shipmentLevel = req.body['shipmentLevel'];
+  const criticalLevel = req.body['criticalLevel'];
+  const material = req.body['material'];
+  const supplierId = +req.body['supplierId'];
+  updateItem(+req.params.id, reorderLevel, shipmentLevel, criticalLevel, material, supplierId).then(
     result => res.status(200).json({value: result})
   ).catch(err => {
     return handleError(err, res);
