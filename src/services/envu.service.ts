@@ -159,7 +159,7 @@ function parseOrders(result: EnvuQuery[]): EnvuSale[] {
       documentCreated: new Date(r.DOCDATE),
       trackingId: r.DOCNUMBR,
       revisionNumber: '1',
-      poNumber: '', // r.CSTPONBR,
+      poNumber: r.DOCNUMBR, // r.CSTPONBR,
       requestedDeliveryDate: dateString(),
       requestedDispatchDate: dateString(),
       buyerCompanyName: '',
@@ -261,11 +261,11 @@ export async function sendChemicalSalesToEnvu() {
     //['goodsreceipt', [2]]
   ] as Array<['goodsreceipt' | 'order' | 'transfer', number[]]>);
 
-  return docTypes.reduce((acc, cur) => {
+  return docTypes.reduce(async (acc, cur) => {
     const lines = queryRes.filter(l => cur[1].includes(l.DOCTYPE));
     const parsedLines = cur[0] === 'order' ? parseOrders(lines) : cur[0] === 'transfer' ? parseTransfers(lines) : parseReceiving(lines);
     const grouped = groupByProperty(parsedLines);
-    if (shouldSend && grouped.length > 0) sendDocument(grouped, cur[0]).then(async () => await newSaveToDb(lines));
+    if (shouldSend && grouped.length > 0) await sendDocument(grouped, cur[0]).then(async () => await newSaveToDb(lines));
     acc[cur[0]] = grouped;
     return acc;
   }, {} as {[key:string]: any});
