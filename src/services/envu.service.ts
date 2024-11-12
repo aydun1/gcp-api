@@ -33,7 +33,7 @@ async function getAccessToken(): Promise<void> {
     if (res.status !== 200 || res.data.error) throw new Error(res.data.error_description);
     authDate = new Date();
     authRes = res.data;
-    console.log('Auth token gotten')
+    console.log('Getting auth token: done')
     return;
   } catch (error: any) {
     throw new Error(error['code'] || error as string);
@@ -47,7 +47,7 @@ async function sendDocument(data: {key: string, lines: EnvuSale[] | EnvuReceipt[
   const headers = {'Content-Type': 'application/json', pn_source, pn_messagetype, Authorization: `Bearer ${Authorization}`};
   try {
     const res = await axios.post<EnvuAuth>(envuConfig.sendEndpoint, data, {headers});
-    console.log(`Data sent: ${data.length} ${pn_messagetype}s  👌`)
+    console.log(`Sending data: ${data.length} ${pn_messagetype}s sent`)
     return res.data;
   } catch (error: any) {
     console.log('Error sending data:', error.response.status)
@@ -70,6 +70,7 @@ function groupByProperty(collection: any[]): {key: string, lines: EnvuSale[] | E
 }
 
 async function getChemicalTransactions(date: string): Promise<EnvuQuery[]> {
+  console.log('Getting GP transactions');
   const request = new sqlRequest();
   const query =
   `
@@ -114,7 +115,10 @@ async function getChemicalTransactions(date: string): Promise<EnvuQuery[]> {
   AND c.SendDate IS NULL
   ORDER BY trx.DOCDATE DESC
   `;
-  return request.query<EnvuQuery[]>(query).then(_ => _.recordset);
+  return request.query<EnvuQuery[]>(query).then(_ => {
+    console.log('Getting GP transactions: done');
+    return _.recordset;
+  });
 }
 
 function parseReceiving(result: EnvuQuery[]): EnvuReceipt[] {
@@ -247,7 +251,7 @@ async function newSaveToDb(result: EnvuQuery[]): Promise<any> {
   INSERT INTO [IMS].[dbo].Consignments (Vendor,DOCTYPE,DOCNUMBR,OrderDate,SendDate,ITEMNMBR,LNSEQNBR,TRXQTY,TRXLOCTN,QUANTITY)
   VALUES ${v.join(',\n')};
   `;
-  return v.length > 0 ? await new sqlRequest().query(insertQuery).then(() => console.log('Data saved')) : '';
+  return v.length > 0 ? await new sqlRequest().query(insertQuery).then(() => console.log('Saving data: done')) : '';
 }
 
 export async function sendChemicalSalesToEnvu() {
