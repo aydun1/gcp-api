@@ -40,8 +40,8 @@ async function getAccessToken(): Promise<void> {
   }
 }
 
-async function sendDocument(data: {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[], pn_messagetype: 'goodsreceipt' | 'order' | 'transfer') {
-  console.log('Sending data')
+async function sendDocument(data: {key: string, lines: EnvuSale[] | EnvuReceipt[] | EnvuTransfer[]}[], pn_messagetype: 'goodsreceipt' | 'order' | 'transfer'): Promise<any> {
+  console.log('Sending data');
   const pn_source = 'gcp';
   const Authorization = authRes.access_token;
   const headers = {'Content-Type': 'application/json', pn_source, pn_messagetype, Authorization: `Bearer ${Authorization}`};
@@ -240,13 +240,14 @@ function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
   });
 }
 
-async function newSaveToDb(result: EnvuQuery[]) {
+async function newSaveToDb(result: EnvuQuery[]): Promise<any> {
+  console.log('Saving data');
   const v = result.map(l => `('Envu',${l.DOCTYPE},'${l.DOCNUMBR}','${l.DOCDATE.toISOString().slice(0, 19).replace('T', ' ')}','${new Date().toISOString().slice(0, 19).replace('T', ' ')}','${l.ITEMNMBR}',${l.LNSEQNBR},${l.TRXQTY},'${l.TRXLOCTN}',${l.QTYFULFI * l.QTYBSUOM})`);
   const insertQuery = `
   INSERT INTO [IMS].[dbo].Consignments (Vendor,DOCTYPE,DOCNUMBR,OrderDate,SendDate,ITEMNMBR,LNSEQNBR,TRXQTY,TRXLOCTN,QUANTITY)
   VALUES ${v.join(',\n')};
   `;
-  return v.length > 0 ? await new sqlRequest().query(insertQuery) : '';
+  return v.length > 0 ? await new sqlRequest().query(insertQuery).then(() => console.log('Data saved')) : '';
 }
 
 export async function sendChemicalSalesToEnvu() {
