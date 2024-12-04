@@ -21,14 +21,15 @@ WITH ranked_silos AS (
   SELECT m.*, ROW_NUMBER() OVER (PARTITION BY [SiloID] ORDER BY [LogTimestamp] DESC) AS rn
   FROM [MATTEC].[Silos].[dbo].[SiloValLog] AS m
 )
-SELECT SiloID, s.SiloNum as SiloName, v.SuplID, RTRIM(v.SuplName) as SuplName, DecValue AS qty, PLC_Logtime as logtime, RTRIM(m.MatDesc) as MaterialName, d.SiteDesc as SiteName, o.ReorderLvl, o.ShipmentLvl, o.CriticalLvl
-FROM ranked_silos a
+SELECT a.rn, SiloID, s.SiloNum as SiloName, v.SuplID, RTRIM(v.SuplName) as SuplName, COALESCE(DecValue, 0) AS qty, PLC_Logtime as logtime, RTRIM(m.MatDesc) as MaterialName, d.SiteDesc as SiteName, COALESCE(o.ReorderLvl, 0) as ReorderLvl, o.ShipmentLvl, COALESCE(o.CriticalLvl, 0) as CriticalLvl, s.Capacity
+FROM [MATTEC].[Silos].[dbo].[SiloCon] as s
+LEFT JOIN ranked_silos a ON s.ID = a.SiloID
 LEFT JOIN [MATTEC].[Silos].[dbo].[SiloMatl] m ON m.ID = a.SiloID
-LEFT JOIN [MATTEC].[Silos].[dbo].[SiloCon] s ON s.ID = a.SiloID
 LEFT JOIN [MATTEC].[Silos].[dbo].[OrderCon] o ON o.ID = a.SiloID
 LEFT JOIN [MATTEC].[Silos].[dbo].[SiteCon] d ON d.SiteID = s.SiteID
 LEFT JOIN [MATTEC].[Silos].[dbo].[MatlSupl] v ON m.SuplID = v.SuplID
-WHERE a.rn = 1
+WHERE (a.rn = 1 OR a.rn IS NULL)
+
 `;
   const silos: Silo[] = await new sqlRequest().query(getQuery).then((_: IResult<Silo[]>) => _.recordset) || [];
   return silos;
