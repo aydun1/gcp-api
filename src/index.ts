@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import passport from 'passport';
 import compression = require('compression');
 
-import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, updatePallets, writeInTransitTransferFile, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getProduction, updateAttachmentCount, addComment, getComments } from './services/gp.service';
+import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, updatePallets, writeInTransitTransferFile, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getProduction, updateAttachmentCount, addComment, getComments, getProductionSchedule } from './services/gp.service';
 import { addNonInventoryChemical, getBasicChemicalInfo, getChemicals, getChemicalsOnRun, getMaterialsInFolder, getNonInventoryChemicals, getSdsPdf, getSyncedChemicals, linkChemical, removeNonInventoryChemical, unlinkChemical, updateNonInventoryChemicalQuantity, updateSDS } from './services/chemical.service';
 import { sendChemicalSalesToEnvu } from './services/envu.service';
 import { runShellCmd } from './services/helper.service';
@@ -204,6 +204,16 @@ app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   const components = params['comp'] === '1';
   getOrdersByLine(branch, [req.params.id], components).then(
     result => res.status(200).send(result)
+  ).catch(err => {
+    return handleError(err, res);
+  });
+});
+
+app.get('/gp/inventory/:id/schedule', auth, (req: Request, res: Response) => {
+  getProductionSchedule(req.params.id).then(
+    result => {
+      res.status(200).send(result)
+    }
   ).catch(err => {
     return handleError(err, res);
   });

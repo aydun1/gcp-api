@@ -8,6 +8,7 @@ import { Line } from '../types/line';
 import { InTransitTransferLine } from '../types/in-transit-transfer-line';
 import { InTransitTransfer } from '../types/in-transit-transfer';
 import { Order } from '../types/order';
+import { ProductionSchedule } from '../types/production-schedule';
 import { parseBranch, sendEmail } from './helper.service';
 
 const palletStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_PalletUpdate]';
@@ -937,6 +938,27 @@ export function updatePallets(customer: string, palletType: string, palletQty: s
 export function getProduction(): Promise<{lines: any[]}> {
   const request = new sqlRequest();
   return request.execute(productionStoredProcedure).then(_ => {return {lines: _.recordset}});
+}
+
+export function getProductionSchedule(itemNmbr: string): Promise<{schedule: ProductionSchedule[]}> {
+  console.log(itemNmbr)
+  const request = new sqlRequest();
+  const query =
+  `
+  SELECT TOP(100) JobSeq, JobID,
+  SchedStart,
+  SchedStop,
+  StartTime,
+  StopTime,
+  CurrentStartTime,
+  MostRecentStartTime,
+  SchedQty, CustomerID, JobType, MiscInfo1, MiscInfo2, Status, MachID, MachDesc, PartID, StatusDesc, PcsPerCtn
+  FROM [MATTEC].[MATTEC_PROHELP].[dbo].[vJobQueue2]
+  WHERE PartID = @itemNmbr
+  AND Status < 3
+  ORDER BY JobSeq DESC
+  `;
+  return request.input('itemNmbr', TYPES.VarChar(15), itemNmbr).query(query).then((_: IResult<ProductionSchedule[]>) => {return {schedule: _.recordset}});
 }
 
 export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
