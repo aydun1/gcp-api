@@ -654,15 +654,16 @@ export function getOrderLines(sopType: number, sopNumber: string): Promise<Order
     UNION
     SELECT BACHNUMB, DOCDATE, COALESCE(c.reqShipDate, a.ReqShipDate) reqShipDate, LOCNCODE, a.SOPTYPE, SOPNUMBE, a.ORIGTYPE, a.ORIGNUMB, a.CUSTNMBR, a.PRSTADCD, CUSTNAME, COALESCE(c.CNTCPRSN, a.CNTCPRSN) cntPrsn, COALESCE(c.ADDRESS1, a.ADDRESS1) ADDRESS1, COALESCE(c.ADDRESS2, a.ADDRESS2) ADDRESS2, COALESCE(c.ADDRESS3, a.ADDRESS3) ADDRESS3, COALESCE(c.CITY, a.CITY) CITY, COALESCE(c.STATE, a.STATE) [STATE], COALESCE(c.ZIPCODE, a.ZIPCODE) ZIPCODE, COALESCE(c.PHNUMBR1, a.PHNUMBR1) PHNUMBR1, COALESCE(c.PHNUMBR2, a.PHNUMBR2) PHNUMBR2, COALESCE(c.PHONE3, a.PHONE3) PHONE3, COALESCE(c.SHIPMTHD, a.SHIPMTHD) SHIPMTHD, 1 posted, COALESCE(c.NOTEINDX, a.NOTEINDX)
     FROM [GPLIVE].[GCP].[dbo].[SOP30200] a WITH (NOLOCK)
-
     LEFT JOIN (
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, NOTEINDX
-      FROM [GPLIVE].[GCP].[dbo].[SOP10100] WITH (NOLOCK)
-      WHERE SOPTYPE = 3
-      UNION
-      SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, NOTEINDX
-      FROM [GPLIVE].[GCP].[dbo].[SOP30200] WITH (NOLOCK)
-      WHERE SOPTYPE = 3
+    	SELECT TOP(1) * FROM (
+        SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, NOTEINDX
+        FROM [GPLIVE].[GCP].[dbo].[SOP10100] WITH (NOLOCK)
+        WHERE SOPTYPE = 3
+        UNION
+        SELECT SOPTYPE, ORIGTYPE, ORIGNUMB, SHIPMTHD, ReqShipDate, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [STATE], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, NOTEINDX
+        FROM [GPLIVE].[GCP].[dbo].[SOP30200] WITH (NOLOCK)
+        WHERE SOPTYPE = 3
+      ) h
     ) c
     ON a.SOPTYPE = c.ORIGTYPE
     AND a.SOPNUMBE = c.ORIGNUMB
@@ -958,7 +959,7 @@ export function getProductionSchedule(itemNmbr: string): Promise<{schedule: Prod
   AND Status < 3
   ORDER BY JobSeq DESC
   `;
-  return request.input('itemNmbr', TYPES.VarChar(15), itemNmbr).query(query).then((_: IResult<ProductionSchedule[]>) => {return {schedule: _.recordset}});
+  return request.input('itemNmbr', TYPES.VarChar(32), itemNmbr).query(query).then((_: IResult<ProductionSchedule[]>) => {return {schedule: _.recordset}});
 }
 
 export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
