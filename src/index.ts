@@ -2,12 +2,12 @@ import { connect } from 'mssql';
 import { compare, compareSync } from 'bcrypt';
 import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 'passport-azure-ad';
 import express, { NextFunction, Request, RequestHandler, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
-import helmet from 'helmet';
+import { createWriteStream } from 'fs';
+import { join } from 'path';
+import helmet from 'helmet/index.cjs';
 import morgan from 'morgan';
 import passport from 'passport';
-import compression = require('compression');
+import compression from 'compression';
 
 import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, updatePallets, writeInTransitTransferFile, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getProduction, updateAttachmentCount, addComment, getComments, getProductionSchedule } from './services/gp.service';
 import { addNonInventoryChemical, getBasicChemicalInfo, getChemicals, getChemicalsOnRun, getMaterialsInFolder, getNonInventoryChemicals, getSdsPdf, getSyncedChemicals, linkChemical, removeNonInventoryChemical, unlinkChemical, updateNonInventoryChemicalQuantity, updateSDS } from './services/chemical.service';
@@ -26,7 +26,7 @@ interface Body {
   palletDate: string;
 }
 
-const accessLogStream = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' });
+const accessLogStream = createWriteStream(join(__dirname, 'access.log'), { flags: 'a' });
 const auth = passport.authenticate('oauth-bearer', {session: false}) as RequestHandler;
 
 const options: IBearerStrategyOptionWithRequest = {

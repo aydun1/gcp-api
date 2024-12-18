@@ -1,6 +1,6 @@
 export interface ProductionSchedule {
   JobSeq: number;
-  JobID: string;
+  jobNumber: string;
   StartTime: number;
   StopTime: number;
   SchedStart: number;
@@ -13,10 +13,11 @@ export interface ProductionSchedule {
   Status: number;
   MachID: string;
   MachDesc: string;
-  PartID: string;
+  ItemNumber: string;
   StatusDesc: string;
   PcsPerCtn: number;
   CurrentStartTime: number;
   MostRecentStartTime: number;
+  remainingQty: number;
 }
 

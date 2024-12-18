@@ -1,5 +1,7 @@
 import { TYPES, Request as sqlRequest, IResult, MAX, IProcedureResult } from 'mssql';
-import fs from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
+import { parse } from 'papaparse';
+import pdf from 'pdf-parse-new';
 
 import { allowedPallets, targetDir } from '../config';
 import { gpRes } from '../types/gp-res';
@@ -10,6 +12,7 @@ import { InTransitTransfer } from '../types/in-transit-transfer';
 import { Order } from '../types/order';
 import { ProductionSchedule } from '../types/production-schedule';
 import { parseBranch, sendEmail } from './helper.service';
+import { Comment } from '../types/comment';
 
 const palletStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_PalletUpdate]';
 const productionStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_ProductionReport]';
@@ -20,6 +23,27 @@ function addressFormatter(order: Order | null): string {
   if (!order) return '';
   const lastLine = [order['city'], order['state'], order['postCode']].filter(_ => _).join(' ');
   return [order['address1'], order['address2'], order['address3'], lastLine].filter(_ => _).join('\r\n');
+}
+
+function parseMattecDate(dt: string): Date {
+  const splitDt = dt.split(', ');
+  const dateParts = splitDt[0].split('/');
+  return new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]} ${splitDt[1]}`);
+}
+
+interface TextContent {
+  items: {str: string, dir: string, width: number, height: number, transform: number[], fontName: string, hasEOL: boolean}[];
+}
+
+function render_page(pageData: any): string {
+  return pageData.getTextContent().then((textContent: TextContent) => {
+    const lines = textContent.items.sort((a, b) => a.transform[4] - b.transform[4]).reduce((acc, cur) => {
+      const lineIndex = cur.transform[5];
+      if (cur.str.trim() && lineIndex > 40 && lineIndex < 510) acc[lineIndex] = [...acc[lineIndex] || '', cur.str];
+      return acc;
+    }, {} as {[key: string]: string[]});
+    return Object.values(lines).filter(_ => _.length === 9).map(_ => `"${_.join('","')}"\n`);
+  });
 }
 
 function createIttId(branch: string): Promise<string> {
@@ -943,25 +967,62 @@ export function getProduction(): Promise<{lines: any[]}> {
   return request.execute(productionStoredProcedure).then(_ => {return {lines: _.recordset}});
 }
 
-export function getProductionSchedule(itemNmbr: string): Promise<{schedule: ProductionSchedule[]}> {
-  console.log(itemNmbr)
+
+export async function getProductionSchedule(itemNmbr: string): Promise<{schedule: ProductionSchedule[]}> {
+  let dataBuffer;
+  try {
+    dataBuffer = readFileSync('/MATTEC/PRODUCTION_SCHEDULE_SUMMARY_FORCASTED_DATES.PDF', {flag: 'r'});
+  } catch(e: any) {
+    console.log('Trying other file path');
+    dataBuffer = readFileSync('G:\\Mattec\\ScheduleSummary\\Archive\\PRODUCTION_SCHEDULE_SUMMARY_FORCASTED_DATES.PDF', {flag: 'r'});
+  }
+  const pdfText = (await pdf(dataBuffer, {pagerender: render_page, verbosityLevel: 0})).text.replace(/^,/gm, '');
+  const parsedLines = [...parse<string[]>(pdfText).data];
+  const matches = parsedLines.filter(_ => _[2] === itemNmbr);
+  const m = matches.map(_ => {
+    const forecastStart = parseMattecDate(_[7]);
+    const forecastEnd = parseMattecDate(_[8]);
+    const forcastTime =  (forecastEnd.getTime() - forecastStart.getTime()) / 1000;
+    const remainingTime = _[5].split(':').reduce((acc, cur, i) => acc + parseInt(cur) * Math.max((60 * (1 - i)), 1), 0) * 60;
+    const res = {
+      jobNumber: _[1],
+      itemNumber: _[2],
+      forecastStart,
+      forecastEnd,
+      remainingQty: parseInt(_[4].replace(',', '')),
+      forcastTime,
+      remainingTime
+    };
+    return res;
+  });
+
   const request = new sqlRequest();
   const query =
   `
-  SELECT TOP(100) JobSeq, JobID,
-  SchedStart,
-  SchedStop,
-  StartTime,
-  StopTime,
-  CurrentStartTime,
-  MostRecentStartTime,
-  SchedQty, CustomerID, JobType, MiscInfo1, MiscInfo2, Status, MachID, MachDesc, PartID, StatusDesc, PcsPerCtn
+  SELECT
+  JobSeq, RTRIM(JobID) jobNumber, SchedStart, SchedStop, StartTime, StopTime, CurrentStartTime, MostRecentStartTime, SchedQty,
+  RTRIM(CustomerID) CustomerID, JobType, RTRIM(MiscInfo1) MiscInfo1, RTRIM(MiscInfo2) MiscInfo2, Status, RTRIM(MachID) MachID,
+  RTRIM(MachDesc) MachDesc, RTRIM(PartID) ItemNumber, RTRIM(StatusDesc) StatusDesc, PcsPerCtn
   FROM [MATTEC].[MATTEC_PROHELP].[dbo].[vJobQueue2]
   WHERE PartID = @itemNmbr
   AND Status < 3
+  AND MachID <> 'TEST'
   ORDER BY JobSeq DESC
   `;
-  return request.input('itemNmbr', TYPES.VarChar(32), itemNmbr).query(query).then((_: IResult<ProductionSchedule[]>) => {return {schedule: _.recordset}});
+  return request.input('itemNmbr', TYPES.VarChar(32), itemNmbr).query(query).then((_: IResult<ProductionSchedule[]>) => {
+    const schedule = _.recordset.map(s => {
+      const runningJob = m.find(j => j.jobNumber === s.jobNumber);
+      const percent = 6 / s.SchedQty;
+      return {...s,
+        forecastStart: runningJob?.forecastStart,
+        forecastEnd: runningJob?.forecastEnd,
+        percent,
+        remainingQty: runningJob?.remainingQty || s.SchedQty,
+        remainingTime: runningJob?.remainingTime
+      };
+    })
+    return {schedule};
+  });
 }
 
 export async function writeInTransitTransferFile(id: string | null, fromSite: string, toSite: string, body: Array<Line>): Promise<string> {
@@ -974,8 +1035,8 @@ export async function writeInTransitTransferFile(id: string | null, fromSite: st
   const lines = body.map(_ => [id, i += 1, date, fromSite, toSite, _.ItemNmbr, _.ToTransfer]).map(_ => _.join(','));
   const path = `${targetDir}/PICKS/ITT Between SITES`
   const fileContents = `${header.join(',')}\r\n${lines.join('\r\n')}`;
-  fs.writeFileSync(`${path}/itt_transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
-  setTimeout(() => fs.writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
+  writeFileSync(`${path}/itt_transfer_from_${fromSite}_to_${toSite}.csv`, fileContents);
+  setTimeout(() => writeFileSync(`${path}/${new Date().getTime()}.txt`, ''), 5000);
   return id;
 }
 

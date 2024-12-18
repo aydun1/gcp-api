@@ -1,24 +1,24 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "ESNext",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "target": "es2022",
+    "target": "ESNext",
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
     "noImplicitAny": true,
-    "moduleResolution": "node",
+    "moduleResolution": "Node",
     "sourceMap": true,
     "strict": true,
     "outDir": "dist",
     "baseUrl": ".",
-    "resolveJsonModule": true,
     "paths": {
       "*": [
         "node_modules/*"
       ]
     }
   },
-  "include": [
-    "src/**/*",
-    "**/*.config.js"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
 }
