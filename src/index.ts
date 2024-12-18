@@ -4,7 +4,7 @@ import { BearerStrategy, IBearerStrategyOptionWithRequest, ITokenPayload } from 
 import express, { NextFunction, Request, RequestHandler, Response } from 'express';
 import { createWriteStream } from 'fs';
 import { join } from 'path';
-import helmet from 'helmet/index.cjs';
+import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 import compression from 'compression';
