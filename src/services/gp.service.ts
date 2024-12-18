@@ -1006,7 +1006,7 @@ export async function getProductionSchedule(itemNmbr: string): Promise<{schedule
   FROM [MATTEC].[MATTEC_PROHELP].[dbo].[vJobQueue2]
   WHERE PartID = @itemNmbr
   AND Status < 3
-  AND MachID <> 'TEST'
+  AND MachID NOT IN ('TEST', 'BC2MAT')
   ORDER BY JobSeq DESC
   `;
   return request.input('itemNmbr', TYPES.VarChar(32), itemNmbr).query(query).then((_: IResult<ProductionSchedule[]>) => {
