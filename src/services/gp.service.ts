@@ -17,7 +17,7 @@ import { Comment } from '../types/comment';
 const palletStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_PalletUpdate]';
 const productionStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_ProductionReport]';
 
-const driverNoteRegexp = /\*([a-zA-Z0-9\s,./\\!@#$%^&()\-=]+)\*/g;
+const driverNoteRegexp = /\*([a-zA-Z0-9\s,.'"/\\|?!@#$%^&():;[\]{}<>\-=]+)\*/g;
 
 function addressFormatter(order: Order | null): string {
   if (!order) return '';
