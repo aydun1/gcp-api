@@ -43,10 +43,9 @@ export async function updatePalletsBc(customer: string, palletType: string, pall
   if (qty > 1000 || palletQty !== qty.toString(10)) throw new Error('Bad quantity');
   const getRes = await axios.get<{value: [{id: string}]}>(`${url}?$filter=custNmbr eq '${custNmbr}'`, {headers});
   const custId = getRes.data.value[0]?.id;
-  console.log(custId)
   if (!custId) throw new Error('Could not find customer to update.');
   const c = axios.create({baseURL, headers: {...headers, 'If-Match': '*'}});
   const a = await c.patch<any>(`/customers(${custId})`, {[palletType]: qty});
-  console.log(a.data)
+  console.log('BC', custNmbr, palletType, palletQty)
   return 'Success'
 }
