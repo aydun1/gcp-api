@@ -18,6 +18,7 @@ import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
 import { Comment } from './types/comment';
 import { getSilos, getSuppliers, updateItem } from './services/silos.service';
+import { updatePalletsBc } from './services/bc.service';
 
 interface Body {
   customer: string;
@@ -333,6 +334,7 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
   ).catch(err => {
     return handleError(err, res);
   });
+  updatePalletsBc();
 });
 
 app.get('/gp/deliveries', auth, (req, res) => {

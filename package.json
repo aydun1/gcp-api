@@ -15,7 +15,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/nodemailer": "^6.4.16",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
@@ -39,6 +38,7 @@
     "@types/morgan": "^1.9.9",
     "@types/mssql": "^9.1.5",
     "@types/node": "^20.12.11",
+    "@types/nodemailer": "^6.4.17",
     "@types/papaparse": "^5.3.15",
     "@types/passport-azure-ad": "^4.3.6",
     "@types/shelljs": "^0.8.15",
