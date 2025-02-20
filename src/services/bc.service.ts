@@ -11,7 +11,7 @@ async function authenticate(): Promise<string | void> {
   const username = process.env.BC_CLIENT_ID || '';
   const password = process.env.BC_CLIENT_SECRET || '';
   return axios({
-    url: `/${process.env.BC_TENANT}/oauth2/v2.0/token`;
+    url: `/${process.env.BC_TENANT}/oauth2/v2.0/token`,
     baseURL: 'https://login.microsoftonline.com/',
     method: 'post',
     auth: {username, password},
