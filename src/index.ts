@@ -334,7 +334,7 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
   ).catch(err => {
     return handleError(err, res);
   });
-  updatePalletsBc();
+  updatePalletsBc(body.customer, body.palletType, body.palletQty);
 });
 
 app.get('/gp/deliveries', auth, (req, res) => {
