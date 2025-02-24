@@ -31,7 +31,6 @@ async function authenticate(): Promise<string | void> {
 }
 
 export async function updatePalletsBc(customer: string, palletType: string, palletQty: string): Promise<string> {
-  if (palletType === 'Cage') throw new Error('Can\'t handle cages yet');
   if (expiresAt <= new Date()) await authenticate();
   const headers = {'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}`};
   const url = `${baseURL}/customers`;
@@ -45,7 +44,7 @@ export async function updatePalletsBc(customer: string, palletType: string, pall
   const custId = getRes.data.value[0]?.id;
   if (!custId) throw new Error('Could not find customer to update.');
   const c = axios.create({baseURL, headers: {...headers, 'If-Match': '*'}});
-  const a = await c.patch<any>(`/customers(${custId})`, {[palletType]: qty});
-  console.log('BC', custNmbr, palletType, palletQty)
+  await c.patch<any>(`/customers(${custId})`, {[palletType]: qty});
+  console.log('BC', custNmbr, palletType, palletQty);
   return 'Success'
 }
