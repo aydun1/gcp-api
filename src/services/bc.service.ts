@@ -25,7 +25,7 @@ async function authenticate(): Promise<string | void> {
     expiresAt.setSeconds(expiresAt.getSeconds() + _.data.expires_in);
     console.log('Signed in to BC.');
   }).catch(e => {
-    console.log('Failed to authenticate.');
+    console.error('Failed to authenticate with BC.');
     return e;
   })
 }
@@ -42,9 +42,14 @@ export async function updatePalletsBc(customer: string, palletType: string, pall
   if (qty > 1000 || palletQty !== qty.toString(10)) throw new Error('Bad quantity');
   const getRes = await axios.get<{value: [{id: string}]}>(`${url}?$filter=custNmbr eq '${custNmbr}'`, {headers});
   const custId = getRes.data.value[0]?.id;
-  if (!custId) throw new Error('Could not find customer to update.');
+  if (!custId) throw new Error('Could not find customer in BC to update.');
   const c = axios.create({baseURL, headers: {...headers, 'If-Match': '*'}});
-  await c.patch<any>(`/customers(${custId})`, {[palletType]: qty});
+  await c.patch<any>(`/customers(${custId})`, {[palletType]: qty}).catch(
+    e => {
+      console.error('BC Failed', custNmbr, palletType, palletQty);
+      console.error(e.message);
+    }
+  );
   console.log('BC', custNmbr, palletType, palletQty);
   return 'Success'
 }

@@ -74,28 +74,26 @@ function handleError(err: any, res: Response) {
 }
 
 function verifyPalletApiToken(req: Request, res: Response, next: NextFunction) {
-  const bearerHeader = req.headers['authorization'];
-  if (typeof bearerHeader === 'undefined') return res.sendStatus(401);
-  const bearerToken = bearerHeader.split(' ')[1];
+  const bearerToken = req.headers['authorization']?.split(' ')[1] || '';
   compare(bearerToken, palletKeyHash, (err, matched) => {
-    if (!matched || err) return res.sendStatus(401);
+    if (!matched || err) res.sendStatus(401);
     next();
   });
 }
 
-function verifyChemicalListToken(req: Request, res: Response, next: NextFunction) {
+function verifyChemicalListToken(req: Request, res: Response, next: NextFunction): void {
   const params = req.query;
   const bearerToken = params['key'] as string || '';
   const matched = compareSync(bearerToken, chemListKeyHash);
-  if (!matched) return res.sendStatus(401);
+  if (!matched) res.sendStatus(401);
   next();
 }
 
-app.get( '/', ( req, res ) => {
-  return res.send('');
+app.get( '/', (req, res) => {
+  res.send('');
 });
 
-app.get('/status', auth, (req: Request, res: Response) => {
+app.get('/status', auth, (req, res) => {
   runShellCmd('./debug.sh').then(
     result => res.status(200).json({value: result})
   ).catch(err => {
@@ -103,11 +101,11 @@ app.get('/status', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp', auth, (req: Request, res: Response) => {
-  return res.send('');
+app.get('/gp', auth, (req, res) => {
+  res.send('');
 });
 
-app.get('/gp/customers', auth, (req: Request, res: Response) => {
+app.get('/gp/customers', auth, (req, res) => {
   const params = req.query;
   const branches = (Array.isArray(params['branch']) ? params['branch'] : [params['branch']].filter(_ => _)) as Array<string>;
   const sort = params['order'] as string || '';
@@ -122,7 +120,7 @@ app.get('/gp/customers', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/customers/:id(*)/addresses', auth, (req: Request, res: Response) => {
+app.get('/gp/customers/:id(*)/addresses', auth, (req, res) => {
   getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
@@ -130,7 +128,7 @@ app.get('/gp/customers/:id(*)/addresses', auth, (req: Request, res: Response) =>
   });
 });
 
-app.get('/gp/customers/:id(*)', auth, (req: Request, res: Response) => {
+app.get('/gp/customers/:id(*)', auth, (req, res) => {
   const custId = req.params.id.replace('\'\'', '\'');
   getCustomer(custId).then(
     result => res.status(200).send(result)
@@ -139,7 +137,7 @@ app.get('/gp/customers/:id(*)', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/vendors', auth, (req: Request, res: Response) => {
+app.get('/gp/vendors', auth, (req, res) => {
   const params = req.query;
   const search = params['search'] as string || '';
   const page = parseInt(params['page'] as string) || 1;
@@ -150,7 +148,7 @@ app.get('/gp/vendors', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/vendors/:id(*)/addresses', auth, (req: Request, res: Response) => {
+app.get('/gp/vendors/:id(*)/addresses', auth, (req, res) => {
   getVendorAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
@@ -158,7 +156,7 @@ app.get('/gp/vendors/:id(*)/addresses', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/pan', auth, (req: Request, res: Response) => {
+app.get('/gp/pan', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   getItems(branch, [], '').then(
@@ -168,7 +166,7 @@ app.get('/gp/pan', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/inventory', auth, (req: Request, res: Response) => {
+app.get('/gp/inventory', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const search = params['search'] as string || '';
@@ -181,7 +179,7 @@ app.get('/gp/inventory', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/inventory/required', auth, (req: Request, res: Response) => {
+app.get('/gp/inventory/required', auth, (req, res) => {
   getProduction().then(
     result => {
       res.status(200).send(result)
@@ -191,7 +189,7 @@ app.get('/gp/inventory/required', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
+app.get('/gp/inventory/:id/history', auth, (req, res) => {
   getHistory(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
@@ -199,7 +197,7 @@ app.get('/gp/inventory/:id/history', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
+app.get('/gp/inventory/:id/current', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const components = params['comp'] === '1';
@@ -210,7 +208,7 @@ app.get('/gp/inventory/:id/current', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/inventory/:id/schedule', auth, (req: Request, res: Response) => {
+app.get('/gp/inventory/:id/schedule', auth, (req, res) => {
   getProductionSchedule(req.params.id).then(
     result => {
       res.status(200).send(result)
@@ -220,7 +218,7 @@ app.get('/gp/inventory/:id/schedule', auth, (req: Request, res: Response) => {
   });
 });
 
-app.post('/gp/inventory/orders', auth, (req: Request, res: Response) => {
+app.post('/gp/inventory/orders', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const components = params['comp'] === '1';
@@ -231,7 +229,7 @@ app.post('/gp/inventory/orders', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/inventory/:id/stock', auth, (req: Request, res: Response) => {
+app.get('/gp/inventory/:id/stock', auth, (req, res) => {
   getItems('', [req.params.id], '').then(
     result => res.status(200).send(result['lines'][0])
   ).catch(err => {
@@ -239,7 +237,7 @@ app.get('/gp/inventory/:id/stock', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/orders', auth, (req: Request, res: Response) => {
+app.get('/gp/orders', auth, (req, res) => {
   const params = req.query;
   const branch = params['branch'] as string || '';
   const date = params['date'] as string || '';
@@ -250,7 +248,7 @@ app.get('/gp/orders', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/orders/:sopType/:sopNumber', auth, (req: Request, res: Response) => {
+app.get('/gp/orders/:sopType/:sopNumber', auth, (req, res) => {
   const sopType = +req.params.sopType;
   const sopNumber = req.params.sopNumber;
   getOrderLines(sopType, sopNumber).then(
@@ -275,7 +273,7 @@ app.patch('/gp/orders/:sopType/:sopNumber', auth, (req, res) => {
   });
 });
 
-app.get('/gp/itt', auth, (req: Request, res: Response) => {
+app.get('/gp/itt', auth, (req, res) => {
   const params = req.query;
   const from = params['from'] as string || '';
   const to = params['to'] as string || '';
@@ -286,7 +284,7 @@ app.get('/gp/itt', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/itt/:id', auth, (req: Request, res: Response) => {
+app.get('/gp/itt/:id', auth, (req, res) => {
   getInTransitTransfer(req.params.id).then(itt =>{
     if (!itt) {
       res.status(404).send({});
@@ -301,7 +299,7 @@ app.get('/gp/itt/:id', auth, (req: Request, res: Response) => {
   });
 });
 
-app.post('/gp/itt', auth, (req: Request, res: Response) => {
+app.post('/gp/itt', auth, (req, res) => {
   const body = req.body as Transfer;
   writeInTransitTransferFile(body.id, body.fromSite, body.toSite, body.lines).then(
     _ => res.status(200).send({docId: _, status: 'Successfully added ITT.'})
@@ -310,7 +308,7 @@ app.post('/gp/itt', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/gp/comments/:id', auth, (req: Request, res: Response) => {
+app.get('/gp/comments/:id', auth, (req, res) => {
   getComments(+req.params.id).then(
     _ => res.status(200).send({comments: _})
   ).catch(err => {
@@ -318,7 +316,7 @@ app.get('/gp/comments/:id', auth, (req: Request, res: Response) => {
   });
 });
 
-app.post('/gp/comments', auth, (req: Request, res: Response) => {
+app.post('/gp/comments', auth, (req, res) => {
   const body = req.body as Comment;
   addComment(body.DeliveryId, body.Comment, body.Commenter).then(
     _ => res.status(200).send({comments: _})
@@ -416,21 +414,21 @@ app.get('/gp/non-inventory-chemicals', auth, (req, res) => {
   });
 });
 
-app.post('/gp/non-inventory-chemicals', auth, (req: Request, res: Response) => {
+app.post('/gp/non-inventory-chemicals', auth, (req, res) => {
   const body = req.body as {itemNmbr: string, itemDesc: string, size: number, units: string};
   addNonInventoryChemical(body.itemNmbr, body.itemDesc, body.size, body.units).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
     return handleError(err, res);
   });
 });
 
-app.delete('/gp/non-inventory-chemicals/:id(*)', auth, (req: Request, res: Response) => {
+app.delete('/gp/non-inventory-chemicals/:id(*)', auth, (req, res) => {
   const itemNmbr = req.params.id;
   removeNonInventoryChemical(itemNmbr).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
     return handleError(err, res);
   });
 });
 
-app.post('/gp/non-inventory-chemical-qty', auth, (req: Request, res: Response) => {
+app.post('/gp/non-inventory-chemical-qty', auth, (req, res) => {
   const body = req.body as {itemNmbr: string, quantity: number, branch: string};
   updateNonInventoryChemicalQuantity(body.itemNmbr, body.quantity, body.branch).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
     return handleError(err, res);
@@ -458,7 +456,7 @@ app.get('/gp/unlink-material', auth, (req, res) => {
   });
 });
 
-app.get('/materials', auth, (req: Request, res: Response) => {
+app.get('/materials', auth, (req, res) => {
   getSilos().then(
     result => res.status(200).json({value: result})
   ).catch(err => {
@@ -466,7 +464,7 @@ app.get('/materials', auth, (req: Request, res: Response) => {
   });
 });
 
-app.get('/materials/suppliers', auth, (req: Request, res: Response) => {
+app.get('/materials/suppliers', auth, (req, res) => {
   getSuppliers().then(
     result => res.status(200).json({value: result})
   ).catch(err => {
@@ -474,7 +472,7 @@ app.get('/materials/suppliers', auth, (req: Request, res: Response) => {
   });
 });
 
-app.patch('/materials/:id', auth, (req: Request, res: Response) => {
+app.patch('/materials/:id', auth, (req, res) => {
   const reorderLevel = req.body['reorderLevel'];
   const shipmentLevel = req.body['shipmentLevel'];
   const criticalLevel = req.body['criticalLevel'];
