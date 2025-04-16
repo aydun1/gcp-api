@@ -40,7 +40,9 @@ export async function updatePalletsBc(customer: string, palletType: string, pall
   if (custNmbr.length > 15) throw new Error('Bad request');
   if (!allowedPallets.includes(palletType)) throw new Error('Bad pallet');
   if (qty > 1000 || palletQty !== qty.toString(10)) throw new Error('Bad quantity');
-  const getRes = await axios.get<{value: [{id: string}]}>(`${url}?$filter=custNmbr eq '${custNmbr}'`, {headers});
+  const getRes = await axios.get<{value: [{id: string}]}>(`${url}?$filter=custNmbr eq '${custNmbr}'`, {headers}).catch(e => {
+    throw new Error(`Failed to get customer: ${custNmbr}`);
+  });
   const custId = getRes.data.value[0]?.id;
   if (!custId) throw new Error('Could not find customer in BC to update.');
   const c = axios.create({baseURL, headers: {...headers, 'If-Match': '*'}});
