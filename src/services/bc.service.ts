@@ -2,7 +2,7 @@ import axios from 'axios';
 
 import { allowedPallets } from '../config';
 
-const baseURL = `https://api.businesscentral.dynamics.com/v2.0/DEV-2/api/gcp/ims/v1.0/companies(${process.env.BC_COMPANY})`;
+const baseURL = `https://api.businesscentral.dynamics.com/v2.0/${process.env.BC_ENVIRONMENT}/api/gcp/ims/v1.0/companies(${process.env.BC_COMPANY})`;
 
 let accessToken = '';
 let expiresAt = new Date;
