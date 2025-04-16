@@ -258,6 +258,7 @@ export async function sendChemicalSalesToEnvu() {
   console.log('Starting envu sales update');
   await getAccessToken();
   const shouldSend = true;
+  const shouldSave = envuConfig.production;
   const date = '2024-06-28';
   const queryRes = await getChemicalTransactions(date);
   const docTypes = ([
@@ -270,7 +271,7 @@ export async function sendChemicalSalesToEnvu() {
     const lines = queryRes.filter(l => cur[1].includes(l.DOCTYPE));
     const parsedLines = cur[0] === 'order' ? parseOrders(lines) : cur[0] === 'transfer' ? parseTransfers(lines) : parseReceiving(lines);
     const grouped = groupByProperty(parsedLines);
-    if (shouldSend && grouped.length > 0) await sendDocument(grouped, cur[0]).then(async () => await newSaveToDb(lines));
+    if (shouldSend && grouped.length > 0) await sendDocument(grouped, cur[0]).then(async () => shouldSave ? await newSaveToDb(lines) : '');
     acc[cur[0]] = grouped;
     return acc;
   }, {} as {[key:string]: any});

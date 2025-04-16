@@ -32,6 +32,7 @@ export const mailerConfig = {
 }
 
 export const envuConfig = {
+  production: process.env.ENVU_PROD === '1' ? true : false,
   authEndpoint: process.env.ENVU_AUTH_ENDPOINT || '',
   clientId: process.env.ENVU_CLIENT_ID,
   clientSecret: process.env.ENVU_CLIENT_SECRET,
