@@ -550,7 +550,7 @@ export function getOrdersByLine(branch: string, itemNmbrs: string[], components 
   `
   Select a.DOCDATE date,
   CASE WHEN a.ReqShipDate < '19900101' THEN null ELSE a.reqShipDate END reqShipDate,
-  a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, rtrim(b.ITEMNMBR) itemNmbr,
+  a.SOPTYPE sopType, rtrim(a.SOPNUMBE) sopNmbr, b.LNITMSEQ lineNmbr, rtrim(b.ITEMNMBR) itemNmbr,
   rtrim(a.LOCNCODE) locnCode, (b.ATYALLOC) * b.QTYBSUOM quantity,
   rtrim(c.CUSTNAME) customer, rtrim(c.CUSTNMBR) custNmbr, d.CMMTTEXT note, e.CMMTTEXT lineNote
   FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
