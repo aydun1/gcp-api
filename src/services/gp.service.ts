@@ -538,7 +538,7 @@ export function getHistory(itemNmbr: string) {
   ) Pivot_table
   `;
   return request.input('itemnmbr', TYPES.VarChar(32), itemNmbr).query(query).then((_: IResult<gpRes>) => {
-    return {itemNumber: itemNmbr, history: _.recordset[0]};
+    return {itemNumber: itemNmbr, history: _.recordset[0] || {}};
   });
 }
 
