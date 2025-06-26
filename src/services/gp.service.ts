@@ -296,11 +296,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ON a.UOMSCHDL = u.UOMSCHDL
 
   -- Get specs
-  LEFT JOIN (
-    SELECT *
-    FROM [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] WITH (NOLOCK)
-    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
-  ) p
+  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] as p WITH (NOLOCK)
   ON a.ITEMNMBR = p.Product
 
   -- get ITTs
