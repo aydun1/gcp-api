@@ -11,7 +11,7 @@ export const products = [
   {envuCode: '84487031', gpCode: 'DEDIC1', name: 'DEDICATE (SL) SC300 12X1L BOT AU'},
   {envuCode: '87291316', gpCode: 'NA', name: 'DEDICATE FORTE STRSGRD SC240 4X1L BOT AU'},
   {envuCode: '79636954', gpCode: 'DESTINY250', name: 'DESTINY WG10 20X(5X50GR) BAG AU'},
-  {envuCode: '86282178', gpCode: 'NA', name: 'ESPLANADE SC500 4X1L BOT AU'},
+  {envuCode: '86282178', gpCode: 'ESPLANADE1', name: 'ESPLANADE SC500 4X1L BOT AU'},
   {envuCode: '87284603', gpCode: 'NA', name: 'ESPLANADE SC500 4X5L BOT AU'},
   {envuCode: '85767097', gpCode: 'NA', name: 'EXTERIS STRESSGARD TURF SC25 4X5L BOT AU'},
   {envuCode: '86720930', gpCode: 'NA', name: 'INDEMNIFY TURF NEMT SC400 4X500ML BOT AU'},
