@@ -296,7 +296,11 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ON a.UOMSCHDL = u.UOMSCHDL
 
   -- Get specs
-  LEFT JOIN [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] as p WITH (NOLOCK)
+  LEFT JOIN (
+    SELECT Product, PalletQty, PalletHeight, PackWeight, PackQty, CustomUom, ROW_NUMBER() OVER(PARTITION BY Product ORDER BY Product DESC) rn
+    FROM [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] WITH (NOLOCK)
+    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  ) p
   ON a.ITEMNMBR = p.Product
 
   -- get ITTs
@@ -381,6 +385,7 @@ export function getItems(branch: string, itemNumbers: Array<string>, searchTerm:
   ON a.ITEMNMBR = g.ITEMNMBR
 
   WHERE b.LOCNCODE = @branch
+  AND (rn = 1 OR rn IS NULL)
   `;
   if (itemNumbers && itemNumbers.length > 0) {
     const itemList = itemNumbers.map(_ => `${_}`).join(',');
