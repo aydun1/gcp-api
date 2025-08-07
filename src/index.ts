@@ -18,6 +18,7 @@ import { adConfig, chemListKeyHash, definitivConfig, palletKeyHash, sqlConfig, w
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
 import { Comment } from './types/comment';
+import { RapidBody } from './types/rapidBody';
 import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 import { updatePalletsBc } from './services/bc.service';
 import { handleDefinitiveEvent, handleRapidEvent } from './services/timesheets.service';
@@ -637,16 +638,13 @@ app.post('/definitiv/webhook/subscriber/events/:event', verifyDefinitivMessage, 
 });
 
 app.post('/rapid/webhook/subscriber/events', (req, res) => {
-  const params = req.params;
-  console.log(req)
-  console.log(req.params);
-  //const eventName = params['event'];
-  //handleRapidEvent(eventName).then(_ => {
-  //  res.status(200).send(_);
-  //}).catch((err: {code: number, message: string}) => {
-  //  console.log(err);
-  //  return res.status(err.code || 404).send(``);
-  //});
+  const body = req.body as RapidBody;
+  handleRapidEvent(body).then(_ => {
+    res.status(200).send(_);
+  }).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 404).send(``);
+  });
   res.status(200).send('');
 });
 

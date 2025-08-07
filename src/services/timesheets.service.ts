@@ -4,6 +4,7 @@ import { AuthRes } from '../types/auth-res';
 import { rapidConfig } from '../config';
 import { Inductee } from '../types/inductee';
 import { Employee } from '../types/employee';
+import { RapidBody } from '../types/rapidBody';
 
 let authRes!: AuthRes;
 let authDate!: Date;
@@ -106,16 +107,19 @@ export async function handleDefinitiveEvent(body: any, eventName: string): Promi
   }
 }
 
-export async function handleRapidEvent(eventName: string): Promise<any> {
-  console.log('Rapid event received.')
+export async function handleRapidEvent(body: RapidBody): Promise<any> {
+  console.log('Rapid event received.');
+  console.log(body.users[0]);
+  const eventName = body.event.topic;
+  const email = body.profile.email;
   switch (eventName) {
-    case 'EmployeeSignIn':
+    case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
       break;
-    case 'EmployeeSignOut':
+    case 'CHECKIN_EXITED':
       console.log('Employee signed out');
       break;
     default:
-      throw new Error(`The Rapid event, ${eventName}, is not supported.`);
+      console.log(`The Rapid event, ${eventName}, is not supported.`);
   }
 }
