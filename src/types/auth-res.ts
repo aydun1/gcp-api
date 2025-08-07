@@ -1,4 +1,4 @@
-export interface EnvuAuth {
+export interface AuthRes {
   access_token: string;
   scope: string;
   expires_in: number;

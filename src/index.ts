@@ -8,17 +8,19 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import passport from 'passport';
 import compression from 'compression';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 import { getCustomer, getCustomerAddresses, getCustomers, getHistory, getInTransitTransfer, getInTransitTransfers, getItems, getOrders, updatePallets, writeInTransitTransferFile, getOrdersByLine, getOrderLines, getVendorAddresses, getVendors, getDeliveries, addDelivery, updateDelivery, removeDelivery, getProduction, updateAttachmentCount, addComment, getComments, getProductionSchedule } from './services/gp.service';
 import { addNonInventoryChemical, getBasicChemicalInfo, getChemicals, getChemicalsOnRun, getMaterialsInFolder, getNonInventoryChemicals, getSdsPdf, getSyncedChemicals, linkChemical, removeNonInventoryChemical, unlinkChemical, updateNonInventoryChemicalQuantity, updateSDS } from './services/chemical.service';
 import { sendChemicalSalesToEnvu } from './services/envu.service';
 import { runShellCmd } from './services/helper.service';
-import { adConfig, chemListKeyHash, palletKeyHash, sqlConfig, webConfig } from './config';
+import { adConfig, chemListKeyHash, definitivConfig, palletKeyHash, sqlConfig, webConfig } from './config';
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
 import { Comment } from './types/comment';
 import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 import { updatePalletsBc } from './services/bc.service';
+import { handleDefinitiveEvent, handleRapidEvent } from './services/timesheets.service';
 
 interface Body {
   customer: string;
@@ -85,6 +87,23 @@ function verifyChemicalListToken(req: Request, res: Response, next: NextFunction
   const params = req.query;
   const bearerToken = params['key'] as string || '';
   const matched = compareSync(bearerToken, chemListKeyHash);
+  if (!matched) res.sendStatus(401);
+  next();
+}
+
+function verifyDefinitivMessage(req: Request, res: Response, next: NextFunction): void {
+  const definitivSignature = Buffer.from((req.headers['definitiv-signature'] as string)?.replace('sha256=', ''));
+  const hash = createHmac('sha256', definitivConfig.verificationSecret).update(req.body);
+  const matched = timingSafeEqual(hash.digest(), definitivSignature);
+  if (!matched) res.sendStatus(401);
+  next();
+}
+
+// TODO
+function verifyRapidMessage(req: Request, res: Response, next: NextFunction): void {
+  const definitivSignature = Buffer.from((req.headers['definitiv-signature'] as string)?.replace('sha256=', ''));
+  const hash = createHmac('sha256', definitivConfig.verificationSecret).update(req.body);
+  const matched = timingSafeEqual(hash.digest(), definitivSignature);
   if (!matched) res.sendStatus(401);
   next();
 }
@@ -604,6 +623,31 @@ app.get('/public/chemical-sales', (req, res) => {
     console.log(err);
     return res.status(err.code || 404).send(``);
   });
+});
+
+app.post('/definitiv/webhook/subscriber/events/:event', verifyDefinitivMessage, (req, res) => {
+  const params = req.params;
+  const eventName = params['event'];
+  handleDefinitiveEvent(req.body, eventName).then(_ => {
+    res.status(200).send(_);
+  }).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 404).send(``);
+  });
+});
+
+app.post('/rapid/webhook/subscriber/events', (req, res) => {
+  const params = req.params;
+  console.log(req)
+  console.log(req.params);
+  //const eventName = params['event'];
+  //handleRapidEvent(eventName).then(_ => {
+  //  res.status(200).send(_);
+  //}).catch((err: {code: number, message: string}) => {
+  //  console.log(err);
+  //  return res.status(err.code || 404).send(``);
+  //});
+  res.status(200).send('');
 });
 
 connect(sqlConfig, err => {

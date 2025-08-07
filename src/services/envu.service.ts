@@ -1,7 +1,7 @@
 import { Request as sqlRequest } from 'mssql';
 import axios from 'axios';
 
-import { EnvuAuth } from '../types/envu-auth';
+import { AuthRes } from '../types/auth-res';
 import { EnvuSale } from '../types/envu-sale';
 import { EnvuReceipt } from '../types/envu-receipt';
 import { EnvuQuery } from '../types/envu-query';
@@ -9,7 +9,7 @@ import { EnvuTransfer } from '../types/envu-transfer';
 import { envuConfig } from '../config';
 import { locations, products } from '../definitions';
 
-let authRes!: EnvuAuth;
+let authRes!: AuthRes;
 let authDate!: Date;
 
 function dateString(): string {
@@ -29,7 +29,7 @@ async function getAccessToken(): Promise<void> {
     const grant_type = 'client_credentials'
     const headers = {'Content-Type': 'application/json'};
     const body = {client_id: envuConfig.clientId, client_secret: envuConfig.clientSecret, grant_type};
-    const res = await axios.post<EnvuAuth>(envuConfig.authEndpoint, body, {headers});
+    const res = await axios.post<AuthRes>(envuConfig.authEndpoint, body, {headers});
     if (res.status !== 200 || res.data.error) throw new Error(res.data.error_description);
     authDate = new Date();
     authRes = res.data;
@@ -46,7 +46,7 @@ async function sendDocument(data: {key: string, lines: EnvuSale[] | EnvuReceipt[
   const Authorization = authRes.access_token;
   const headers = {'Content-Type': 'application/json', pn_source, pn_messagetype, Authorization: `Bearer ${Authorization}`};
   try {
-    const res = await axios.post<EnvuAuth>(envuConfig.sendEndpoint, data, {headers});
+    const res = await axios.post<{data: any}>(envuConfig.sendEndpoint, data, {headers});
     console.log(`Sending data: ${data.length} ${pn_messagetype}s sent`)
     return res.data;
   } catch (error: any) {
@@ -244,7 +244,7 @@ function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
   });
 }
 
-async function newSaveToDb(result: EnvuQuery[]): Promise<any> {
+async function newSaveToDb(result: EnvuQuery[]): Promise<string | void> {
   console.log('Saving data');
   const v = result.map(l => `('Envu',${l.DOCTYPE},'${l.DOCNUMBR}','${l.DOCDATE.toISOString().slice(0, 19).replace('T', ' ')}','${new Date().toISOString().slice(0, 19).replace('T', ' ')}','${l.ITEMNMBR}',${l.LNSEQNBR},${l.TRXQTY},'${l.TRXLOCTN}',${l.QTYFULFI * l.QTYBSUOM})`);
   const insertQuery = `
@@ -254,7 +254,7 @@ async function newSaveToDb(result: EnvuQuery[]): Promise<any> {
   return v.length > 0 ? await new sqlRequest().query(insertQuery).then(() => console.log('Saving data: done')) : '';
 }
 
-export async function sendChemicalSalesToEnvu() {
+export async function sendChemicalSalesToEnvu(): Promise<{[key: string]: any}> {
   console.log('Starting envu sales update');
   await getAccessToken();
   const shouldSend = true;

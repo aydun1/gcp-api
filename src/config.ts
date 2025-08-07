@@ -39,6 +39,18 @@ export const envuConfig = {
   sendEndpoint: process.env.ENVU_SEND_ENDPOINT || ''
 }
 
+export const rapidConfig = {
+  authEndpoint: process.env.RAPID_AUTH_ENDPOINT || '',
+  username: process.env.RAPID_USERNAME,
+  password: process.env.RAPID_PASSWORD,
+  sendEndpoint: process.env.RAPID_SEND_ENDPOINT || ''
+}
+
+export const definitivConfig = {
+  verificationSecret: process.env.DEFINITIV_VERIFICATION_SECRET || ''
+}
+
+
 export const webConfig = {
   ip: '0.0.0.0',
   port: process.env.PORT || '3000',
