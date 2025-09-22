@@ -18,10 +18,10 @@ import { adConfig, chemListKeyHash, definitivConfig, palletKeyHash, sqlConfig, w
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
 import { Comment } from './types/comment';
-import { RapidBody } from './types/rapidBody';
+import { RapidBody } from './types/rapid-body';
 import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 import { updatePalletsBc } from './services/bc.service';
-import { handleDefinitiveEvent, handleRapidEvent } from './services/timesheets.service';
+import { handleDefinitivEvent, handleRapidEvent, testEvent } from './services/timesheets.service';
 
 interface Body {
   customer: string;
@@ -647,6 +647,16 @@ app.post('/rapid/webhook/subscriber/events', (req, res) => {
   });
   res.status(200).send('');
 });
+
+app.get('/rapid/webhook/subscriber/events', (req, res) => {
+  testEvent().then(_ => {
+    res.status(200).send(_);
+  }).catch((err: {code: number, message: string}) => {
+    console.log(err);
+    return res.status(err.code || 404).send(``);
+  });
+});
+
 
 connect(sqlConfig, err => {
   if (err) {
