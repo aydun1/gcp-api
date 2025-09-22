@@ -94,7 +94,7 @@ function verifyChemicalListToken(req: Request, res: Response, next: NextFunction
 
 function verifyDefinitivMessage(req: Request, res: Response, next: NextFunction): void {
   const definitivSignature = Buffer.from((req.headers['definitiv-signature'] as string)?.replace('sha256=', ''));
-  const hash = createHmac('sha256', definitivConfig.verificationSecret).update(req.body);
+  const hash = createHmac('sha256', definitivConfig.apiKey).update(req.body);
   const matched = timingSafeEqual(hash.digest(), definitivSignature);
   if (!matched) res.sendStatus(401);
   next();
@@ -103,7 +103,7 @@ function verifyDefinitivMessage(req: Request, res: Response, next: NextFunction)
 // TODO
 function verifyRapidMessage(req: Request, res: Response, next: NextFunction): void {
   const definitivSignature = Buffer.from((req.headers['definitiv-signature'] as string)?.replace('sha256=', ''));
-  const hash = createHmac('sha256', definitivConfig.verificationSecret).update(req.body);
+  const hash = createHmac('sha256', definitivConfig.apiKey).update(req.body);
   const matched = timingSafeEqual(hash.digest(), definitivSignature);
   if (!matched) res.sendStatus(401);
   next();
@@ -629,7 +629,7 @@ app.get('/public/chemical-sales', (req, res) => {
 app.post('/definitiv/webhook/subscriber/events/:event', verifyDefinitivMessage, (req, res) => {
   const params = req.params;
   const eventName = params['event'];
-  handleDefinitiveEvent(req.body, eventName).then(_ => {
+  handleDefinitivEvent(req.body, eventName).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);

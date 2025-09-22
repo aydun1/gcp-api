@@ -187,23 +187,21 @@ export async function handleDefinitivEvent(body: any, eventName: string): Promis
   }
 }
 
-
-
 export async function testEvent(): Promise<any> {
-  await getEmployeesDefinitiv();
+  await getEmployeeDefinitiv('', '');
   //await createEmployeeDefinitiv();
 }
-
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
   console.log('Rapid event received.');
   const eventName = body.event.topic;
   const email = body.profile.email;
   const name = body.profile.name;
-  console.log(body.profile)
+  console.log(body)
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
+      //getEmployeeDefinitiv();
       //TODO - Clock user into Definitiv
       break;
     case 'CHECKIN_EXITED':
