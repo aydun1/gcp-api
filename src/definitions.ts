@@ -6,6 +6,12 @@ export const locations = [
   {envuCode: 'AUC-GCP005', gpCode: 'WA', address1: '2 Turley Street', city: 'Forrestdale', state: 'Western Australia', postcode: '6112', countryCode: 'AU'}
 ];
 
+export const companies = [
+  {orgId: '735f7d6d-f6b1-4f95-9ede-77cb17264cc9', name: 'Garden City Plastics'},
+  {orgId: 'c06d598d-de9e-49bc-808d-22093441badd', name: 'King Island Dairy'},
+  {orgId: 'fe87ad64-0e8c-4fd0-8ced-998615ac73ae', name: 'Olympus Cheese'}
+];
+
 export const products = [
   {envuCode: '84504815', gpCode: 'BANOL1', name: 'BANOL (SL) SL722 12X1L BOT AU'},
   {envuCode: '84487031', gpCode: 'DEDIC1', name: 'DEDICATE (SL) SC300 12X1L BOT AU'},

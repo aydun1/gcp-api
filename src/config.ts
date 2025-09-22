@@ -47,7 +47,8 @@ export const rapidConfig = {
 }
 
 export const definitivConfig = {
-  verificationSecret: process.env.DEFINITIV_VERIFICATION_SECRET || ''
+  endpoint: process.env.DEFINITIV_ENDPOINT || '',
+  apiKey: process.env.DEFINITIV_API_KEY || ''
 }
 
 
