@@ -1,13 +1,21 @@
 import axios from 'axios';
 
 import { AuthRes } from '../types/auth-res';
-import { rapidConfig } from '../config';
+import { definitivConfig, rapidConfig } from '../config';
 import { Inductee } from '../types/inductee';
 import { Employee } from '../types/employee';
-import { RapidBody } from '../types/rapidBody';
+import { RapidBody } from '../types/rapid-body';
+import { DefinitiveOrg } from '../types/definitiv-org';
+import { DefinitiveEmployee } from '../types/definitiv-employee';
 
 let authRes!: AuthRes;
 let authDate!: Date;
+
+const definitiveHeaders = {
+  'Content-Type': 'application/json',
+  Authorization: 'Basic '+ Buffer.from(definitivConfig.apiKey + ':').toString('base64')
+};
+
 
 async function getAccessTokenRapid(): Promise<void> {
   console.log('Getting auth token for Rapid')
@@ -75,7 +83,79 @@ async function updateInducteeRapid(id: number, firstName: string, lastName: stri
   }
 }
 
-export async function handleDefinitiveEvent(body: any, eventName: string): Promise<any> {
+
+
+
+async function getOrgsDefinitiv() {
+  const url = `${definitivConfig.endpoint}/api/admin/organizations`;
+  try {
+    const res = await axios.get<{data: DefinitiveOrg}>(url, {headers: definitiveHeaders});
+    console.log(res.data)
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+  }
+}
+
+async function getEmployeeDefinitiv(employeeName: string, orgId: string) {
+  const staffMember = (await getEmployeesDefinitiv(orgId)).data.filter(_ => _.name === employeeName);
+}
+
+async function getEmployeesDefinitiv(orgId: string): Promise<{data: DefinitiveEmployee[]}> {
+  const url =  `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
+  try {
+    const res = await axios.get<{data: DefinitiveEmployee[]}>(url, {headers: definitiveHeaders});
+    console.log(res.data);
+    return res;
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return error;
+  }
+}
+
+async function createEmployeeDefinitiv(): Promise<void> {
+  const url =  `${definitivConfig.endpoint}/api/employees`;
+  const body = {
+    organizationId: '735f7d6d-f6b1-4f95-9ede-77cb17264cc9',
+    sendInvitationEmail: true,
+    title: 'Mr',
+    gender: 'Male',
+    firstName: 'First',
+    middleName: 'Mid',
+    surname: 'Lastname',
+    preferredName: 'Lasty',
+    dateOfBirth: '2001-05-22',
+    hireDate: '2023-06-19',
+    // payCalendarId: 'bab9438c-1871-45e4-93b1-473fd32daa32',
+    // positionId: '18537979-ac3d-a2c8-1744-ce7cd04345a6',
+    primaryEmail: 'john.smith2@mailinator.com',
+    customFields:
+    [
+      {name: 'medicalCondition', value:'Asthma'}
+    ]
+  };
+  try {
+    const a = await axios.post<{data: any}>(url, {headers: definitiveHeaders, body});
+    console.log(a.data)
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return;
+  }
+}
+
+async function createTimesheetDefinitiv() {
+  const url =  `${definitivConfig.endpoint}/api/timesheets`;
+  const body = {
+  };
+  try {
+    const a = await axios.post<{data: any}>(url, {headers: definitiveHeaders, body});
+    console.log(a.data)
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return;
+  }
+}
+
+export async function handleDefinitivEvent(body: any, eventName: string): Promise<any> {
   console.log('Definitiv event received.')
   let employee: Employee;
   let inductee: Inductee | undefined;
@@ -107,17 +187,28 @@ export async function handleDefinitiveEvent(body: any, eventName: string): Promi
   }
 }
 
+
+
+export async function testEvent(): Promise<any> {
+  await getEmployeesDefinitiv();
+  //await createEmployeeDefinitiv();
+}
+
+
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
   console.log('Rapid event received.');
-  console.log(body.users[0]);
   const eventName = body.event.topic;
   const email = body.profile.email;
+  const name = body.profile.name;
+  console.log(body.profile)
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
+      //TODO - Clock user into Definitiv
       break;
     case 'CHECKIN_EXITED':
       console.log('Employee signed out');
+      //TODO - Clock user out of Difinitiv
       break;
     default:
       console.log(`The Rapid event, ${eventName}, is not supported.`);
