@@ -197,14 +197,14 @@ export async function testEvent(): Promise<any> {
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
   console.log('Rapid event received.');
-  if (!body.event) return Promise.resolve('Not a Rapid event.');
+  if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
   const eventName = body.event.topic;
   const name = body.profile.name;
   const email = body.profile.email;
   const orgId = companies.find(_ => _.emailDomain === email.split('@')[1])?.orgId || '';
-  if (!orgId) return Promise.resolve('Not an employee. Nothing to do.');
+  if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
-  if (!employee) return Promise.resolve('Unable to match to an employee in Definitiv.');
+  if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
   console.log('Employee Id:', employee.employeeId);
   const entryTime = new Date(body.event.data.entry?.timestamp || '');
   const exitTime = new Date(body.event.data.exit?.timestamp || '');
@@ -219,6 +219,6 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
       console.log('Exit:', exitTime);
       break;
     default:
-      console.log(`The Rapid event, ${eventName}, is not supported.`);
+      return Promise.reject({code: 200, message: `The Rapid event, ${eventName}, is not supported.`});
   }
 }

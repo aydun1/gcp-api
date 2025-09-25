@@ -642,7 +642,7 @@ app.post('/rapid/webhook/subscriber/events', (req, res) => {
   handleRapidEvent(body).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
-    console.log(err);
+    console.log(err?.message || err);
     return res.status(err.code || 404).send(``);
   });
   res.status(200).send('');
@@ -652,7 +652,7 @@ app.get('/rapid/webhook/subscriber/events', (req, res) => {
   handleRapidEvent(req.body).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
-    console.log(err);
+    console.log(err?.message || err);
     return res.status(err.code || 404).send(``);
   });
 });
@@ -666,3 +666,71 @@ connect(sqlConfig, err => {
     console.log(`server started at http://localhost:${webConfig.port}`);
   });
 });
+
+
+const checkinBody = {
+  config: {},
+  location: {
+    id: 'f80201db-883f-4af5-9bf2-2506cd3a03ef',
+    name: 'Stapylton',
+    timezone: 'Australia/Brisbane',
+    hubIds: [],
+    dateCreated: '2025-09-15T02:13:47.909Z',
+    lastUpdated: '2025-09-15T02:13:47.909Z'
+  },
+  users: [
+    {
+      name: 'wayne.wickens@gardencityplastics.com',
+      email: 'wayne.wickens@gardencityplastics.com',
+      dateCreated: '2025-06-12T00:47:47.444Z',
+      lastUpdated: '2025-06-12T00:48:13.048Z'
+    },
+    {
+      name: 'sunee.bam@gardencityplastics.com',
+      email: 'sunee.bam@gardencityplastics.com',
+      dateCreated: '2025-06-12T00:48:07.608Z',
+      lastUpdated: '2025-06-12T00:48:19.311Z'
+    },
+    {
+      name: "Aidan O'Brien",
+      email: 'aidan.obrien@gardencityplastics.com',
+      dateCreated: '2025-08-06T05:31:32.678Z',
+      lastUpdated: '2025-08-06T05:31:41.161Z'
+    }
+  ],
+  profile: {
+    id: 'ec11a943-0e01-423e-b0a4-ceb7b1ea8668',
+    name: "Peter Constable",
+    email: 'peter.constable@kingislanddairy.com',
+    phone: '+61415419822',
+    metadata: [],
+    dateCreated: '2025-08-07T05:31:59.958Z',
+    lastUpdated: '2025-08-07T05:33:07.955Z'
+  },
+  labels: [
+    {
+      id: 'e676fe47-178d-4300-91a6-fd8889081c40',
+      name: 'Visitor',
+      color: 'BLUE',
+      dateCreated: '2025-05-29T05:55:02.521Z',
+      lastUpdated: '2025-09-19T06:02:02.647Z'
+    }
+  ],
+  event: {
+    id: 'a277779e-0e5f-4b78-93ab-19d5948b18ae',
+    topic: 'CHECKIN_EXITED',
+    version: 1,
+    companyId: 464,
+    timestamp: '2025-09-22T05:15:00.471Z',
+    serverTimestamp: '2025-09-22T05:14:13.999Z',
+    data: {
+      id: 'b7e3a613-83d1-4209-90e9-54caa4ff824b',
+      locationId: 'f80201db-883f-4af5-9bf2-2506cd3a03ef',
+      created: '2025-09-22T05:15:00.471Z',
+      status: 'OUT',
+      identityId: 'ec11a943-0e01-423e-b0a4-ceb7b1ea8668',
+    }
+  },
+  webhookId: '67cce9d2-0a6d-4d5b-a1e4-1cbf2a776325',
+  alternativeProfiles: []
+} as unknown as RapidBody;
