@@ -110,7 +110,7 @@ async function getEmployeesDefinitiv(orgId: string): Promise<DefinitiveEmployee[
     const res = await axios.get<{data: DefinitiveEmployee[]}>(url, {headers: definitiveHeaders});
     return res.data as unknown as DefinitiveEmployee[];
   } catch (error: any) {
-    console.log(error.response.status, error.response.statusText);
+    error.response ? console.log(error.response.status, error.response.statusText) : console.log(error);
     return error;
   }
 }
@@ -197,6 +197,7 @@ export async function testEvent(): Promise<any> {
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
   console.log('Rapid event received.');
+  if (!body.event) return Promise.resolve('Not a Rapid event.');
   const eventName = body.event.topic;
   const name = body.profile.name;
   const email = body.profile.email;
@@ -206,7 +207,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!employee) return Promise.resolve('Unable to match to an employee in Definitiv.');
 
   console.log('Employee Id:', employee.employeeId);
-  
+
   console.log('Entry:')
   console.log(body.event.data.entry);
 
