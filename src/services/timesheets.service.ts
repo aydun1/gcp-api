@@ -206,8 +206,8 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.resolve('Unable to match to an employee in Definitiv.');
   console.log('Employee Id:', employee.employeeId);
-  const entryTime = new Date(body.event.data.entry.timestamp);
-  const exitTime = new Date(body.event.data.exit.timestamp);
+  const entryTime = new Date(body.event.data.entry?.timestamp || '');
+  const exitTime = new Date(body.event.data.exit?.timestamp || '');
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');

@@ -30,8 +30,8 @@ export interface RapidBody {
       id: string;
       locationId: string;
       created: string;
-      entry: {source: string; timestamp: string};
-      exit: {source: string; timestamp: string};
+      entry?: {source: string; timestamp: string};
+      exit?: {source: string; timestamp: string};
       status: string;
       identityId: string;
       breaks: Array<any>;
