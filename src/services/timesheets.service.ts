@@ -104,7 +104,7 @@ async function getEmployeeDefinitiv(employeeName: string, orgId: string): Promis
 }
 
 async function getEmployeesDefinitiv(orgId: string): Promise<DefinitiveEmployee[]> {
-  console.log(orgId)
+  console.log('Company Id:', orgId)
   const url =  `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
   try {
     const res = await axios.get<{data: DefinitiveEmployee[]}>(url, {headers: definitiveHeaders});
@@ -205,27 +205,18 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!orgId) return Promise.resolve('Not an employee. Nothing to do.');
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.resolve('Unable to match to an employee in Definitiv.');
-
   console.log('Employee Id:', employee.employeeId);
-
-  console.log('Entry:')
-  console.log(body.event.data.entry);
-
-  console.log('Exit:')
-  console.log(body.event.data.exit);
-
-  console.log('Breaks:')
-  console.log(body.event.data.breaks);
-
+  const entryTime = new Date(body.event.data.entry.timestamp);
+  const exitTime = new Date(body.event.data.exit.timestamp);
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
-      //getEmployeeDefinitiv();
-      //TODO - Clock user into Definitiv
+      console.log('Entry:', entryTime);
       break;
     case 'CHECKIN_EXITED':
       console.log('Employee signed out');
-      //TODO - Clock user out of Difinitiv
+      console.log('Entry:', entryTime);
+      console.log('Exit:', exitTime);
       break;
     default:
       console.log(`The Rapid event, ${eventName}, is not supported.`);
