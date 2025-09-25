@@ -1,6 +1,5 @@
 export interface RapidBody {
-  config: {
-  }
+  config: {}
   location: {
     id: string;
     name: string;
@@ -9,7 +8,7 @@ export interface RapidBody {
     dateCreated: string;
     lastUpdated: string;
   }
-  users: Array<any>;
+  users: Array<{name: string; email: string; dateCreated: string; lastUpdated: string;}>;
   profile: {
     id: string;
     name: string;
@@ -19,7 +18,7 @@ export interface RapidBody {
     dateCreated: string;
     lastUpdated: string;
   }
-  labels: Array<any>;
+  labels: Array<{id: string; name: string; color: string; dateCreated: string; lastUpdated: string;}>;
   event: {
     id: string;
     topic: string;
@@ -27,7 +26,16 @@ export interface RapidBody {
     companyId: number;
     timestamp: string;
     serverTimestamp: string;
-    data: Array<any>;
+    data: {
+      id: string;
+      locationId: string;
+      created: string;
+      entry: Array<any>;
+      exit: Array<any>;
+      status: string;
+      identityId: string;
+      breaks: Array<any>;
+    }
   }
   webhookId: string;
   alternativeProfiles: Array<any>;

@@ -7,6 +7,7 @@ import { Employee } from '../types/employee';
 import { RapidBody } from '../types/rapid-body';
 import { DefinitiveOrg } from '../types/definitiv-org';
 import { DefinitiveEmployee } from '../types/definitiv-employee';
+import { companies } from '../definitions';
 
 let authRes!: AuthRes;
 let authDate!: Date;
@@ -96,16 +97,18 @@ async function getOrgsDefinitiv() {
   }
 }
 
-async function getEmployeeDefinitiv(employeeName: string, orgId: string) {
-  const staffMember = (await getEmployeesDefinitiv(orgId)).data.filter(_ => _.name === employeeName);
+async function getEmployeeDefinitiv(employeeName: string, orgId: string): Promise<DefinitiveEmployee | undefined>{
+  return getEmployeesDefinitiv(orgId).then(
+    _ => _.find(_ => _.name === employeeName)
+  )
 }
 
-async function getEmployeesDefinitiv(orgId: string): Promise<{data: DefinitiveEmployee[]}> {
+async function getEmployeesDefinitiv(orgId: string): Promise<DefinitiveEmployee[]> {
+  console.log(orgId)
   const url =  `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
   try {
     const res = await axios.get<{data: DefinitiveEmployee[]}>(url, {headers: definitiveHeaders});
-    console.log(res.data);
-    return res;
+    return res.data as unknown as DefinitiveEmployee[];
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
     return error;
@@ -195,9 +198,24 @@ export async function testEvent(): Promise<any> {
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
   console.log('Rapid event received.');
   const eventName = body.event.topic;
-  const email = body.profile.email;
   const name = body.profile.name;
-  console.log(body)
+  const email = body.profile.email;
+  const orgId = companies.find(_ => _.emailDomain === email.split('@')[1])?.orgId || '';
+  if (!orgId) return Promise.resolve('Not an employee. Nothing to do.');
+  const employee = await getEmployeeDefinitiv(name, orgId);
+  if (!employee) return Promise.resolve('Unable to match to an employee in Definitiv.');
+
+  console.log('Employee Id:', employee.employeeId);
+  
+  console.log('Entry:')
+  console.log(body.event.data.entry);
+
+  console.log('Exit:')
+  console.log(body.event.data.exit);
+
+  console.log('Breaks:')
+  console.log(body.event.data.breaks);
+
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');

@@ -649,7 +649,7 @@ app.post('/rapid/webhook/subscriber/events', (req, res) => {
 });
 
 app.get('/rapid/webhook/subscriber/events', (req, res) => {
-  testEvent().then(_ => {
+  handleRapidEvent(req.body).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);

@@ -7,9 +7,9 @@ export const locations = [
 ];
 
 export const companies = [
-  {orgId: '735f7d6d-f6b1-4f95-9ede-77cb17264cc9', name: 'Garden City Plastics'},
-  {orgId: 'c06d598d-de9e-49bc-808d-22093441badd', name: 'King Island Dairy'},
-  {orgId: 'fe87ad64-0e8c-4fd0-8ced-998615ac73ae', name: 'Olympus Cheese'}
+  {orgId: '735f7d6d-f6b1-4f95-9ede-77cb17264cc9', name: 'Garden City Plastics', emailDomain: 'gardencityplastics.com'},
+  {orgId: 'c06d598d-de9e-49bc-808d-22093441badd', name: 'King Island Dairy', emailDomain: 'kingislanddairy.com'},
+  {orgId: 'fe87ad64-0e8c-4fd0-8ced-998615ac73ae', name: 'Olympus Cheese', emailDomain: 'olympuscheese.com.au'}
 ];
 
 export const products = [
