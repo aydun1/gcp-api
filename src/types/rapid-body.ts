@@ -1,7 +1,9 @@
+import { UUID } from 'crypto';
+
 export interface RapidBody {
   config: {}
   location: {
-    id: string;
+    id: UUID;
     name: string;
     timezone: string;
     hubIds: Array<any>;
@@ -10,7 +12,7 @@ export interface RapidBody {
   }
   users: Array<{name: string; email: string; dateCreated: string; lastUpdated: string;}>;
   profile: {
-    id: string;
+    id: UUID;
     name: string;
     email: string;
     phone: string;
@@ -27,16 +29,16 @@ export interface RapidBody {
     timestamp: string;
     serverTimestamp: string;
     data: {
-      id: string;
-      locationId: string;
+      id: UUID;
+      locationId: UUID;
       created: string;
       entry?: {source: string; timestamp: string};
       exit?: {source: string; timestamp: string};
       status: string;
-      identityId: string;
+      identityId: UUID;
       breaks: Array<any>;
     }
   }
-  webhookId: string;
+  webhookId: UUID;
   alternativeProfiles: Array<any>;
 }

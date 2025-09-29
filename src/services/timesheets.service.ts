@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Request as sqlRequest, TYPES } from 'mssql';
 
 import { AuthRes } from '../types/auth-res';
 import { definitivConfig, rapidConfig } from '../config';
@@ -195,6 +196,24 @@ export async function testEvent(): Promise<any> {
   //await createEmployeeDefinitiv();
 }
 
+function addToLocalDb(employee: DefinitiveEmployee, event: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
+    const request = new sqlRequest();
+    const insertQuery = `
+    INSERT INTO [IMS].[dbo].Deliveries (CustomerName,CustomerNumber,City,State,PostCode,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,RequestedDate,Attachments)
+    VALUES (@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@RequestedDate,@Attachments);
+    `;
+    request.input('Created', TYPES.DateTime, new Date());
+    request.input('EventId', TYPES.UniqueIdentifier, event.event.id);
+    request.input('EventName', TYPES.VarChar(35), event.event.topic);
+    request.input('EntryTime', TYPES.DateTime, checkIn);
+    request.input('ExitTime', TYPES.DateTime, checkOut);
+    request.input('Name', TYPES.VarChar(35), employee.name);
+    request.input('Email', TYPES.VarChar(35), event.profile.email);
+    request.input('Company', TYPES.VarChar(35), employee.organizationName);
+    request.input('CompanyId', TYPES.VarChar(35), employee.organizationId);
+
+}
+
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
   console.log('Rapid event received.');
   if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
@@ -206,9 +225,14 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
-  console.log('Employee Id:', employee.employeeId);
-  const entryTime = new Date(body.event.data.entry?.timestamp || '');
-  const exitTime = new Date(body.event.data.exit?.timestamp || '');
+  console.log(employee);
+  const entryTime = body.event.data.entry?.timestamp ? new Date(body.event.data.entry.timestamp) : undefined;
+  const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
+
+
+
+
+
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
