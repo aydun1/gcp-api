@@ -201,6 +201,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const eventName = body.event.topic;
   const name = body.profile.name;
   const email = body.profile.email;
+  if (!email) return Promise.reject({code: 200, message: 'User doesn\'t have an email address.'});
   const orgId = companies.find(_ => _.emailDomain === email.split('@')[1])?.orgId || '';
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
