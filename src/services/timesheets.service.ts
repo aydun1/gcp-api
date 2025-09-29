@@ -207,7 +207,7 @@ async function addToLocalDb(employee: DefinitiveEmployee, body: RapidBody, check
     request.input('EventName', TYPES.NChar(20), body.event.topic);
     request.input('EntryTime', TYPES.DateTime, checkIn);
     request.input('ExitTime', TYPES.DateTime, checkOut);
-    request.input('EmployeeId', TYPES.UniqueIdentifier, employee.name);
+    request.input('EmployeeId', TYPES.UniqueIdentifier, employee.employeeId);
     request.input('EmployeeName', TYPES.NVarChar(255), employee.name);
     request.input('EmployeeEmail', TYPES.NVarChar(255), body.profile.email);
     request.input('CompanyId', TYPES.UniqueIdentifier, employee.organizationId);
