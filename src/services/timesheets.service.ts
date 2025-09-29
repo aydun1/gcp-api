@@ -199,7 +199,7 @@ export async function testEvent(): Promise<any> {
 async function addToLocalDb(employee: DefinitiveEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
     const request = new sqlRequest();
     const insertQuery = `
-    INSERT INTO [IMS].[dbo].CheckIns (Created,EventId,City,EventName,EntryTime,ExitTime,EmployeeId,EmployeeName,EmployeeEmail,CompanyId,CompanyName)
+    INSERT INTO [IMS].[dbo].CheckIns (Created,EventId,EventName,EntryTime,ExitTime,EmployeeId,EmployeeName,EmployeeEmail,CompanyId,CompanyName)
     VALUES (@Created,@EventId,@EventName,@EntryTime,@ExitTime,@EmployeeId,@EmployeeName,@EmployeeEmail,@CompanyId,@CompanyName);
     `;
     request.input('Created', TYPES.DateTime, body.event.timestamp);

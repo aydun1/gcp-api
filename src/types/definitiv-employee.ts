@@ -1,7 +1,9 @@
+import { UUID } from 'crypto';
+
 export interface DefinitiveEmployee {
-  organizationId: string;
+  organizationId: UUID;
   organizationName: string;
-  employeeId: string;
+  employeeId: UUID;
   employeeFriendlyId: string;
   name: string;
   firstName: string;
