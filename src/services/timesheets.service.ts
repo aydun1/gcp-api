@@ -119,23 +119,6 @@ async function getEmployeesDefinitiv(orgId: string): Promise<DefinitiveEmployee[
 async function createEmployeeDefinitiv(): Promise<void> {
   const url =  `${definitivConfig.endpoint}/api/employees`;
   const body = {
-    organizationId: '735f7d6d-f6b1-4f95-9ede-77cb17264cc9',
-    sendInvitationEmail: true,
-    title: 'Mr',
-    gender: 'Male',
-    firstName: 'First',
-    middleName: 'Mid',
-    surname: 'Lastname',
-    preferredName: 'Lasty',
-    dateOfBirth: '2001-05-22',
-    hireDate: '2023-06-19',
-    // payCalendarId: 'bab9438c-1871-45e4-93b1-473fd32daa32',
-    // positionId: '18537979-ac3d-a2c8-1744-ce7cd04345a6',
-    primaryEmail: 'john.smith2@mailinator.com',
-    customFields:
-    [
-      {name: 'medicalCondition', value:'Asthma'}
-    ]
   };
   try {
     const a = await axios.post<{data: any}>(url, {headers: definitiveHeaders, body});
@@ -194,6 +177,7 @@ export async function handleDefinitivEvent(body: any, eventName: string): Promis
 export async function testEvent(): Promise<any> {
   await getEmployeeDefinitiv('', '');
   //await createEmployeeDefinitiv();
+  //await createTimesheetDefinitiv();
 }
 
 async function addToLocalDb(employee: DefinitiveEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
@@ -226,22 +210,19 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
-  console.log(employee);
   const entryTime = body.event.data.entry?.timestamp ? new Date(body.event.data.entry.timestamp) : undefined;
   const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
-
-
-  addToLocalDb(employee, body, entryTime, exitTime);
-
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
       console.log('Entry:', entryTime);
+      addToLocalDb(employee, body, entryTime, exitTime);
       break;
     case 'CHECKIN_EXITED':
       console.log('Employee signed out');
       console.log('Entry:', entryTime);
       console.log('Exit:', exitTime);
+      addToLocalDb(employee, body, entryTime, exitTime);
       break;
     default:
       return Promise.reject({code: 200, message: `The Rapid event, ${eventName}, is not supported.`});
