@@ -120,7 +120,7 @@ export async function updateAttachmentCount(sopNumber: string, id: number, creat
     request.input('DeliveryDate', TYPES.Date, order.reqShipDate);
     request.input('RequestedDate', TYPES.Date, order.reqShipDate);
     request.input('Attachments', TYPES.Int, increment ? 1 : attachments);
-    await request.query(insertQuery)
+    await request.query(insertQuery);
     return 'Created new entry and added attachment';
   } else {
     const updateQuery = `
@@ -817,7 +817,7 @@ export async function addDelivery(delivery: Delivery, userName: string, userEmai
   SELECT @id = SCOPE_IDENTITY();
   `;
 
-  const request = new sqlRequest()
+  const request = new sqlRequest();
   request.input('Run', TYPES.NVarChar(50), delivery.Run);
   request.input('Status', TYPES.VarChar(50), 'Active');
   request.input('CustomerName', TYPES.VarChar(65), delivery.CustomerName);
@@ -944,7 +944,7 @@ export async function addComment(deliveryId: number, comment: string, commenter:
   const getQuery = 'SELECT * FROM [IMS].[dbo].[Emails] WITH (NOLOCK) WHERE EmailType = \'runs\' AND Branch = @branch';
   new sqlRequest().input('branch', TYPES.NChar(15), delivery?.Branch).query(getQuery).then((_: IResult<{ToEmail: string}[]>) => {
     const emails = _.recordset.map(_ => _.ToEmail);
-    if (emails.length > 0) sendEmail(emails, 'Delivery comment', htmlMessage)
+    if (emails.length > 0) sendEmail(emails, 'Delivery comment', htmlMessage);
   });
   return comments;
 };
@@ -1021,7 +1021,7 @@ export async function getProductionSchedule(itemNmbr: string): Promise<{schedule
         remainingQty: runningJob?.remainingQty || s.SchedQty,
         remainingTime: runningJob?.remainingTime
       };
-    })
+    });
     return {schedule};
   });
 }

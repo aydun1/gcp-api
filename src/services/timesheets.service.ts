@@ -196,22 +196,23 @@ export async function testEvent(): Promise<any> {
   //await createEmployeeDefinitiv();
 }
 
-function addToLocalDb(employee: DefinitiveEmployee, event: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
+async function addToLocalDb(employee: DefinitiveEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
     const request = new sqlRequest();
     const insertQuery = `
-    INSERT INTO [IMS].[dbo].Deliveries (CustomerName,CustomerNumber,City,State,PostCode,Address,CustomerType,ContactPerson,DeliveryDate,OrderNumber,Spaces,Weight,PhoneNumber,Branch,Created,Creator,Notes,RequestedDate,Attachments)
-    VALUES (@CustomerName,@CustomerNumber,@City,@State,@PostCode,@Address,@CustomerType,@ContactPerson,@DeliveryDate,@OrderNumber,@Spaces,@Weight,@PhoneNumber,@Branch,@Created,@Creator,@Notes,@RequestedDate,@Attachments);
+    INSERT INTO [IMS].[dbo].CheckIns (Created,EventId,City,EventName,EntryTime,ExitTime,EmployeeId,EmployeeName,EmployeeEmail,CompanyId,CompanyName)
+    VALUES (@Created,@EventId,@EventName,@EntryTime,@ExitTime,@EmployeeId,@EmployeeName,@EmployeeEmail,@CompanyId,@CompanyName);
     `;
-    request.input('Created', TYPES.DateTime, new Date());
-    request.input('EventId', TYPES.UniqueIdentifier, event.event.id);
-    request.input('EventName', TYPES.VarChar(35), event.event.topic);
+    request.input('Created', TYPES.DateTime, body.event.timestamp);
+    request.input('EventId', TYPES.UniqueIdentifier, body.event.id);
+    request.input('EventName', TYPES.NChar(20), body.event.topic);
     request.input('EntryTime', TYPES.DateTime, checkIn);
     request.input('ExitTime', TYPES.DateTime, checkOut);
-    request.input('Name', TYPES.VarChar(35), employee.name);
-    request.input('Email', TYPES.VarChar(35), event.profile.email);
-    request.input('Company', TYPES.VarChar(35), employee.organizationName);
-    request.input('CompanyId', TYPES.VarChar(35), employee.organizationId);
-
+    request.input('EmployeeId', TYPES.UniqueIdentifier, employee.name);
+    request.input('EmployeeName', TYPES.NVarChar(255), employee.name);
+    request.input('EmployeeEmail', TYPES.NVarChar(255), body.profile.email);
+    request.input('CompanyId', TYPES.UniqueIdentifier, employee.organizationId);
+    request.input('CompanyName', TYPES.NChar(35), employee.organizationName);
+    await request.query(insertQuery);
 }
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
@@ -230,8 +231,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
 
 
-
-
+  addToLocalDb(employee, body, entryTime, exitTime);
 
   switch (eventName) {
     case 'CHECKIN_ENTERED':
