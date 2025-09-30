@@ -1,6 +1,6 @@
 import { UUID } from 'crypto';
 
-export interface DefinitiveEmployee {
+export interface DefinitivEmployee {
   organizationId: UUID;
   organizationName: string;
   employeeId: UUID;

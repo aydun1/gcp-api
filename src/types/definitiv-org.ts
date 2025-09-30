@@ -1,4 +1,4 @@
-export interface DefinitiveOrg {
+export interface DefinitivOrg {
   organizationName: string;
   organizationFriendlyId: string;
   organizationId: string;

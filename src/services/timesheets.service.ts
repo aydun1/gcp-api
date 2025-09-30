@@ -6,16 +6,18 @@ import { definitivConfig, rapidConfig } from '../config';
 import { Inductee } from '../types/inductee';
 import { Employee } from '../types/employee';
 import { RapidBody } from '../types/rapid-body';
-import { DefinitiveOrg } from '../types/definitiv-org';
-import { DefinitiveEmployee } from '../types/definitiv-employee';
+import { DefinitivOrg } from '../types/definitiv-org';
+import { DefinitivTimesheet } from '../types/definitiv-timesheet';
+import { DefinitivEmployee } from '../types/definitiv-employee';
 import { companies } from '../definitions';
+import { UUID } from 'crypto';
 
 let authRes!: AuthRes;
 let authDate!: Date;
 
-const definitiveHeaders = {
+const definitivHeaders = {
   'Content-Type': 'application/json',
-  Authorization: 'Basic '+ Buffer.from(definitivConfig.apiKey + ':').toString('base64')
+  'Authorization': 'Basic '+ Buffer.from(definitivConfig.apiKey + ':').toString('base64')
 };
 
 
@@ -91,25 +93,25 @@ async function updateInducteeRapid(id: number, firstName: string, lastName: stri
 async function getOrgsDefinitiv() {
   const url = `${definitivConfig.endpoint}/api/admin/organizations`;
   try {
-    const res = await axios.get<{data: DefinitiveOrg}>(url, {headers: definitiveHeaders});
+    const res = await axios.get<{data: DefinitivOrg}>(url, {headers: definitivHeaders});
     console.log(res.data)
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
   }
 }
 
-async function getEmployeeDefinitiv(employeeName: string, orgId: string): Promise<DefinitiveEmployee | undefined>{
+async function getEmployeeDefinitiv(employeeName: string, orgId: string): Promise<DefinitivEmployee | undefined>{
   return getEmployeesDefinitiv(orgId).then(
     _ => _.find(_ => _.name === employeeName)
   )
 }
 
-async function getEmployeesDefinitiv(orgId: string): Promise<DefinitiveEmployee[]> {
+async function getEmployeesDefinitiv(orgId: string): Promise<DefinitivEmployee[]> {
   console.log('Company Id:', orgId)
   const url =  `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
   try {
-    const res = await axios.get<{data: DefinitiveEmployee[]}>(url, {headers: definitiveHeaders});
-    return res.data as unknown as DefinitiveEmployee[];
+    const res = await axios.get<{data: DefinitivEmployee[]}>(url, {headers: definitivHeaders});
+    return res.data as unknown as DefinitivEmployee[];
   } catch (error: any) {
     error.response ? console.log(error.response.status, error.response.statusText) : console.log(error);
     return error;
@@ -121,7 +123,7 @@ async function createEmployeeDefinitiv(): Promise<void> {
   const body = {
   };
   try {
-    const a = await axios.post<{data: any}>(url, {headers: definitiveHeaders, body});
+    const a = await axios.post<{data: any}>(url, {headers: definitivHeaders, body});
     console.log(a.data)
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
@@ -129,12 +131,58 @@ async function createEmployeeDefinitiv(): Promise<void> {
   }
 }
 
+async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | null, start: Date | null, end: Date | null): Promise<DefinitivTimesheet[]> {
+  const searchParams: any = {};
+  if (orgId) searchParams['orgId'] = orgId;
+  if (employeeId) searchParams['employeeId'] = employeeId;
+  if (start) searchParams['start'] = start.toISOString();
+  if (end) searchParams['end'] = end.toISOString();
+  const queryString = Object.keys(searchParams).map(_ => `${_}=${searchParams[_]}`).join('&');
+
+  const url = `${definitivConfig.endpoint}/api/timesheets?${queryString}`;
+  console.log(url);
+  try {
+    const res = await axios.get<DefinitivTimesheet[]>(url, {headers: definitivHeaders});
+    console.log(res.data)
+    return res.data;
+  } catch (error: any) {
+    error.response ? console.log(error.response.status, error.response.statusText) : console.log(error);
+    return error;
+  }
+}
+
 async function createTimesheetDefinitiv() {
-  const url =  `${definitivConfig.endpoint}/api/timesheets`;
+  const url = `${definitivConfig.endpoint}/api/timesheets`;
   const body = {
+    employeeId: 'cb2317f2-8826-4487-b6b5-541208510b19',
+    employeeName: 'Denny Nari',
+    projectId: '91f27001-95db-4141-8735-8710bab8418f',
+    projectName: 'KID',
+    roleId: 'b12f3060-504b-4083-9d92-e841edecd0e0',
+    roleName: 'Production Operator / Forklift Driver',
+    departmentId: 'b72eedd0-e656-41ce-9270-ae5bb2fc3136',
+    departmentName: 'KID  Production',
+    locationId: '23bd1802-39c9-43d3-89a5-f59f2e65a31b',
+    locationName: 'Tasmania',
+    date: '2025-09-29',
+    useTime: true,
+    durationHours: null,
+    employeeSpecifiedDurationHours: null,
+    startTimeOfDay: '06:00:00',
+    employeeSpecifiedStartTimeOfDay: null,
+    endTimeOfDay: '15:00:00',
+    employeeSpecifiedEndTimeOfDay: null,
+    notes: null,
+    timePeriodMode: 'StartEndTimes',
+    status: 'Approved',
+    totalBreakHours: 0.5,
+    totalWorkedHours: 8.5,
+    allowEditing: true,
+    submittedDateTime: '2025-09-29T03:56:20.883Z',
+    lastUpdated: '2025-09-29T03:56:20.883Z'
   };
   try {
-    const a = await axios.post<{data: any}>(url, {headers: definitiveHeaders, body});
+    const a = await axios.post<{data: any}>(url, {headers: definitivHeaders, body});
     console.log(a.data)
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
@@ -175,12 +223,25 @@ export async function handleDefinitivEvent(body: any, eventName: string): Promis
 }
 
 export async function testEvent(): Promise<any> {
-  await getEmployeeDefinitiv('', '');
+  //await getEmployeeDefinitiv('', '');
   //await createEmployeeDefinitiv();
-  //await createTimesheetDefinitiv();
+  //createTimesheetDefinitiv()
+  //const timesheets = await getTimesheetsDefinitiv();
+
+  const dayStart = new Date()
+  dayStart.setHours(0,0,0,0);
+  const dayEnd = new Date()
+  dayEnd.setHours(23,59,59,999);
+
+  console.log(dayStart)
+  console.log(dayEnd)
+
+  getTimesheetsDefinitiv(null, 'cb2317f2-8826-4487-b6b5-541208510b19', new Date('2025-07-13'), dayEnd);
+
+  //console.log(timesheets)
 }
 
-async function addToLocalDb(employee: DefinitiveEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
+async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
     const request = new sqlRequest();
     const insertQuery = `
     INSERT INTO [IMS].[dbo].CheckIns (Created,EventId,EventName,EntryTime,ExitTime,EmployeeId,EmployeeName,EmployeeEmail,CompanyId,CompanyName)
