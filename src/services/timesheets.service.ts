@@ -100,6 +100,17 @@ async function getOrgsDefinitiv() {
   }
 }
 
+async function getWorkSchedule(employeeId: string) {
+  const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/work-schedules`;
+  console.log(url);
+  try {
+    const res = await axios.get<{data: DefinitivOrg}>(url, {headers: definitivHeaders});
+    console.log(res.data)
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+  }
+}
+
 async function getEmployeeDefinitiv(employeeName: string, orgId: string): Promise<DefinitivEmployee | undefined>{
   return getEmployeesDefinitiv(orgId).then(
     _ => _.find(_ => _.name === employeeName)
@@ -222,12 +233,12 @@ export async function handleDefinitivEvent(body: any, eventName: string): Promis
   }
 }
 
-export async function testEvent(): Promise<any> {
+export async function testEvent(body: RapidBody): Promise<any> {
   //await getEmployeeDefinitiv('', '');
   //await createEmployeeDefinitiv();
   //createTimesheetDefinitiv()
   //const timesheets = await getTimesheetsDefinitiv();
-
+  //getWorkSchedule('cb2317f2-8826-4487-b6b5-541208510b19')
   const dayStart = new Date()
   dayStart.setHours(0,0,0,0);
   const dayEnd = new Date()
