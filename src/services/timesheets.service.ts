@@ -6,9 +6,10 @@ import { definitivConfig, rapidConfig } from '../config';
 import { Inductee } from '../types/inductee';
 import { Employee } from '../types/employee';
 import { RapidBody } from '../types/rapid-body';
-import { DefinitivOrg } from '../types/definitiv-org';
-import { DefinitivTimesheet } from '../types/definitiv-timesheet';
 import { DefinitivEmployee } from '../types/definitiv-employee';
+import { DefinitivOrg } from '../types/definitiv-org';
+import { DefinitivSchedule } from '../types/definitiv-schedule';
+import { DefinitivTimesheet } from '../types/definitiv-timesheet';
 import { companies } from '../definitions';
 import { UUID } from 'crypto';
 
@@ -100,12 +101,17 @@ async function getOrgsDefinitiv() {
   }
 }
 
-async function getWorkSchedule(employeeId: string) {
+async function getWorkSchedule(employeeId: string, orgId: string): Promise<any> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/work-schedules`;
   console.log(url);
   try {
-    const res = await axios.get<{data: DefinitivOrg}>(url, {headers: definitivHeaders});
-    console.log(res.data)
+    const res = await axios.get<DefinitivSchedule[]>(url, {headers: definitivHeaders});
+    const sched = res.data[0];
+    console.log(sched);
+    const url2 = `${definitivConfig.endpoint}/api/admin/company/${orgId}/work-schedules/${sched.workScheduleId}`;
+    const res2 = await axios.get<{data: DefinitivOrg}>(url2, {headers: definitivHeaders});
+    console.log(res2.data)
+    return res2
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
   }
@@ -134,7 +140,7 @@ async function createEmployeeDefinitiv(): Promise<void> {
   const body = {
   };
   try {
-    const a = await axios.post<{data: any}>(url, {headers: definitivHeaders, body});
+    const a = await axios.post<{data: any}>(url, body, {headers: definitivHeaders});
     console.log(a.data)
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
@@ -193,10 +199,11 @@ async function createTimesheetDefinitiv() {
     lastUpdated: '2025-09-29T03:56:20.883Z'
   };
   try {
-    const a = await axios.post<{data: any}>(url, {headers: definitivHeaders, body});
+    const a = await axios.post<{data: any}>(url, body, {headers: definitivHeaders});
     console.log(a.data)
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
+    console.log(error.response.data?.errors?.summary)
     return;
   }
 }
@@ -282,6 +289,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
+  getWorkSchedule(employee.employeeId, orgId)
   const entryTime = body.event.data.entry?.timestamp ? new Date(body.event.data.entry.timestamp) : undefined;
   const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
   switch (eventName) {
