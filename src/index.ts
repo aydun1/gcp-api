@@ -649,7 +649,7 @@ app.post('/rapid/webhook/subscriber/events', (req, res) => {
 });
 
 app.get('/rapid/webhook/subscriber/events', (req, res) => {
-  handleRapidEvent(req.body).then(_ => {
+  handleRapidEvent(checkinBody).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err?.message || err);
@@ -718,19 +718,21 @@ const checkinBody = {
   ],
   event: {
     id: 'a277779e-0e5f-4b78-93ab-19d5948b18ae',
-    topic: 'CHECKIN_EXITED',
+    topic: 'CHECKIN_ENTERED',
     version: 1,
     companyId: 464,
-    timestamp: '2025-09-22T05:15:00.471Z',
-    serverTimestamp: '2025-09-22T05:14:13.999Z',
+    timestamp: '2025-10-06T05:15:00.471Z',
+    serverTimestamp: '2025-10-06T05:14:13.999Z',
     data: {
       id: 'b7e3a613-83d1-4209-90e9-54caa4ff824b',
       locationId: 'f80201db-883f-4af5-9bf2-2506cd3a03ef',
-      created: '2025-09-22T05:15:00.471Z',
+      created: '2025-10-06T05:15:00.471Z',
       status: 'OUT',
       identityId: 'ec11a943-0e01-423e-b0a4-ceb7b1ea8668',
+      breaks: [],
+      entry: {source: '', timestamp: '2025-10-06T05:15:00.471Z', serverTimestamp: '2025-10-06T05:14:13.999Z'}
     }
   },
   webhookId: '67cce9d2-0a6d-4d5b-a1e4-1cbf2a776325',
   alternativeProfiles: []
-} as unknown as RapidBody;
+} as RapidBody;

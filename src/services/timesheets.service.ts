@@ -1,17 +1,17 @@
 import axios from 'axios';
+import { UUID } from 'crypto';
 import { Request as sqlRequest, TYPES } from 'mssql';
 
-import { AuthRes } from '../types/auth-res';
 import { definitivConfig, rapidConfig } from '../config';
-import { Inductee } from '../types/inductee';
+import { companies } from '../definitions';
+import { AuthRes } from '../types/auth-res';
 import { Employee } from '../types/employee';
+import { Inductee } from '../types/inductee';
 import { RapidBody } from '../types/rapid-body';
 import { DefinitivEmployee } from '../types/definitiv-employee';
 import { DefinitivOrg } from '../types/definitiv-org';
 import { DefinitivSchedule } from '../types/definitiv-schedule';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
-import { companies } from '../definitions';
-import { UUID } from 'crypto';
 
 let authRes!: AuthRes;
 let authDate!: Date;
@@ -45,7 +45,7 @@ async function getAccessTokenRapid(): Promise<void> {
   }
 }
 
-async function getInducteeRapid(employeeId: string): Promise<Inductee | undefined> {
+async function getInducteeRapid(employeeId: UUID): Promise<Inductee | undefined> {
   console.log(`Checking for existing rapid inductee.`);
   await getAccessTokenRapid();
   const url = rapidConfig.sendEndpoint + '/Inductee/Search';
@@ -88,55 +88,59 @@ async function updateInducteeRapid(id: number, firstName: string, lastName: stri
   }
 }
 
-
-
-
-async function getOrgsDefinitiv() {
+async function getOrgsDefinitiv(): Promise<DefinitivOrg | undefined> {
   const url = `${definitivConfig.endpoint}/api/admin/organizations`;
   try {
-    const res = await axios.get<{data: DefinitivOrg}>(url, {headers: definitivHeaders});
+    const res = await axios.get<DefinitivOrg>(url, {headers: definitivHeaders});
     console.log(res.data)
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
+    return undefined;
   }
 }
 
-async function getWorkSchedule(employeeId: string, orgId: string): Promise<any> {
+async function getWorkSchedules(employeeId: UUID): Promise<DefinitivSchedule[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/work-schedules`;
   console.log(url);
   try {
     const res = await axios.get<DefinitivSchedule[]>(url, {headers: definitivHeaders});
-    const sched = res.data[0];
-    console.log(sched);
-    const url2 = `${definitivConfig.endpoint}/api/admin/company/${orgId}/work-schedules/${sched.workScheduleId}`;
-    const res2 = await axios.get<{data: DefinitivOrg}>(url2, {headers: definitivHeaders});
-    console.log(res2.data)
-    return res2
+    return res.data;
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
+    return undefined;
   }
 }
 
-async function getEmployeeDefinitiv(employeeName: string, orgId: string): Promise<DefinitivEmployee | undefined>{
-  return getEmployeesDefinitiv(orgId).then(
-    _ => _.find(_ => _.name === employeeName)
-  )
+async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID): Promise<DefinitivSchedule[] | undefined> {
+  const url = `${definitivConfig.endpoint}/api/admin/company/${orgId}/work-schedules/${workScheduleId}`;
+  console.log(url);
+  try {
+    const res = await axios.get<DefinitivSchedule[]>(url, {headers: definitivHeaders});
+    return res.data;
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return undefined;
+  }
 }
 
-async function getEmployeesDefinitiv(orgId: string): Promise<DefinitivEmployee[]> {
+async function getEmployeesDefinitiv(orgId: UUID): Promise<DefinitivEmployee[]> {
   console.log('Company Id:', orgId)
-  const url =  `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
+  const url = `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
   try {
-    const res = await axios.get<{data: DefinitivEmployee[]}>(url, {headers: definitivHeaders});
-    return res.data as unknown as DefinitivEmployee[];
+    const res = await axios.get<DefinitivEmployee[]>(url, {headers: definitivHeaders});
+    return res.data;
   } catch (error: any) {
     error.response ? console.log(error.response.status, error.response.statusText) : console.log(error);
     return error;
   }
 }
 
+async function getEmployeeDefinitiv(employeeName: string, orgId: UUID): Promise<DefinitivEmployee | undefined>{
+  return getEmployeesDefinitiv(orgId).then(_ => _.find(_ => _.name === employeeName));
+}
+
 async function createEmployeeDefinitiv(): Promise<void> {
-  const url =  `${definitivConfig.endpoint}/api/employees`;
+  const url = `${definitivConfig.endpoint}/api/employees`;
   const body = {
   };
   try {
@@ -168,42 +172,38 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   }
 }
 
-async function createTimesheetDefinitiv() {
+async function createTimesheetDefinitiv(employee: DefinitivEmployee, rapidBody: RapidBody) {
   const url = `${definitivConfig.endpoint}/api/timesheets`;
+  const now = (new Date()).toISOString();
   const body = {
-    employeeId: 'cb2317f2-8826-4487-b6b5-541208510b19',
-    employeeName: 'Denny Nari',
-    projectId: '91f27001-95db-4141-8735-8710bab8418f',
-    projectName: 'KID',
-    roleId: 'b12f3060-504b-4083-9d92-e841edecd0e0',
-    roleName: 'Production Operator / Forklift Driver',
-    departmentId: 'b72eedd0-e656-41ce-9270-ae5bb2fc3136',
-    departmentName: 'KID  Production',
-    locationId: '23bd1802-39c9-43d3-89a5-f59f2e65a31b',
-    locationName: 'Tasmania',
-    date: '2025-09-29',
+    employeeId: employee.employeeId,
+    //projectId: '91f27001-95db-4141-8735-8710bab8418f', // REQUIRED
+    //roleId: 'b12f3060-504b-4083-9d92-e841edecd0e0', // REQUIRED
+    //departmentId: 'b72eedd0-e656-41ce-9270-ae5bb2fc3136', // REQUIRED
+    //locationId: '23bd1802-39c9-43d3-89a5-f59f2e65a31b', // REQUIRED
+    date: rapidBody.event.data.entry?.serverTimestamp.split('T')[0],
     useTime: true,
     durationHours: null,
     employeeSpecifiedDurationHours: null,
     startTimeOfDay: '06:00:00',
-    employeeSpecifiedStartTimeOfDay: null,
+    employeeSpecifiedStartTimeOfDay: rapidBody.event.data.entry?.serverTimestamp.split('T')[1].split('.')[0],
     endTimeOfDay: '15:00:00',
-    employeeSpecifiedEndTimeOfDay: null,
-    notes: null,
+    //employeeSpecifiedEndTimeOfDay: null,
+    //notes: null,
     timePeriodMode: 'StartEndTimes',
-    status: 'Approved',
-    totalBreakHours: 0.5,
-    totalWorkedHours: 8.5,
+    //status: 'Approved',
+    //totalBreakHours: 0.5,
+    //totalWorkedHours: 8.5,
     allowEditing: true,
-    submittedDateTime: '2025-09-29T03:56:20.883Z',
-    lastUpdated: '2025-09-29T03:56:20.883Z'
+    submittedDateTime: now,
+    lastUpdated: now
   };
   try {
     const a = await axios.post<{data: any}>(url, body, {headers: definitivHeaders});
     console.log(a.data)
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
-    console.log(error.response.data?.errors?.summary)
+    console.log(error.response.data?.errors);
     return;
   }
 }
@@ -289,9 +289,11 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
-  getWorkSchedule(employee.employeeId, orgId)
-  const entryTime = body.event.data.entry?.timestamp ? new Date(body.event.data.entry.timestamp) : undefined;
-  const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
+  const workSchedules = await getWorkSchedules(employee.employeeId);
+  if (!workSchedules) return Promise.reject({code: 200, message: 'No work schedules for this employee.'});
+  const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0].workScheduleId);
+  const entryTime = body.event.data.entry?.serverTimestamp ? new Date(body.event.data.entry.serverTimestamp) : undefined;
+  const exitTime = body.event.data.exit?.serverTimestamp ? new Date(body.event.data.exit?.serverTimestamp) : undefined;
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');

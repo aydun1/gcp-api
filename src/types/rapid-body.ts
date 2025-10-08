@@ -32,8 +32,8 @@ export interface RapidBody {
       id: UUID;
       locationId: UUID;
       created: string;
-      entry?: {source: string; timestamp: string};
-      exit?: {source: string; timestamp: string};
+      entry?: {source: string; timestamp: string; serverTimestamp: string};
+      exit?: {source: string; timestamp: string; serverTimestamp: string};
       status: string;
       identityId: UUID;
       breaks: Array<any>;

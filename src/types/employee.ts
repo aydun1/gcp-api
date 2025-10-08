@@ -1,5 +1,7 @@
+import { UUID } from 'crypto';
+
 export interface Employee {
-  employeeId: string;
+  employeeId: UUID;
   employeeNumber: string;
   gender: string;
   title: string;
@@ -26,17 +28,17 @@ export interface Employee {
     value: string;
   }[];
   roles: {
-    roleAssignmentId: string;
+    roleAssignmentId: UUID;
     role: {
-      id: string;
+      id: UUID;
       name: string;
     };
     employmentType: {
-      id: string;
+      id: UUID;
       name: string;
     };
     defaultShiftType: {
-      id: string;
+      id: UUID;
       name: string;
     };
     isPrimary: boolean;
@@ -46,9 +48,9 @@ export interface Employee {
     ceaseDate: string;
   }[];
   locations: {
-    locationAssignmentId: string;
+    locationAssignmentId: UUID;
     location: {
-      id: string;
+      id: UUID;
       name: string;
     };
     isPrimary: boolean;
@@ -56,9 +58,9 @@ export interface Employee {
     ceaseDate: string;
   }[];
   departments: {
-    departmentAssignmentId: string;
+    departmentAssignmentId: UUID;
     department: {
-      id: string;
+      id: UUID;
       name: string;
     };
     isPrimary: boolean;
@@ -66,16 +68,16 @@ export interface Employee {
     ceaseDate: string;
   }[];
   employmentRecords: {
-    employmentRecordId: string;
+    employmentRecordId: UUID;
     hireDate: string;
     yearsOfServiceStartDate: string;
-    hireReasonId: string;
+    hireReasonId: UUID;
     hireReasonName: string;
     hireComments: string;
     terminationDate: string;
-    terminationTypeId: string;
+    terminationTypeId: UUID;
     terminationTypeName: string;
-    terminationReasonId: string;
+    terminationReasonId: UUID;
     terminationReasonName: string;
     terminationComments: string;
     hasTermination: boolean;

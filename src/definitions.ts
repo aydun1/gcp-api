@@ -1,3 +1,5 @@
+import { UUID } from 'crypto';
+
 export const locations = [
   {envuCode: 'AUC-GCP001', gpCode: 'NSW', address1: '4 - 6 Pinnacle Place', city: 'Somersby', state: 'New South Wales', postcode: '2250', countryCode: 'AU'},
   {envuCode: 'AUC-GCP002', gpCode: 'MAIN', address1: 'EJ Court (off Assembly Drive)', city: 'Dandenong South', state: 'Victoria', postcode: '3175', countryCode: 'AU'},
@@ -7,9 +9,9 @@ export const locations = [
 ];
 
 export const companies = [
-  {orgId: '735f7d6d-f6b1-4f95-9ede-77cb17264cc9', name: 'Garden City Plastics', emailDomain: 'gardencityplastics.com'},
-  {orgId: 'c06d598d-de9e-49bc-808d-22093441badd', name: 'King Island Dairy', emailDomain: 'kingislanddairy.com'},
-  {orgId: 'fe87ad64-0e8c-4fd0-8ced-998615ac73ae', name: 'Olympus Cheese', emailDomain: 'olympuscheese.com.au'}
+  {orgId: '735f7d6d-f6b1-4f95-9ede-77cb17264cc9' as UUID, name: 'Garden City Plastics', emailDomain: 'gardencityplastics.com'},
+  {orgId: 'c06d598d-de9e-49bc-808d-22093441badd' as UUID, name: 'King Island Dairy', emailDomain: 'kingislanddairy.com'},
+  {orgId: 'fe87ad64-0e8c-4fd0-8ced-998615ac73ae' as UUID, name: 'Olympus Cheese', emailDomain: 'olympuscheese.com.au'}
 ];
 
 export const products = [
