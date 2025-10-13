@@ -15,6 +15,7 @@ import { DefinitivOrg } from '../types/definitiv-org';
 import { DefinitivProject } from '../types/definitiv-projects';
 import { DefinitivRole } from '../types/definitiv-role';
 import { DefinitivSchedule } from '../types/definitiv-schedule';
+import { DefinitivSchedule2 } from '../types/definitiv-schedule2';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
 
 let authRes!: AuthRes;
@@ -115,11 +116,11 @@ async function getWorkSchedules(employeeId: UUID): Promise<DefinitivSchedule[] |
   }
 }
 
-async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID): Promise<DefinitivSchedule[] | undefined> {
+async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID): Promise<DefinitivSchedule2 | undefined> {
   const url = `${definitivConfig.endpoint}/api/admin/company/${orgId}/work-schedules/${workScheduleId}`;
   console.log(url);
   try {
-    const res = await axios.get<DefinitivSchedule[]>(url, {headers: definitivHeaders});
+    const res = await axios.get<DefinitivSchedule2>(url, {headers: definitivHeaders});
     return res.data;
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
@@ -220,9 +221,17 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   }
 }
 
-async function createTimesheetDefinitiv(employee: DefinitivEmployee, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID) {
+async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedule: DefinitivSchedule2, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID) {
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const now = (new Date()).toISOString();
+
+  const entryTime = rapidBody.event.data.entry?.serverTimestamp ? new Date(rapidBody.event.data.entry.serverTimestamp) : undefined;
+  const exitTime = rapidBody.event.data.exit?.serverTimestamp ? new Date(rapidBody.event.data.exit?.serverTimestamp) : undefined;
+  const todaysEntry = workSchedule?.dailySchedules[0].timeEntries[0]
+  const scheduledStartTime = todaysEntry?.startTimeOfDay;
+  const scheduledEndTime = todaysEntry?.endTimeOfDay;
+  console.log(entryTime, scheduledStartTime);
+  console.log(entryTime?.toLocaleTimeString());
   const body = {
     employeeId: employee.employeeId,
     projectId,
@@ -233,9 +242,9 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, rapidBody: 
     useTime: true,
     durationHours: null,
     employeeSpecifiedDurationHours: null,
-    startTimeOfDay: '06:00:00',
+    startTimeOfDay: scheduledStartTime,
+    endTimeOfDay: scheduledEndTime,
     employeeSpecifiedStartTimeOfDay: rapidBody.event.data.entry?.serverTimestamp.split('T')[1].split('.')[0],
-    endTimeOfDay: '15:00:00',
     //employeeSpecifiedEndTimeOfDay: null,
     //notes: null,
     timePeriodMode: 'StartEndTimes',
@@ -327,6 +336,7 @@ async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkI
 }
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
+  console.log(body.event)
   console.log('Rapid event received.');
   if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
   const eventName = body.event.topic;
@@ -340,6 +350,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const workSchedules = await getWorkSchedules(employee.employeeId);
   if (!workSchedules) return Promise.reject({code: 200, message: 'No work schedules for this employee.'});
   const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0].workScheduleId);
+  if (!workSchedule) return Promise.reject({code: 200, message: 'Unable to get employee\'s work schedule.'});
   const departments = await getEmployeeDepartments(employee.employeeId);
   const departmentId = departments?.[0]?.departmentId;
   if (!departmentId) return Promise.reject({code: 200, message: 'Unable to get employee\'s department.'});
@@ -357,15 +368,13 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
-      console.log('Entry:', entryTime);
       await addToLocalDb(employee, body, entryTime, exitTime);
+      //await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId)
       break;
     case 'CHECKIN_EXITED':
       console.log('Employee signed out');
-      console.log('Entry:', entryTime);
-      console.log('Exit:', exitTime);
       await addToLocalDb(employee, body, entryTime, exitTime);
-      await createTimesheetDefinitiv(employee, body, departmentId, locationId, projectId, roleId)
+      //await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId)
       break;
     default:
       return Promise.reject({code: 200, message: `The Rapid event, ${eventName}, is not supported.`});
