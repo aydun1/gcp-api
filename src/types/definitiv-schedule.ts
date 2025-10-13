@@ -8,4 +8,4 @@ export interface DefinitivSchedule {
   commencementDate: string;
   ceaseDate: string;
   periodStartDate: string;
-  }
+}

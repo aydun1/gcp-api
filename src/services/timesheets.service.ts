@@ -8,8 +8,12 @@ import { AuthRes } from '../types/auth-res';
 import { Employee } from '../types/employee';
 import { Inductee } from '../types/inductee';
 import { RapidBody } from '../types/rapid-body';
+import { DefinitivDepartment } from '../types/definitiv-department';
 import { DefinitivEmployee } from '../types/definitiv-employee';
+import { DefinitivLocation } from '../types/definitiv-location';
 import { DefinitivOrg } from '../types/definitiv-org';
+import { DefinitivProject } from '../types/definitiv-projects';
+import { DefinitivRole } from '../types/definitiv-role';
 import { DefinitivSchedule } from '../types/definitiv-schedule';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
 
@@ -123,6 +127,50 @@ async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID): Promise<D
   }
 }
 
+async function getEmployeeRoles(employeeId: UUID): Promise<DefinitivRole[] | undefined> {
+  const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/roles`;
+  try {
+    const res = await axios.get<DefinitivRole[]>(url, {headers: definitivHeaders});
+    return res.data;
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return undefined;
+  }
+}
+
+async function getEmployeeDepartments(employeeId: UUID): Promise<DefinitivDepartment[] | undefined> {
+  const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/departments`;
+  try {
+    const res = await axios.get<DefinitivDepartment[]>(url, {headers: definitivHeaders});
+    return res.data;
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return undefined;
+  }
+}
+
+async function getEmployeeLocations(employeeId: UUID): Promise<DefinitivLocation[] | undefined> {
+  const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/locations`;
+  try {
+    const res = await axios.get<DefinitivLocation[]>(url, {headers: definitivHeaders});
+    return res.data;
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return undefined;
+  }
+}
+
+async function getEmployeeProjects(employeeId: UUID): Promise<DefinitivProject[] | undefined> {
+  const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/projects`;
+  try {
+    const res = await axios.get<DefinitivProject[]>(url, {headers: definitivHeaders});
+    return res.data;
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    return undefined;
+  }
+}
+
 async function getEmployeesDefinitiv(orgId: UUID): Promise<DefinitivEmployee[]> {
   console.log('Company Id:', orgId)
   const url = `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
@@ -172,15 +220,15 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   }
 }
 
-async function createTimesheetDefinitiv(employee: DefinitivEmployee, rapidBody: RapidBody) {
+async function createTimesheetDefinitiv(employee: DefinitivEmployee, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID) {
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const now = (new Date()).toISOString();
   const body = {
     employeeId: employee.employeeId,
-    //projectId: '91f27001-95db-4141-8735-8710bab8418f', // REQUIRED
-    //roleId: 'b12f3060-504b-4083-9d92-e841edecd0e0', // REQUIRED
-    //departmentId: 'b72eedd0-e656-41ce-9270-ae5bb2fc3136', // REQUIRED
-    //locationId: '23bd1802-39c9-43d3-89a5-f59f2e65a31b', // REQUIRED
+    projectId,
+    roleId,
+    departmentId,
+    locationId,
     date: rapidBody.event.data.entry?.serverTimestamp.split('T')[0],
     useTime: true,
     durationHours: null,
@@ -292,19 +340,32 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const workSchedules = await getWorkSchedules(employee.employeeId);
   if (!workSchedules) return Promise.reject({code: 200, message: 'No work schedules for this employee.'});
   const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0].workScheduleId);
+  const departments = await getEmployeeDepartments(employee.employeeId);
+  const departmentId = departments?.[0]?.departmentId;
+  if (!departmentId) return Promise.reject({code: 200, message: 'Unable to get employee\'s department.'});
+  const locations = await getEmployeeLocations(employee.employeeId);
+  const locationId = locations?.[0]?.locationId;
+  if (!locationId) return Promise.reject({code: 200, message: 'Unable to get employee\'s location.'});
+  const projects = await getEmployeeProjects(employee.employeeId);
+  const projectId = projects?.[0]?.projectId;
+  if (!projectId) return Promise.reject({code: 200, message: 'Unable to get employee\'s project.'});
+  const roles = await getEmployeeRoles(employee.employeeId);
+  const roleId = roles?.[0]?.roleId;
+  if (!roleId) return Promise.reject({code: 200, message: 'Unable to get employee\'s role.'});
   const entryTime = body.event.data.entry?.serverTimestamp ? new Date(body.event.data.entry.serverTimestamp) : undefined;
   const exitTime = body.event.data.exit?.serverTimestamp ? new Date(body.event.data.exit?.serverTimestamp) : undefined;
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
       console.log('Entry:', entryTime);
-      addToLocalDb(employee, body, entryTime, exitTime);
+      await addToLocalDb(employee, body, entryTime, exitTime);
       break;
     case 'CHECKIN_EXITED':
       console.log('Employee signed out');
       console.log('Entry:', entryTime);
       console.log('Exit:', exitTime);
-      addToLocalDb(employee, body, entryTime, exitTime);
+      await addToLocalDb(employee, body, entryTime, exitTime);
+      await createTimesheetDefinitiv(employee, body, departmentId, locationId, projectId, roleId)
       break;
     default:
       return Promise.reject({code: 200, message: `The Rapid event, ${eventName}, is not supported.`});
