@@ -1,12 +1,20 @@
 import { UUID } from 'crypto';
 
 export interface RapidBody {
+  imageUrl: string;
   config: any;
+  camera?: {
+    id: UUID;
+    hubId: UUID;
+    name: string;
+    dateCreated: string;
+    lastUpdated: string;
+  }
   location: {
     id: UUID;
     name: string;
-    timezone: string;
-    hubIds: Array<any>;
+    timezone: string; //'Australia/Brisbane'
+    hubIds: Array<UUID>;
     dateCreated: string;
     lastUpdated: string;
   }
@@ -20,9 +28,15 @@ export interface RapidBody {
     dateCreated: string;
     lastUpdated: string;
   }
-  labels: Array<{id: string; name: string; color: string; dateCreated: string; lastUpdated: string;}>;
+  labels: {
+    id: UUID;
+    name: string;
+    color: string;
+    dateCreated: string;
+    lastUpdated: string;
+  }[];
   event: {
-    id: string;
+    id: UUID;
     topic: string;
     version: number;
     companyId: number;
@@ -32,11 +46,17 @@ export interface RapidBody {
       id: UUID;
       locationId: UUID;
       created: string;
-      entry?: {source: string; timestamp: string; };
-      exit?: {source: string; timestamp: string; };
-      status: string;
+      entry?: {
+        source: 'USER' | 'SCHEDULER' | 'DOORKEEPER';
+        timestamp: string;
+      };
+      exit?: {
+        source: 'USER' | 'SCHEDULER' | 'DOORKEEPER';
+        timestamp: string;
+      };
+      status: 'IN' | 'OUT';
       identityId: UUID;
-      breaks: Array<any>;
+      breaks?: [];
     }
   }
   webhookId: UUID;

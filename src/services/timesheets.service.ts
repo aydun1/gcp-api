@@ -381,14 +381,10 @@ async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkI
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
   console.log('Rapid event received.');
-  console.log(body);
-  console.log(body.labels);
   if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
   const eventName = body.event.topic;
   const name = body.profile.name;
-  const email = body.profile.email;
-  if (!email) return Promise.reject({code: 200, message: 'User doesn\'t have an email address.'});
-  const orgId = companies.find(_ => _.emailDomain === email.split('@')[1])?.orgId || '';
+  const orgId = companies.find(_ => body.labels.map(l => l.name).includes(_.name))?.orgId || '';
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
