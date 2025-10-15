@@ -1,7 +1,7 @@
 import { UUID } from 'crypto';
 
 export interface RapidBody {
-  config: {}
+  config: any;
   location: {
     id: UUID;
     name: string;
@@ -32,8 +32,8 @@ export interface RapidBody {
       id: UUID;
       locationId: UUID;
       created: string;
-      entry?: {source: string; timestamp: string; serverTimestamp: string};
-      exit?: {source: string; timestamp: string; serverTimestamp: string};
+      entry?: {source: string; timestamp: string; };
+      exit?: {source: string; timestamp: string; };
       status: string;
       identityId: UUID;
       breaks: Array<any>;

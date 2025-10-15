@@ -1,32 +1,5 @@
 import { UUID } from 'crypto';
-
-interface DefinitivTimeEntry {
-  projectId: null;
-  roleId: null;
-  departmentId: null;
-  positionId: null;
-  locationId: null;
-  shiftTypeId: null;
-  projectWorkOrderId: null;
-  breaks: {
-    description: string;
-    startTimeOfDay: string;
-    employeeSpecifiedStartTimeOfDay: null;
-    endTimeOfDay: string;
-    employeeSpecifiedEndTimeOfDay: null;
-    durationHours: null;
-    employeeSpecifiedDurationHours: null;
-  }[];
-  tasks: Array<any>;
-  workOrderTasks: null;
-  assets: null;
-  notes: null;
-  useTime: boolean;
-  startTimeOfDay: string;
-  endTimeOfDay: string;
-  durationHours: null;
-  customFields: Array<any>;
-}
+import { DefinitivTimeEntry } from './definitiv-time-entry';
 
 export interface DefinitivSchedule2 {
   workScheduleId: UUID;

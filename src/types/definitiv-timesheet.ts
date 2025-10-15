@@ -24,9 +24,9 @@ export interface DefinitivTimesheet {
   durationHours: null;
   employeeSpecifiedDurationHours: null;
   startTimeOfDay: string; // 06:00:00
-  employeeSpecifiedStartTimeOfDay: null;
+  employeeSpecifiedStartTimeOfDay: string;
   endTimeOfDay: string; // 15:00:00
-  employeeSpecifiedEndTimeOfDay: null;
+  employeeSpecifiedEndTimeOfDay: string;
   timePeriodAlerts: [];
   breaks: Array<any>;
   tasks: [];

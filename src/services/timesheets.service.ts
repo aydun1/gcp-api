@@ -16,6 +16,7 @@ import { DefinitivProject } from '../types/definitiv-projects';
 import { DefinitivRole } from '../types/definitiv-role';
 import { DefinitivSchedule } from '../types/definitiv-schedule';
 import { DefinitivSchedule2 } from '../types/definitiv-schedule2';
+import { DefinitivBreak, DefinitivTimeEntry } from '../types/definitiv-time-entry';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
 
 let authRes!: AuthRes;
@@ -61,7 +62,7 @@ async function getInducteeRapid(employeeId: UUID): Promise<Inductee | undefined>
     return res.data.collection[0];
   } catch (error: any) {
     console.log('Error getting rapid inductees:', error.response.status)
-    return undefined;
+    return;
   }
 }
 
@@ -106,7 +107,6 @@ async function getOrgsDefinitiv(): Promise<DefinitivOrg | undefined> {
 
 async function getWorkSchedules(employeeId: UUID): Promise<DefinitivSchedule[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/work-schedules`;
-  console.log(url);
   try {
     const res = await axios.get<DefinitivSchedule[]>(url, {headers: definitivHeaders});
     return res.data;
@@ -118,7 +118,6 @@ async function getWorkSchedules(employeeId: UUID): Promise<DefinitivSchedule[] |
 
 async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID): Promise<DefinitivSchedule2 | undefined> {
   const url = `${definitivConfig.endpoint}/api/admin/company/${orgId}/work-schedules/${workScheduleId}`;
-  console.log(url);
   try {
     const res = await axios.get<DefinitivSchedule2>(url, {headers: definitivHeaders});
     return res.data;
@@ -173,7 +172,6 @@ async function getEmployeeProjects(employeeId: UUID): Promise<DefinitivProject[]
 }
 
 async function getEmployeesDefinitiv(orgId: UUID): Promise<DefinitivEmployee[]> {
-  console.log('Company Id:', orgId)
   const url = `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
   try {
     const res = await axios.get<DefinitivEmployee[]>(url, {headers: definitivHeaders});
@@ -205,15 +203,12 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   const searchParams: any = {};
   if (orgId) searchParams['orgId'] = orgId;
   if (employeeId) searchParams['employeeId'] = employeeId;
-  if (start) searchParams['start'] = start.toISOString();
-  if (end) searchParams['end'] = end.toISOString();
+  if (start) searchParams['start'] = start.toLocaleDateString('en-CA');
+  if (end) searchParams['end'] = end.toLocaleDateString('en-CA');
   const queryString = Object.keys(searchParams).map(_ => `${_}=${searchParams[_]}`).join('&');
-
   const url = `${definitivConfig.endpoint}/api/timesheets?${queryString}`;
-  console.log(url);
   try {
     const res = await axios.get<DefinitivTimesheet[]>(url, {headers: definitivHeaders});
-    console.log(res.data)
     return res.data;
   } catch (error: any) {
     error.response ? console.log(error.response.status, error.response.statusText) : console.log(error);
@@ -221,48 +216,109 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   }
 }
 
-async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedule: DefinitivSchedule2, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID) {
-  const url = `${definitivConfig.endpoint}/api/timesheets`;
-  const now = (new Date()).toISOString();
+function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, todaysSchedule: DefinitivTimeEntry): DefinitivBreak[] {
+  const breaks= [] as Array<DefinitivBreak>;
+  if (todaysSchedule.breaks && todaysSchedule.breaks.length > 0) {
+    if (todaysSchedule.breaks.length > 1) console.log('More than one break is not handled.');
+    const melbourneMidnight = new Date(new Date(new Date(date).toLocaleString('en-US', {timeZone: 'Australia/Melbourne'})).setHours(0,0,0,0));
+    const breakStartParts = todaysSchedule.breaks[0].startTimeOfDay.split(':').map(_ => +_);
+    const breakStartSeconds = breakStartParts[0] * 3600 + breakStartParts[1] * 60 + breakStartParts[2]
+    const breakStartDateTime = new Date(melbourneMidnight.getTime() + breakStartSeconds * 1000);
+    const breakEndParts = todaysSchedule.breaks[0].endTimeOfDay.split(':').map(_ => +_);
+    const breakEndSeconds = breakEndParts[0] * 3600 + breakEndParts[1] * 60 + breakEndParts[2]
+    const breakEndDateTime = new Date(melbourneMidnight.getTime() + breakEndSeconds * 1000);
+    if (breakStartDateTime > entryTime && breakEndDateTime < exitTime) {
+      breaks.push(todaysSchedule.breaks[0]);
+      console.log('Break fits');
+    }
+  }
+  return breaks;
+}
 
-  const entryTime = rapidBody.event.data.entry?.serverTimestamp ? new Date(rapidBody.event.data.entry.serverTimestamp) : undefined;
-  const exitTime = rapidBody.event.data.exit?.serverTimestamp ? new Date(rapidBody.event.data.exit?.serverTimestamp) : undefined;
-  const todaysEntry = workSchedule?.dailySchedules[0].timeEntries[0]
-  const scheduledStartTime = todaysEntry?.startTimeOfDay;
-  const scheduledEndTime = todaysEntry?.endTimeOfDay;
-  console.log(entryTime, scheduledStartTime);
-  console.log(entryTime?.toLocaleTimeString());
+async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedule: DefinitivSchedule2, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID): Promise<DefinitivTimesheet | undefined> {
+  const url = `${definitivConfig.endpoint}/api/timesheets`;
+  const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry.timestamp) : undefined;
+  if (!entryTime) return;
+  const exitTime = rapidBody.event.data.exit?.timestamp ? new Date(rapidBody.event.data.exit?.timestamp) : undefined;
+  if (!exitTime) return;
+  const date = entryTime?.toLocaleDateString('en-CA');
+  if (!date) return;
+  const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
+  const scheduledStartTime = todaysSchedule?.startTimeOfDay;
+  const scheduledEndTime = todaysSchedule?.endTimeOfDay;
+  const employeeSpecifiedStartTimeOfDay = entryTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const employeeSpecifiedEndTimeOfDay = exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const breaks = getAppropriateBreaks(date, entryTime, exitTime, todaysSchedule);
   const body = {
     employeeId: employee.employeeId,
     projectId,
     roleId,
     departmentId,
     locationId,
-    date: rapidBody.event.data.entry?.serverTimestamp.split('T')[0],
+    date,
     useTime: true,
     durationHours: null,
     employeeSpecifiedDurationHours: null,
-    startTimeOfDay: scheduledStartTime,
-    endTimeOfDay: scheduledEndTime,
-    employeeSpecifiedStartTimeOfDay: rapidBody.event.data.entry?.serverTimestamp.split('T')[1].split('.')[0],
-    //employeeSpecifiedEndTimeOfDay: null,
-    //notes: null,
+    startTimeOfDay: employeeSpecifiedStartTimeOfDay,
+    endTimeOfDay: employeeSpecifiedEndTimeOfDay,
+    employeeSpecifiedStartTimeOfDay,
+    employeeSpecifiedEndTimeOfDay,
     timePeriodMode: 'StartEndTimes',
-    //status: 'Approved',
-    //totalBreakHours: 0.5,
-    //totalWorkedHours: 8.5,
     allowEditing: true,
-    submittedDateTime: now,
-    lastUpdated: now
+    breaks
   };
+
   try {
-    const a = await axios.post<{data: any}>(url, body, {headers: definitivHeaders});
-    console.log(a.data)
+    const res = await axios.post<DefinitivTimesheet>(url, body, {headers: definitivHeaders});
+    return res.data;
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
     console.log(error.response.data?.errors);
     return;
   }
+}
+
+async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSchedule: DefinitivSchedule2, rapidBody: RapidBody): Promise<any> {
+  const url = `${definitivConfig.endpoint}/api/timesheets`;
+  const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry?.timestamp) : undefined;
+  if (!entryTime) return;
+  const exitTime = rapidBody.event.data.exit?.timestamp ? new Date(rapidBody.event.data.exit?.timestamp) : undefined;
+  if (!exitTime) return;
+  const date = entryTime?.toLocaleDateString('en-CA');
+  if (!date) return;
+  const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
+  const employeeSpecifiedEndTimeOfDay = exitTime?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const breaks = getAppropriateBreaks(date, entryTime, exitTime, todaysSchedule);
+  const body = {
+    ...timesheet,
+    endTimeOfDay: employeeSpecifiedEndTimeOfDay,
+    employeeSpecifiedEndTimeOfDay: employeeSpecifiedEndTimeOfDay,
+    breaks
+  };
+  try {
+    const res = await axios.put<DefinitivTimesheet>(`${url}/${timesheet.timesheetId}`, body, {headers: definitivHeaders});
+    console.log('Timesheet updated')
+    return res.data;
+  } catch (error: any) {
+    console.log(error.response.status, error.response.statusText);
+    console.log(error.response.data?.errors);
+    return;
+  }
+}
+
+async function getTimeSheetToUpdate(orgId: UUID, employeeId: UUID, entryTime: Date, exitTime: Date): Promise<DefinitivTimesheet | undefined> {
+  const maxShiftLength = 12;
+  const fromTime = new Date(entryTime.getTime() - 1000 * 60 * 60 * 24);
+  const previousTimeSheets = await getTimesheetsDefinitiv(orgId, employeeId, fromTime, entryTime);
+  const offset = new Date().getTimezoneOffset() * 60 * 1000;
+  const timesheetToUpdate = previousTimeSheets.filter(_ => {
+    const isoDate = _.date.split('/').reverse().join('-');
+    const localDate = new Date(`${isoDate}T${_.startTimeOfDay}Z`);
+    const startDate = new Date(localDate.getTime() + offset);
+    const hoursBefore = ((exitTime?.getTime() || 0) - startDate.getTime()) / 1000 / 60 / 60;
+    return hoursBefore < maxShiftLength;
+  })[0];
+  return timesheetToUpdate;
 }
 
 export async function handleDefinitivEvent(body: any, eventName: string): Promise<any> {
@@ -297,46 +353,34 @@ export async function handleDefinitivEvent(body: any, eventName: string): Promis
   }
 }
 
-export async function testEvent(body: RapidBody): Promise<any> {
-  //await getEmployeeDefinitiv('', '');
-  //await createEmployeeDefinitiv();
-  //createTimesheetDefinitiv()
-  //const timesheets = await getTimesheetsDefinitiv();
-  //getWorkSchedule('cb2317f2-8826-4487-b6b5-541208510b19')
-  const dayStart = new Date()
-  dayStart.setHours(0,0,0,0);
-  const dayEnd = new Date()
-  dayEnd.setHours(23,59,59,999);
+export async function handleTestEvent(): Promise<any> {
+  const employee = await getEmployeeDefinitiv('Peter Constable', 'c06d598d-de9e-49bc-808d-22093441badd');
+  const inductee = await getInducteeRapid('c06d598d-de9e-49bc-808d-22093441badd');
+  console.log(inductee)
 
-  console.log(dayStart)
-  console.log(dayEnd)
-
-  getTimesheetsDefinitiv(null, 'cb2317f2-8826-4487-b6b5-541208510b19', new Date('2025-07-13'), dayEnd);
-
-  //console.log(timesheets)
 }
 
-async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined) {
-    const request = new sqlRequest();
-    const insertQuery = `
-    INSERT INTO [IMS].[dbo].CheckIns (Created,EventId,EventName,EntryTime,ExitTime,EmployeeId,EmployeeName,EmployeeEmail,CompanyId,CompanyName)
-    VALUES (@Created,@EventId,@EventName,@EntryTime,@ExitTime,@EmployeeId,@EmployeeName,@EmployeeEmail,@CompanyId,@CompanyName);
-    `;
-    request.input('Created', TYPES.DateTime, body.event.timestamp);
-    request.input('EventId', TYPES.UniqueIdentifier, body.event.id);
-    request.input('EventName', TYPES.NChar(20), body.event.topic);
-    request.input('EntryTime', TYPES.DateTime, checkIn);
-    request.input('ExitTime', TYPES.DateTime, checkOut);
-    request.input('EmployeeId', TYPES.UniqueIdentifier, employee.employeeId);
-    request.input('EmployeeName', TYPES.NVarChar(255), employee.name);
-    request.input('EmployeeEmail', TYPES.NVarChar(255), body.profile.email);
-    request.input('CompanyId', TYPES.UniqueIdentifier, employee.organizationId);
-    request.input('CompanyName', TYPES.NChar(35), employee.organizationName);
-    await request.query(insertQuery);
+async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined): Promise<void> {
+  const request = new sqlRequest();
+  const insertQuery = `
+  INSERT INTO [IMS].[dbo].CheckIns (Created,EventId,EventName,EntryTime,ExitTime,EmployeeId,EmployeeName,EmployeeEmail,CompanyId,CompanyName)
+  VALUES (@Created,@EventId,@EventName,@EntryTime,@ExitTime,@EmployeeId,@EmployeeName,@EmployeeEmail,@CompanyId,@CompanyName);
+  `;
+  request.input('Created', TYPES.DateTime, body.event.timestamp);
+  request.input('EventId', TYPES.UniqueIdentifier, body.event.id);
+  request.input('EventName', TYPES.NChar(20), body.event.topic);
+  request.input('EntryTime', TYPES.DateTime, checkIn);
+  request.input('ExitTime', TYPES.DateTime, checkOut);
+  request.input('EmployeeId', TYPES.UniqueIdentifier, employee.employeeId);
+  request.input('EmployeeName', TYPES.NVarChar(255), employee.name);
+  request.input('EmployeeEmail', TYPES.NVarChar(255), body.profile.email);
+  request.input('CompanyId', TYPES.UniqueIdentifier, employee.organizationId);
+  request.input('CompanyName', TYPES.NChar(35), employee.organizationName);
+  await request.query(insertQuery);
 }
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
-  console.log(body.event)
+  console.log(body.profile)
   console.log('Rapid event received.');
   if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
   const eventName = body.event.topic;
@@ -363,18 +407,23 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const roles = await getEmployeeRoles(employee.employeeId);
   const roleId = roles?.[0]?.roleId;
   if (!roleId) return Promise.reject({code: 200, message: 'Unable to get employee\'s role.'});
-  const entryTime = body.event.data.entry?.serverTimestamp ? new Date(body.event.data.entry.serverTimestamp) : undefined;
-  const exitTime = body.event.data.exit?.serverTimestamp ? new Date(body.event.data.exit?.serverTimestamp) : undefined;
+  const entryTime = body.event.data.entry?.timestamp ? new Date(body.event.data.entry.timestamp) : undefined;
+  const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
       await addToLocalDb(employee, body, entryTime, exitTime);
-      //await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId)
       break;
     case 'CHECKIN_EXITED':
+      if (!entryTime || !exitTime) return;
       console.log('Employee signed out');
       await addToLocalDb(employee, body, entryTime, exitTime);
-      //await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId)
+      const previousTimeSheet = await getTimeSheetToUpdate(orgId, employee.employeeId, entryTime, exitTime);
+      if (previousTimeSheet) {
+        await updateTimeSheetDefinitiv(previousTimeSheet, workSchedule, body);
+      } else {
+        await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId);
+      }
       break;
     default:
       return Promise.reject({code: 200, message: `The Rapid event, ${eventName}, is not supported.`});
