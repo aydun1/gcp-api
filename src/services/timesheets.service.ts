@@ -216,7 +216,7 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   }
 }
 
-function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, todaysSchedule: DefinitivTimeEntry): DefinitivBreak[] {
+function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, timeZone: string, todaysSchedule: DefinitivTimeEntry): DefinitivBreak[] {
   const breaks= [] as Array<DefinitivBreak>;
   if (todaysSchedule.breaks && todaysSchedule.breaks.length > 0) {
     if (todaysSchedule.breaks.length > 1) console.log('More than one break is not handled.');
@@ -243,12 +243,13 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   if (!exitTime) return;
   const date = entryTime?.toLocaleDateString('en-CA');
   if (!date) return;
+  const timezone = rapidBody.location.timezone;
   const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
   const scheduledStartTime = todaysSchedule?.startTimeOfDay;
   const scheduledEndTime = todaysSchedule?.endTimeOfDay;
   const employeeSpecifiedStartTimeOfDay = entryTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const employeeSpecifiedEndTimeOfDay = exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, entryTime, exitTime, todaysSchedule);
+  const breaks = getAppropriateBreaks(date, entryTime, exitTime, timezone, todaysSchedule);
   const body = {
     employeeId: employee.employeeId,
     projectId,
@@ -286,9 +287,10 @@ async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSched
   if (!exitTime) return;
   const date = entryTime?.toLocaleDateString('en-CA');
   if (!date) return;
+  const timezone = rapidBody.location.timezone;
   const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
   const employeeSpecifiedEndTimeOfDay = exitTime?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, entryTime, exitTime, todaysSchedule);
+  const breaks = getAppropriateBreaks(date, entryTime, exitTime, timezone, todaysSchedule);
   const body = {
     ...timesheet,
     endTimeOfDay: employeeSpecifiedEndTimeOfDay,

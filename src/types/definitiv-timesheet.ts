@@ -37,7 +37,19 @@ export interface DefinitivTimesheet {
   status: string;
   approvals: Array<any>;
   publicHolidayWorked: null;
-  timeClockEvents: [];
+  timeClockEvents: {
+    timeClockEventId: UUID;
+    timestamp: string;
+    employeeSpecifiedTime: string;
+    description: 'ClockOn' | 'ClockOff';
+    isForgottenEvent: boolean;
+    fileExists: boolean;
+    location: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+    }
+  }[];
   customFields: Array<any>;
   totalBreakHours: number;
   totalWorkedHours: number;
