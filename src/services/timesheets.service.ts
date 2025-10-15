@@ -380,8 +380,9 @@ async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkI
 }
 
 export async function handleRapidEvent(body: RapidBody): Promise<any> {
-  console.log(body.profile)
   console.log('Rapid event received.');
+  console.log(body);
+  console.log(body.labels);
   if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
   const eventName = body.event.topic;
   const name = body.profile.name;
