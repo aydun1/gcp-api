@@ -347,31 +347,26 @@ async function getTimeSheetToUpdate(orgId: UUID, employeeId: UUID, entryTime: Da
 
 export async function handleDefinitivEvent(body: DefinitivEvent, eventName: string): Promise<any> {
   console.log('Definitiv event received.')
-  let employee: Employee;
-  let inductee: Inductee | undefined;
-  return Promise.reject({code: 200, message: `Pass for now`});
+  if (!body.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
+  const inductee = await getInducteeRapid(body.data.employeeId);
+  const updateBody = {firstName: body.data.firstName, lastName: body.data.surname, emailAddress: body.data.emailAddresses[0].value}
   switch (eventName) {
     case 'EmployeeCreated':
       console.log('Employee created.');
       //employee = body['data'];
-      if (!employee.employeeId) return;
-      inductee = await getInducteeRapid(employee.employeeId);
-      //inductee && inductee.inducteeId ?
-      //await updateInducteeRapid(inductee.inducteeId, employee.firstName, employee.surname, employee.emailAddresses[0].value) : 
-      //await createInducteeRapid(employee.firstName, employee.surname, employee.emailAddresses[0].value);
+      inductee && inductee.inducteeId ?
+      await updateInducteeRapid(inductee.inducteeId, updateBody) : 
+      await createInducteeRapid(body.data.firstName, body.data.surname, body.data.emailAddresses[0].value, +body.data.employeeNumber);
       break;
     case 'EmployeeModified':
       console.log('Employee modified');
       //employee = body['data'];
-      if (!employee.employeeId) return;
-      inductee = await getInducteeRapid(employee.employeeId);
-      //inductee && inductee.inducteeId ?
-      //await updateInducteeRapid(inductee.inducteeId, employee.firstName, employee.surname, employee.emailAddresses[0].value) : 
-      //await createInducteeRapid(employee.firstName, employee.surname, employee.emailAddresses[0].value);
+      inductee && inductee.inducteeId ?
+      await updateInducteeRapid(inductee.inducteeId, updateBody) : 
+      await createInducteeRapid(body.data.firstName, body.data.surname, body.data.emailAddresses[0].value, +body.data.employeeNumber);
       break;
     case 'EmployeeDeleted':
       console.log('Employee deleted');
-      // TODO
       break;
     default:
       return Promise.reject({code: 200, message: `The Definitiv event, ${eventName}, is not supported.`});
