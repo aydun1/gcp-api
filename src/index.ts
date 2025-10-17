@@ -21,7 +21,7 @@ import { Comment } from './types/comment';
 import { RapidBody } from './types/rapid-body';
 import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 import { updatePalletsBc } from './services/bc.service';
-import { handleDefinitivEvent, handleRapidEvent } from './services/timesheets.service';
+import { handleDefinitivEvent, handleRapidEvent, handleTestEvent } from './services/timesheets.service';
 
 interface Body {
   customer: string;
@@ -629,6 +629,7 @@ app.get('/public/chemical-sales', (req, res) => {
 app.post('/definitiv/webhook/subscriber/events/:event', verifyDefinitivMessage, (req, res) => {
   const params = req.params;
   const eventName = params['event'];
+  console.log(req.body);
   handleDefinitivEvent(req.body, eventName).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
@@ -648,16 +649,6 @@ app.post('/rapid/webhook/subscriber/events', (req, res) => {
   res.status(200).send('');
 });
 
-app.get('/rapid/webhook/subscriber/events', (req, res) => {
-  handleRapidEvent(checkinBody).then(_ => {
-    res.status(200).send(_);
-  }).catch((err: {code: number, message: string}) => {
-    console.log(err?.message || err);
-    return res.status(err.code || 404).send(``);
-  });
-});
-
-
 connect(sqlConfig, err => {
   if (err) {
     console.log('Failed to open a SQL Database connection.', err.message);
@@ -666,4 +657,3 @@ connect(sqlConfig, err => {
     console.log(`server started at http://localhost:${webConfig.port}`);
   });
 });
-
