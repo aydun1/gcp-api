@@ -18,6 +18,7 @@ import { DefinitivSchedule } from '../types/definitiv-schedule';
 import { DefinitivSchedule2 } from '../types/definitiv-schedule2';
 import { DefinitivBreak, DefinitivTimeEntry } from '../types/definitiv-time-entry';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
+import { DefinitivEvent } from '../types/definitiv-body';
 
 let authRes!: AuthRes;
 let authDate!: Date;
@@ -344,14 +345,15 @@ async function getTimeSheetToUpdate(orgId: UUID, employeeId: UUID, entryTime: Da
   return timesheetToUpdate;
 }
 
-export async function handleDefinitivEvent(body: any, eventName: string): Promise<any> {
+export async function handleDefinitivEvent(body: DefinitivEvent, eventName: string): Promise<any> {
   console.log('Definitiv event received.')
   let employee: Employee;
   let inductee: Inductee | undefined;
+  return Promise.reject({code: 200, message: `Pass for now`});
   switch (eventName) {
     case 'EmployeeCreated':
       console.log('Employee created.');
-      employee = body['data'];
+      //employee = body['data'];
       if (!employee.employeeId) return;
       inductee = await getInducteeRapid(employee.employeeId);
       //inductee && inductee.inducteeId ?
@@ -360,7 +362,7 @@ export async function handleDefinitivEvent(body: any, eventName: string): Promis
       break;
     case 'EmployeeModified':
       console.log('Employee modified');
-      employee = body['data'];
+      //employee = body['data'];
       if (!employee.employeeId) return;
       inductee = await getInducteeRapid(employee.employeeId);
       //inductee && inductee.inducteeId ?
@@ -372,7 +374,7 @@ export async function handleDefinitivEvent(body: any, eventName: string): Promis
       // TODO
       break;
     default:
-      throw new Error(`The Definitiv event, ${eventName}, is not supported.`);
+      return Promise.reject({code: 200, message: `The Definitiv event, ${eventName}, is not supported.`});
   }
 }
 

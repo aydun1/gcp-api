@@ -18,6 +18,7 @@ import { adConfig, chemListKeyHash, definitivConfig, palletKeyHash, sqlConfig, w
 import { Transfer } from './types/transfer';
 import { Delivery } from './types/delivery';
 import { Comment } from './types/comment';
+import { DefinitivBody } from './types/definitiv-body';
 import { RapidBody } from './types/rapid-body';
 import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 import { updatePalletsBc } from './services/bc.service';
@@ -626,11 +627,12 @@ app.get('/public/chemical-sales', (req, res) => {
   });
 });
 
-app.post('/definitiv/webhook/subscriber/events/:event', verifyDefinitivMessage, (req, res) => {
-  const params = req.params;
-  const eventName = params['event'];
-  console.log(req.body);
-  handleDefinitivEvent(req.body, eventName).then(_ => {
+app.post('/definitiv/webhook/subscriber/events', (req, res) => {
+  const body = req.body as DefinitivBody;
+  const latestEvent = body.events[0];
+  const eventName = latestEvent.eventType;
+  console.log(req.body.events[0]);
+  handleDefinitivEvent(latestEvent, eventName).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
