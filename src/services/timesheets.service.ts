@@ -349,7 +349,10 @@ export async function handleDefinitivEvent(body: DefinitivEvent, eventName: stri
   console.log('Definitiv event received.')
   if (!body.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
   const inductee = await getInducteeRapid(body.data.employeeId);
-  const updateBody = {firstName: body.data.firstName, lastName: body.data.surname, emailAddress: body.data.emailAddresses[0].value}
+  const updateBody = {firstName: body.data.firstName, lastName: body.data.surname, emailAddress: body.data.emailAddresses[0].value};
+  console.log(body.data.emailAddresses);
+  console.log(body.data.phoneNumbers);
+  console.log(updateBody);
   switch (eventName) {
     case 'EmployeeCreated':
       console.log('Employee created.');
