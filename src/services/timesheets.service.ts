@@ -5,7 +5,6 @@ import { Request as sqlRequest, TYPES } from 'mssql';
 import { definitivConfig, rapidConfig } from '../config';
 import { companies } from '../definitions';
 import { AuthRes } from '../types/auth-res';
-import { Employee } from '../types/employee';
 import { Inductee } from '../types/inductee';
 import { RapidBody } from '../types/rapid-body';
 import { DefinitivDepartment } from '../types/definitiv-department';
@@ -18,7 +17,7 @@ import { DefinitivSchedule } from '../types/definitiv-schedule';
 import { DefinitivSchedule2 } from '../types/definitiv-schedule2';
 import { DefinitivBreak, DefinitivTimeEntry } from '../types/definitiv-time-entry';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
-import { DefinitivEvent } from '../types/definitiv-body';
+import { DefinitivBody } from '../types/definitiv-body';
 
 let authRes!: AuthRes;
 let authDate!: Date;
@@ -57,63 +56,59 @@ async function getSitesRapid(): Promise<any> {
   const url = rapidConfig.sendEndpoint + 'Site';
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res = await axios.get<{collection: Inductee[]}>(url, {headers}).catch(error => {
-    console.log('Error getting rapid inductees:', error.response.status);
+    console.log('Error getting rapid sites:', error.response.status);
   });
   return res?.data;
 }
 
-async function getInducteeRapid(employeeId: UUID): Promise<Inductee | undefined> {
+async function getInducteeRapid(employeeId: string, firstName: string, lastName: string): Promise<Inductee | undefined> {
   console.log(`Checking for existing rapid inductee.`);
   await getAccessTokenRapid();
   const url = rapidConfig.sendEndpoint + 'Inductee/Search';
-  const body = {
-    inducteeStatus: 1,
-  };
-
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
-  const res = await axios.post<{collection: Inductee[]}>(url, body, {headers}).catch(error => {
+  const res1 = await axios.post<{collection: Inductee[]}>(url, {employeeId}, {headers}).catch(error => {
     console.log('Error getting rapid inductees:', error.response.status);
   });
-  if (!res) return;
-
-  console.log(res.data.collection.length);
-  res.data.collection.forEach(_ => {
-    if (_.employeeId === employeeId) console.log(_.firstName);
-    //console.log(_.firstName);
-  })
+  if (res1) return res1.data.collection[0];
+  console.log('Could not match by employee ID. Searching by name.');
+  const res2 = await axios.post<{collection: Inductee[]}>(url, {}, {headers}).catch(error => {
+    console.log('Error getting rapid inductees:', error.response.status);
+  });
+  console.log('Could not match by name either.');
+  return res2?.data.collection.find(_ => _.firstName === firstName && _.lastName === lastName);
 }
 
-async function createInducteeRapid(firstName: string, lastName: string, email: string, employeeId: number): Promise<Inductee | undefined> {
+async function createInducteeRapid(firstName: string, lastName: string, email: string, employeeId: string): Promise<Inductee | undefined> {
   console.log('Creating inductee in Rapid');
   await getAccessTokenRapid();
   const url = rapidConfig.sendEndpoint + 'Inductee/Create';
   const body: Partial<Inductee> = {
     userType: 0,
-    personnelTypeId: 999,
+    personnelTypeId: 637938,
     siteIds: [206543],
     firstName,
     lastName,
-    email
+    email,
+    employeeId
   };
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res = await axios.post<Inductee>(url, body, {headers}).catch(error => {
     console.log(error.response.data);
   });
+  console.log(res?.data);
   return res?.data;
 }
 
-async function updateInducteeRapid(id: number, payload: Partial<Inductee>): Promise<void> {
-  console.log('Creating inductee in Rapid');
+async function updateInducteeRapid(id: number, payload: Partial<Inductee>): Promise<string | undefined> {
+  console.log('Updating inductee in Rapid');
   await getAccessTokenRapid();
-  const url = `${rapidConfig.sendEndpoint}/Inductee/${id}`;
-  const body: Partial<Inductee> = {employeeId: '12345'};
+  const url = `${rapidConfig.sendEndpoint}Inductee/${id}`;
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
-  try {
-    await axios.put<{data: any}>(url, body, {headers});
-    return;
-  } catch (error: any) {
-    throw new Error('Error sending data:', error.response.status);
-  }
+  const res = await axios.put<string>(url, payload, {headers}).catch(error => {
+    console.log('Error updating inductee.', error.response.status);
+  });
+  console.log(res?.data);
+  return res?.data;
 }
 
 async function getOrgsDefinitiv(): Promise<DefinitivOrg | undefined> {
@@ -345,42 +340,24 @@ async function getTimeSheetToUpdate(orgId: UUID, employeeId: UUID, entryTime: Da
   return timesheetToUpdate;
 }
 
-export async function handleDefinitivEvent(body: DefinitivEvent, eventName: string): Promise<any> {
-  console.log('Definitiv event received.')
-  if (!body.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
-  const inductee = await getInducteeRapid(body.data.employeeId);
-  const updateBody = {firstName: body.data.firstName, lastName: body.data.surname, emailAddress: body.data.emailAddresses[0].value};
-  console.log(body.data.emailAddresses);
-  console.log(body.data.phoneNumbers);
-  console.log(updateBody);
+export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
+  const latestEvent = body.events[0];
+  console.log('Definitiv event received:', latestEvent.eventType);
+  const eventName = latestEvent.eventType;
+  if (!latestEvent.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
+  const inductee = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
   switch (eventName) {
     case 'EmployeeCreated':
-      console.log('Employee created.');
-      //employee = body['data'];
-      inductee && inductee.inducteeId ?
-      await updateInducteeRapid(inductee.inducteeId, updateBody) : 
-      await createInducteeRapid(body.data.firstName, body.data.surname, body.data.emailAddresses[0].value, +body.data.employeeNumber);
-      break;
     case 'EmployeeModified':
-      console.log('Employee modified');
-      //employee = body['data'];
       inductee && inductee.inducteeId ?
-      await updateInducteeRapid(inductee.inducteeId, updateBody) : 
-      await createInducteeRapid(body.data.firstName, body.data.surname, body.data.emailAddresses[0].value, +body.data.employeeNumber);
+      await updateInducteeRapid(inductee.inducteeId, {employeeId: latestEvent.data.employeeNumber}) : 
+      await createInducteeRapid(latestEvent.data.firstName, latestEvent.data.surname, latestEvent.data.emailAddresses[0].value, latestEvent.data.employeeNumber);
       break;
     case 'EmployeeDeleted':
-      console.log('Employee deleted');
       break;
     default:
       return Promise.reject({code: 200, message: `The Definitiv event, ${eventName}, is not supported.`});
   }
-}
-
-export async function handleTestEvent(): Promise<any> {
-  const employee = await getEmployeeDefinitiv('Peter Constable', 'c06d598d-de9e-49bc-808d-22093441badd');
-  const inductee = await getInducteeRapid('c06d598d-de9e-49bc-808d-22093441badd');
-  console.log(inductee)
-
 }
 
 async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined): Promise<void> {

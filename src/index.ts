@@ -629,10 +629,7 @@ app.get('/public/chemical-sales', (req, res) => {
 
 app.post('/definitiv/webhook/subscriber/events', (req, res) => {
   const body = req.body as DefinitivBody;
-  const latestEvent = body.events[0];
-  const eventName = latestEvent.eventType;
-  console.log(req.body.events[0]);
-  handleDefinitivEvent(latestEvent, eventName).then(_ => {
+  handleDefinitivEvent(body).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
     console.log(err);
