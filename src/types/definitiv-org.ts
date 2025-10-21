@@ -1,7 +1,9 @@
+import { UUID } from 'crypto';
+
 export interface DefinitivOrg {
   organizationName: string;
   organizationFriendlyId: string;
-  organizationId: string;
+  organizationId: UUID;
   organizationImage: string;
-  userEmployeeId: string;
+  userEmployeeId: UUID;
 }

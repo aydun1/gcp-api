@@ -1,12 +1,16 @@
 import axios from 'axios';
 import { UUID } from 'crypto';
+import { readFileSync } from 'fs';
 import { Request as sqlRequest, TYPES } from 'mssql';
+import { parse } from 'csv-parse/sync';
 
 import { definitivConfig, rapidConfig } from '../config';
 import { companies } from '../definitions';
 import { AuthRes } from '../types/auth-res';
 import { Inductee } from '../types/inductee';
 import { RapidBody } from '../types/rapid-body';
+import { RapidLearnerType } from '../types/rapid-learner-type';
+import { RapidSite } from '../types/rapid-site';
 import { DefinitivDepartment } from '../types/definitiv-department';
 import { DefinitivEmployee } from '../types/definitiv-employee';
 import { DefinitivLocation } from '../types/definitiv-location';
@@ -17,7 +21,7 @@ import { DefinitivSchedule } from '../types/definitiv-schedule';
 import { DefinitivSchedule2 } from '../types/definitiv-schedule2';
 import { DefinitivBreak, DefinitivTimeEntry } from '../types/definitiv-time-entry';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
-import { DefinitivBody } from '../types/definitiv-body';
+import { DefinitivBody, DefinitivEvent } from '../types/definitiv-body';
 
 let authRes!: AuthRes;
 let authDate!: Date;
@@ -29,12 +33,12 @@ const definitivHeaders = {
 
 
 async function getAccessTokenRapid(): Promise<void> {
-  console.log('Getting auth token for Rapid')
+  console.log(' - Getting auth token for Rapid')
   const now = new Date();
   const expires = authRes ? new Date(authDate.getTime() + authRes.expires_in * 1000) : 0;
   if (now < expires) {
-    console.log('Already authenticated')
-    return Promise.resolve()
+    console.log(' - Already authenticated');
+    return Promise.resolve();
   };
   try {
     const grant_type = 'password'
@@ -44,48 +48,65 @@ async function getAccessTokenRapid(): Promise<void> {
     if (res.status !== 200 || res.data.error) throw new Error(res.data.error_description);
     authDate = new Date();
     authRes = res.data;
-    console.log('Getting auth token: done')
+    console.log(' - Getting auth token: done')
     return;
   } catch (error: any) {
     throw new Error(error['code'] || error as string);
   }
 }
 
-async function getSitesRapid(): Promise<any> {
+async function getSitesRapid(): Promise<RapidSite[] | undefined> {
+  console.log('Getting sites from Rapid');
   await getAccessTokenRapid();
   const url = rapidConfig.sendEndpoint + 'Site';
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
-  const res = await axios.get<{collection: Inductee[]}>(url, {headers}).catch(error => {
+  const res = await axios.get<RapidSite[]>(url, {headers}).catch(error => {
     console.log('Error getting rapid sites:', error.response.status);
   });
   return res?.data;
 }
 
+async function getLearnerTypesRapid(): Promise<RapidLearnerType[] | undefined> {
+  await getAccessTokenRapid();
+  const url = rapidConfig.sendEndpoint + 'LearnerType';
+  const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
+  const res = await axios.get<RapidLearnerType[]>(url, {headers}).catch(error => {
+    console.log('Error getting rapid types of work:', error.response.status);
+  });
+  return res?.data;
+}
+
 async function getInducteeRapid(employeeId: string, firstName: string, lastName: string): Promise<Inductee | undefined> {
-  console.log(`Checking for existing rapid inductee.`);
+  console.log(`Checking for existing inductees from Rapid.`);
   await getAccessTokenRapid();
   const url = rapidConfig.sendEndpoint + 'Inductee/Search';
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res1 = await axios.post<{collection: Inductee[]}>(url, {employeeId}, {headers}).catch(error => {
-    console.log('Error getting rapid inductees:', error.response.status);
+    if (error.response.status === 404) {
+      console.log(' - Could not match by employee ID. Searching by name.');
+    } else {
+      console.log('Error getting rapid inductees:', error.response.status);
+    }
   });
-  if (res1) return res1.data.collection[0];
-  console.log('Could not match by employee ID. Searching by name.');
   const res2 = await axios.post<{collection: Inductee[]}>(url, {}, {headers}).catch(error => {
     console.log('Error getting rapid inductees:', error.response.status);
   });
-  console.log('Could not match by name either.');
   return res2?.data.collection.find(_ => _.firstName === firstName && _.lastName === lastName);
 }
 
-async function createInducteeRapid(firstName: string, lastName: string, email: string, employeeId: string): Promise<Inductee | undefined> {
+async function createInducteeRapid(firstName: string, lastName: string, email: string | undefined, employeeId: string, siteId: number | undefined): Promise<Inductee | undefined> {
   console.log('Creating inductee in Rapid');
+  if (!email) {
+    console.log(' - Email address is missing');
+    return;
+  }
   await getAccessTokenRapid();
   const url = rapidConfig.sendEndpoint + 'Inductee/Create';
   const body: Partial<Inductee> = {
     userType: 0,
-    personnelTypeId: 637938,
-    siteIds: [206543],
+    personnelTypeId: 637937,
+    siteIds: siteId ? [siteId] : [],
+    sendPassword: false,
     firstName,
     lastName,
     email,
@@ -95,7 +116,6 @@ async function createInducteeRapid(firstName: string, lastName: string, email: s
   const res = await axios.post<Inductee>(url, body, {headers}).catch(error => {
     console.log(error.response.data);
   });
-  console.log(res?.data);
   return res?.data;
 }
 
@@ -111,15 +131,12 @@ async function updateInducteeRapid(id: number, payload: Partial<Inductee>): Prom
   return res?.data;
 }
 
-async function getOrgsDefinitiv(): Promise<DefinitivOrg | undefined> {
+async function getOrgsDefinitiv(): Promise<DefinitivOrg[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/admin/organizations`;
-  try {
-    const res = await axios.get<DefinitivOrg>(url, {headers: definitivHeaders});
-    console.log(res.data)
-  } catch (error: any) {
-    console.log(error.response.status, error.response.statusText);
-    return undefined;
-  }
+  const res = await axios.get<DefinitivOrg[]>(url, {headers: definitivHeaders}).catch(error => {
+    console.log('Error getting orgs.', error.response.status);
+  });
+  return res?.data;
 }
 
 async function getWorkSchedules(employeeId: UUID): Promise<DefinitivSchedule[] | undefined> {
@@ -179,13 +196,18 @@ async function getEmployeeLocations(employeeId: UUID): Promise<DefinitivLocation
 
 async function getEmployeeProjects(employeeId: UUID): Promise<DefinitivProject[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/projects`;
-  try {
-    const res = await axios.get<DefinitivProject[]>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
+  const res = await axios.get<DefinitivProject[]>(url, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
-    return undefined;
-  }
+  });
+  return res?.data;
+}
+
+async function getEmployeeContactDetailsDefinitiv(employeeId: UUID): Promise<any> {
+  const url = `${definitivConfig.endpoint}/api/employees/${employeeId}/contact-details`;
+  const res = await axios.get<DefinitivProject[]>(url, {headers: definitivHeaders}).catch(error => {
+    console.log(error.response.status, error.response.statusText);
+  });
+  return res?.data;
 }
 
 async function getEmployeesDefinitiv(orgId: UUID): Promise<DefinitivEmployee[]> {
@@ -346,18 +368,41 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   const eventName = latestEvent.eventType;
   if (!latestEvent.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
   const inductee = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
+  const rapidSites = await getSitesRapid();
+  const siteId = rapidSites?.find(_ => _.name === latestEvent.data.locations[0]?.location.name)?.siteId;
+  const payload = {employeeId: latestEvent.data.employeeNumber};
   switch (eventName) {
     case 'EmployeeCreated':
     case 'EmployeeModified':
       inductee && inductee.inducteeId ?
-      await updateInducteeRapid(inductee.inducteeId, {employeeId: latestEvent.data.employeeNumber}) : 
-      await createInducteeRapid(latestEvent.data.firstName, latestEvent.data.surname, latestEvent.data.emailAddresses[0].value, latestEvent.data.employeeNumber);
+      await updateInducteeRapid(inductee.inducteeId, payload) : 
+      await createInducteeRapid(latestEvent.data.firstName, latestEvent.data.surname, latestEvent.data.emailAddresses?.[0]?.value, latestEvent.data.employeeNumber, siteId);
       break;
     case 'EmployeeDeleted':
       break;
     default:
       return Promise.reject({code: 200, message: `The Definitiv event, ${eventName}, is not supported.`});
   }
+  //const i = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
+  //console.log(i);
+}
+
+export async function syncEmployeesToRapid(): Promise<any | void> {
+  const orgName = 'King Island Dairy 2';
+  const locations = [{location: {name: 'Tasmania'}}];
+  const orgs = await getOrgsDefinitiv();
+  const orgId = orgs?.find(_ => _.organizationName === orgName)?.organizationId;
+  if (!orgId) return;
+  const definitivEmployees = await getEmployeesDefinitiv(orgId);
+  // const memberContact = readFileSync('private/packed product label table.csv', { flag: 'r' });
+  // const memberCsv = parse(memberContact, {columns: true, bom: true});
+  for (const e of [definitivEmployees[0]]) {
+    const contactDetails = await getEmployeeContactDetailsDefinitiv(e.employeeId);
+    console.log(contactDetails)
+    const definitivEvent = {data: {...e, locations, ...contactDetails}, eventType: 'EmployeeCreated', eventDateUtc: '', action: ''} as DefinitivEvent;
+    await handleDefinitivEvent({eventCount: 1, events: [definitivEvent]});
+  }
+
 }
 
 async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkIn: Date | undefined, checkOut: Date | undefined): Promise<void> {
