@@ -33,11 +33,11 @@ const definitivHeaders = {
 
 
 async function getAccessTokenRapid(): Promise<void> {
-  console.log(' - Getting auth token for Rapid')
+  //console.log(' - Getting auth token for Rapid')
   const now = new Date();
   const expires = authRes ? new Date(authDate.getTime() + authRes.expires_in * 1000) : 0;
   if (now < expires) {
-    console.log(' - Already authenticated');
+    //console.log(' - Already authenticated');
     return Promise.resolve();
   };
   try {
@@ -370,7 +370,8 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   const inductee = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
   const rapidSites = await getSitesRapid();
   const siteId = rapidSites?.find(_ => _.name === latestEvent.data.locations[0]?.location.name)?.siteId;
-  const payload = {employeeId: latestEvent.data.employeeNumber};
+  const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace('0', '+61').replace(/\s/g, '');
+  const payload = {employeeId: latestEvent.data.employeeNumber, mobile} as Partial<Inductee>;
   switch (eventName) {
     case 'EmployeeCreated':
     case 'EmployeeModified':
@@ -394,13 +395,22 @@ export async function syncEmployeesToRapid(): Promise<any | void> {
   const orgId = orgs?.find(_ => _.organizationName === orgName)?.organizationId;
   if (!orgId) return;
   const definitivEmployees = await getEmployeesDefinitiv(orgId);
-  // const memberContact = readFileSync('private/packed product label table.csv', { flag: 'r' });
-  // const memberCsv = parse(memberContact, {columns: true, bom: true});
-  for (const e of [definitivEmployees[0]]) {
-    const contactDetails = await getEmployeeContactDetailsDefinitiv(e.employeeId);
-    console.log(contactDetails)
+  const memberContact = readFileSync('private/import.csv', { flag: 'r' });
+  let i = 0;
+  const memberCsv = parse(memberContact, {columns: true, bom: true});
+  const total = definitivEmployees.length;
+  for (const e of definitivEmployees) {
+    const details = memberCsv.find((_: any) => _.Id === e.employeeId) as any;
+    if (!details) continue;
+    i += 1;
+    const contactDetails = {
+      emailAddresses: [{value: details['Primary Email']}],
+      phoneNumbers: [{value: details['Mobile Phone']}],
+    } as any;
+    //const contactDetails = await getEmployeeContactDetailsDefinitiv(e.employeeId);
     const definitivEvent = {data: {...e, locations, ...contactDetails}, eventType: 'EmployeeCreated', eventDateUtc: '', action: ''} as DefinitivEvent;
     await handleDefinitivEvent({eventCount: 1, events: [definitivEvent]});
+    console.log(`${i} / ${total}`)
   }
 
 }

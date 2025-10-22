@@ -22,7 +22,7 @@ import { DefinitivBody } from './types/definitiv-body';
 import { RapidBody } from './types/rapid-body';
 import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 import { updatePalletsBc } from './services/bc.service';
-import { handleDefinitivEvent, handleRapidEvent, handleTestEvent } from './services/timesheets.service';
+import { handleDefinitivEvent, handleRapidEvent } from './services/timesheets.service';
 
 interface Body {
   customer: string;
@@ -645,7 +645,6 @@ app.post('/rapid/webhook/subscriber/events', (req, res) => {
     console.log(err?.message || err);
     return res.status(err.code || 404).send(``);
   });
-  res.status(200).send('');
 });
 
 connect(sqlConfig, err => {
