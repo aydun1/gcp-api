@@ -446,7 +446,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const workSchedules = await getWorkSchedules(employee.employeeId);
   if (!workSchedules) return Promise.reject({code: 200, message: 'No work schedules for this employee.'});
   const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0].workScheduleId);
-  if (!workSchedule) return Promise.reject({code: 200, message: 'Unable to get employee\'s work schedule.'});
+  if (!workSchedule) return Promise.reject({code: 200, message: 'Unable to get employee\'s work schedule.', payload: {orgId: employee.organizationId, scheduleId: workSchedules[0].workScheduleId}});
   const departments = await getEmployeeDepartments(employee.employeeId);
   const departmentId = departments?.[0]?.departmentId;
   if (!departmentId) return Promise.reject({code: 200, message: 'Unable to get employee\'s department.'});
