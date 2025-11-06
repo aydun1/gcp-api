@@ -641,8 +641,9 @@ app.post('/rapid/webhook/subscriber/events', (req, res) => {
   const body = req.body as RapidBody;
   handleRapidEvent(body).then(_ => {
     res.status(200).send(_);
-  }).catch((err: {code: number, message: string}) => {
+  }).catch((err: {code: number, message: string, payload: any}) => {
     console.log(err?.message || err);
+    if (err?.payload) console.log(err.payload);
     return res.status(err.code || 404).send(``);
   });
 });
