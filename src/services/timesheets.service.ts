@@ -439,10 +439,13 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
   const eventName = body.event.topic;
   const name = body.profile.name;
+  const entryTime = body.event.data.entry?.timestamp ? new Date(body.event.data.entry.timestamp) : undefined;
+  const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
   const orgId = companies.find(_ => body.labels.map(l => l.name).includes(_.name))?.orgId || '';
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
+  await addToLocalDb(employee, body, entryTime, exitTime);
   const workSchedules = await getWorkSchedules(employee.employeeId);
   if (!workSchedules) return Promise.reject({code: 200, message: 'No work schedules for this employee.'});
   const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0].workScheduleId);
@@ -459,17 +462,13 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const roles = await getEmployeeRoles(employee.employeeId);
   const roleId = roles?.[0]?.roleId;
   if (!roleId) return Promise.reject({code: 200, message: 'Unable to get employee\'s role.'});
-  const entryTime = body.event.data.entry?.timestamp ? new Date(body.event.data.entry.timestamp) : undefined;
-  const exitTime = body.event.data.exit?.timestamp ? new Date(body.event.data.exit?.timestamp) : undefined;
   switch (eventName) {
     case 'CHECKIN_ENTERED':
       console.log('Employee signed in.');
-      await addToLocalDb(employee, body, entryTime, exitTime);
       break;
     case 'CHECKIN_EXITED':
       if (!entryTime || !exitTime) return;
       console.log('Employee signed out');
-      await addToLocalDb(employee, body, entryTime, exitTime);
       const previousTimeSheet = await getTimeSheetToUpdate(orgId, employee.employeeId, entryTime, exitTime);
       if (previousTimeSheet) {
         await updateTimeSheetDefinitiv(previousTimeSheet, workSchedule, body);
