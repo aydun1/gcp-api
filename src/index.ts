@@ -24,7 +24,7 @@ import { getSilos, getSuppliers, updateItem } from './services/silos.service';
 import { updatePalletsBc } from './services/bc.service';
 import { handleDefinitivEvent, handleRapidEvent } from './services/timesheets.service';
 
-interface Body {
+interface PalletPayload {
   customer: string;
   palletType: string;
   palletQty: string;
@@ -347,13 +347,16 @@ app.post('/gp/comments', auth, (req, res) => {
 });
 
 app.post('/pallets', verifyPalletApiToken, (req, res) => {
-  const body = req.body as Body;
-  updatePallets(body.customer, body.palletType, body.palletQty).then(
-    () => res.status(200).json({result: 'Pallet updated successfully.'})
-  ).catch(err => {
-    return handleError(err, res);
+  const body = req.body as PalletPayload;
+  const updateGp = updatePallets(body.customer, body.palletType, body.palletQty);
+  const updateBc = updatePalletsBc(body.customer, body.palletType, body.palletQty);
+  Promise.allSettled([updateGp, updateBc]).then(results => {
+    results.forEach((result) => console.log(result.status));
+    res.status(200).json({result: 'Pallet updated successfully.'});
+  }).catch(err => {
+    console.log(err?.message || err);
+    return res.status(err.code || 200).send(``);
   });
-  updatePalletsBc(body.customer, body.palletType, body.palletQty);
 });
 
 app.get('/gp/deliveries', auth, (req, res) => {
