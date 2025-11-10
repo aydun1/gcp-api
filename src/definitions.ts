@@ -4,7 +4,7 @@ export const locations = [
   {envuCode: 'AUC-GCP001', gpCode: 'NSW', address1: '4 - 6 Pinnacle Place', city: 'Somersby', state: 'New South Wales', postcode: '2250', countryCode: 'AU'},
   {envuCode: 'AUC-GCP002', gpCode: 'MAIN', address1: 'EJ Court (off Assembly Drive)', city: 'Dandenong South', state: 'Victoria', postcode: '3175', countryCode: 'AU'},
   {envuCode: 'AUC-GCP003', gpCode: 'SA', address1: '10-12 Hakkinen Road', city: 'Wingfield', state: 'South Australia', postcode: '5013', countryCode: 'AU'},
-  {envuCode: 'AUC-GCP004', gpCode: 'QLD', address1: '19 Eastern Service Road', city: 'Stapylton', state: 'Queesnland', postcode: '4207', countryCode: 'AU'},
+  {envuCode: 'AUC-GCP004', gpCode: 'QLD', address1: '19 Eastern Service Road', city: 'Stapylton', state: 'Queensland', postcode: '4207', countryCode: 'AU'},
   {envuCode: 'AUC-GCP005', gpCode: 'WA', address1: '2 Turley Street', city: 'Forrestdale', state: 'Western Australia', postcode: '6112', countryCode: 'AU'}
 ];
 
