@@ -311,8 +311,9 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   try {
     console.log(
       exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
-      offset, offset / 1000 / 60 / 60,
-      new Date(exitTime.getSeconds() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+      offset,
+      offset / 1000 / 60 / 60,
+      new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
     );
   } catch (error: any) {
     console.log('This failed');
@@ -344,7 +345,7 @@ async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSched
     console.log(
       exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
       offset, offset / 1000 / 60 / 60,
-      new Date(exitTime.getSeconds() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+      new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
     );
   } catch (error: any) {
     console.log('This failed');
