@@ -14,6 +14,16 @@ export const companies = [
   {orgId: 'fe87ad64-0e8c-4fd0-8ced-998615ac73ae' as UUID, name: 'Olympus Cheese'}
 ];
 
+export const timezones = [
+  {name: 'Cooparoo', timeZone: 'Australia/Brisbane'},
+  {name: 'Dandenong South', timeZone: 'Australia/Melbourne'},
+  {name: 'Forrestdale', timeZone: 'Australia/Forrestdale'},
+  {name: 'King Island', timeZone: 'Australia/Tasmania'},
+  {name: 'Somersby', timeZone: 'Australia/Sydney'},
+  {name: 'Stapylton', timeZone: 'Australia/Brisbane'},
+  {name: 'Wingfield', timeZone: 'Australia/Adelaide'}
+];
+
 export const products = [
   {envuCode: '84504815', gpCode: 'BANOL1', name: 'BANOL (SL) SL722 12X1L BOT AU'},
   {envuCode: '84487031', gpCode: 'DEDIC1', name: 'DEDICATE (SL) SC300 12X1L BOT AU'},
