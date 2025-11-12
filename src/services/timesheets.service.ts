@@ -58,7 +58,7 @@ async function getAccessTokenRapid(): Promise<void> {
 async function getSitesRapid(): Promise<RapidSite[] | undefined> {
   console.log('Getting sites from Rapid');
   await getAccessTokenRapid();
-  const url = rapidConfig.sendEndpoint + 'Site';
+  const url = `${rapidConfig.sendEndpoint}/Site`;
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res = await axios.get<RapidSite[]>(url, {headers}).catch(error => {
     console.log('Error getting rapid sites:', error.response.status);
@@ -68,7 +68,7 @@ async function getSitesRapid(): Promise<RapidSite[] | undefined> {
 
 async function getLearnerTypesRapid(): Promise<RapidLearnerType[] | undefined> {
   await getAccessTokenRapid();
-  const url = rapidConfig.sendEndpoint + 'LearnerType';
+  const url = `${rapidConfig.sendEndpoint}/LearnerType`;
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res = await axios.get<RapidLearnerType[]>(url, {headers}).catch(error => {
     console.log('Error getting rapid types of work:', error.response.status);
@@ -79,7 +79,7 @@ async function getLearnerTypesRapid(): Promise<RapidLearnerType[] | undefined> {
 async function getInducteeRapid(employeeId: string, firstName: string, lastName: string): Promise<Inductee | undefined> {
   console.log(`Checking for existing inductees from Rapid.`);
   await getAccessTokenRapid();
-  const url = rapidConfig.sendEndpoint + 'Inductee/Search';
+  const url = `${rapidConfig.sendEndpoint}/Inductee/Search`;
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res1 = await axios.post<{collection: Inductee[]}>(url, {employeeId}, {headers}).catch(error => {
     if (error.response.status === 404) {
@@ -101,7 +101,7 @@ async function createInducteeRapid(firstName: string, lastName: string, email: s
     return;
   }
   await getAccessTokenRapid();
-  const url = rapidConfig.sendEndpoint + 'Inductee/Create';
+  const url = `${rapidConfig.sendEndpoint}/Inductee/Create`;
   const body: Partial<Inductee> = {
     userType: 0,
     personnelTypeId: 637937,
@@ -122,7 +122,7 @@ async function createInducteeRapid(firstName: string, lastName: string, email: s
 async function updateInducteeRapid(id: number, payload: Partial<Inductee>): Promise<string | undefined> {
   console.log('Updating inductee in Rapid');
   await getAccessTokenRapid();
-  const url = `${rapidConfig.sendEndpoint}Inductee/${id}`;
+  const url = `${rapidConfig.sendEndpoint}/Inductee/${id}`;
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res = await axios.put<string>(url, payload, {headers}).catch(error => {
     console.log('Error updating inductee.', error.response.status);
