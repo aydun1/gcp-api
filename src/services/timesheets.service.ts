@@ -287,7 +287,7 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   const scheduledStartTime = todaysSchedule?.startTimeOfDay;
   const scheduledEndTime = todaysSchedule?.endTimeOfDay;
   const employeeSpecifiedStartTimeOfDay = entryTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const employeeSpecifiedEndTimeOfDay = exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const breaks = getAppropriateBreaks(date, entryTime, exitTime, timezone, todaysSchedule);
   const body = {
     employeeId: employee.employeeId,
@@ -309,17 +309,6 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   };
 
   try {
-    console.log(
-      exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
-      offset,
-      offset / 1000 / 60 / 60,
-      new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-    );
-  } catch (error: any) {
-    console.log('This failed');
-  }
-
-  try {
     const res = await axios.post<DefinitivTimesheet>(url, body, {headers: definitivHeaders});
     return res.data;
   } catch (error: any) {
@@ -339,18 +328,7 @@ async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSched
   if (!date) return;
   const timezone = rapidBody.location.timezone;
   const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
-  const employeeSpecifiedEndTimeOfDay = exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-
-  try {
-    console.log(
-      exitTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
-      offset, offset / 1000 / 60 / 60,
-      new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-    );
-  } catch (error: any) {
-    console.log('This failed');
-  }
-
+  const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const breaks = getAppropriateBreaks(date, entryTime, exitTime, timezone, todaysSchedule);
   const body = {
     ...timesheet,
