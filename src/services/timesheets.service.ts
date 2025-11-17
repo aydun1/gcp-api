@@ -467,12 +467,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const locations = await getEmployeeLocations(employee.employeeId);
   const locationId = locations?.[0]?.locationId;
   if (!locationId) return Promise.reject({code: 200, message: 'Unable to get employee\'s location.'});
-  let tzOffset = 0;
-  try {
-    tzOffset = getTzDifference(locations[0].locationName);
-  } catch (error: any) { 
-    console.log('nm');
-  }
+  const tzOffset = getTzDifference(locations[0].locationName);
 
   const projects = await getEmployeeProjects(employee.employeeId);
   const projectId = projects?.[0]?.projectId;
