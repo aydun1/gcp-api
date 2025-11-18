@@ -238,7 +238,7 @@ async function createEmployeeDefinitiv(): Promise<void> {
   }
 }
 
-async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | null, start: Date | null, end: Date | null): Promise<DefinitivTimesheet[]> {
+async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | null, start: Date | null, end: Date | null): Promise<DefinitivTimesheet[] | undefined> {
   const searchParams: any = {};
   if (orgId) searchParams['orgId'] = orgId;
   if (employeeId) searchParams['employeeId'] = employeeId;
@@ -246,13 +246,10 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   if (end) searchParams['end'] = end.toLocaleDateString('en-CA');
   const queryString = Object.keys(searchParams).map(_ => `${_}=${searchParams[_]}`).join('&');
   const url = `${definitivConfig.endpoint}/api/timesheets?${queryString}`;
-  try {
-    const res = await axios.get<DefinitivTimesheet[]>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
-    error.response ? console.log(error.response.status, error.response.statusText) : console.log(error);
-    return error;
-  }
+  const res = await axios.get<DefinitivTimesheet[]>(url, {headers: definitivHeaders}).catch(error => {
+    console.log('Error getting definitiv timesheets:', error.response.status);
+  });
+  return res?.data;
 }
 
 function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, timeZone: string, todaysSchedule: DefinitivTimeEntry): DefinitivBreak[] {
@@ -308,14 +305,10 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
     breaks
   };
 
-  try {
-    const res = await axios.post<DefinitivTimesheet>(url, body, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
-    console.log(error.response.status, error.response.statusText);
-    console.log(error.response.data?.errors);
-    return;
-  }
+  const res = await axios.post<DefinitivTimesheet>(url, body, {headers: definitivHeaders}).catch(error => {
+    console.log('Error creating definitiv timesheet:', error.response.status);
+  });
+  return res?.data;
 }
 
 async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSchedule: DefinitivSchedule2, rapidBody: RapidBody, offset: number): Promise<any> {
@@ -352,7 +345,7 @@ async function getTimeSheetToUpdate(orgId: UUID, employeeId: UUID, entryTime: Da
   const fromTime = new Date(entryTime.getTime() - 1000 * 60 * 60 * 24);
   const previousTimeSheets = await getTimesheetsDefinitiv(orgId, employeeId, fromTime, entryTime);
   const offset = new Date().getTimezoneOffset() * 60 * 1000;
-  const timesheetToUpdate = previousTimeSheets.filter(_ => {
+  const timesheetToUpdate = previousTimeSheets?.filter(_ => {
     const isoDate = _.date.split('/').reverse().join('-');
     const localDate = new Date(`${isoDate}T${_.startTimeOfDay}Z`);
     const startDate = new Date(localDate.getTime() + offset);
@@ -371,6 +364,7 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   const rapidSites = await getSitesRapid();
   const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory');
   const siteId = rapidSites?.find(_ => _.name === definitivLocationName)?.siteId;
+  if (!siteId) Promise.reject({code: 200, message: `Could not find a site matching the location: ${definitivLocationName}.`});
   const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace('0', '+61').replace(/\s/g, '');
   const payload = {employeeId: latestEvent.data.employeeNumber, mobile} as Partial<Inductee>;
   switch (eventName) {
@@ -468,7 +462,6 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   const locationId = locations?.[0]?.locationId;
   if (!locationId) return Promise.reject({code: 200, message: 'Unable to get employee\'s location.'});
   const tzOffset = getTzDifference(locations[0].locationName);
-
   const projects = await getEmployeeProjects(employee.employeeId);
   const projectId = projects?.[0]?.projectId;
   if (!projectId) return Promise.reject({code: 200, message: 'Unable to get employee\'s project.'});
