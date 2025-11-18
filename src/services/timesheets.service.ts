@@ -281,9 +281,9 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   if (!date) return;
   const timezone = rapidBody.location.timezone;
   const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
-  const scheduledStartTime = todaysSchedule?.startTimeOfDay;
-  const scheduledEndTime = todaysSchedule?.endTimeOfDay;
-  const employeeSpecifiedStartTimeOfDay = entryTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  // const scheduledStartTime = todaysSchedule?.startTimeOfDay;
+  // const scheduledEndTime = todaysSchedule?.endTimeOfDay;
+  const employeeSpecifiedStartTimeOfDay = new Date(entryTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const breaks = getAppropriateBreaks(date, entryTime, exitTime, timezone, todaysSchedule);
   const body = {
