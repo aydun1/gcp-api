@@ -294,7 +294,6 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   if (!exitTime) return;
   const date = entryTime?.toLocaleDateString('en-CA');
   if (!date) return;
-  const timezone = rapidBody.location.timezone;
   const employeeSpecifiedStartTimeOfDay = new Date(entryTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const breaks = getAppropriateBreaks(date, entryTime, exitTime, offset, workSchedule);
@@ -373,7 +372,7 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   if (!latestEvent.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
   const inductee = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
   const rapidSites = await getSitesRapid();
-  const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory');
+  const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory').replace('Cooparoo', 'Olympus Cheese');
   const siteId = rapidSites?.find(_ => _.name === definitivLocationName)?.siteId;
   if (!siteId) Promise.reject({code: 200, message: `Could not find a site matching the location: ${definitivLocationName}.`});
   const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace('0', '+61').replace(/\s/g, '');
