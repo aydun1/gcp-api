@@ -271,10 +271,10 @@ function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, off
       console.log('Added a scheduled break.');
     }
   } else if (shiftDurationHours > 4.6) {
-    const fourHours = 1000 * 60 * 60 * 60 * 4;
-    const thirtyMinutes = 1000 * 60 * 60 * 30;
-    const startTimeOfDay = new Date(exitTime.getTime() + offset + fourHours).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-    const endTimeOfDay = new Date(exitTime.getTime() + offset + fourHours + thirtyMinutes).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const fourHours = 1000 * 60 * 60 * 4;
+    const thirtyMinutes = 1000 * 60 * 30;
+    const startTimeOfDay = new Date(entryTime.getTime() + offset + fourHours).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const endTimeOfDay = new Date(entryTime.getTime() + offset + fourHours + thirtyMinutes).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     const smoko = {
       description: 'Break',
       startTimeOfDay,
