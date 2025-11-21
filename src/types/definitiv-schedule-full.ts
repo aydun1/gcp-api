@@ -1,7 +1,7 @@
 import { UUID } from 'crypto';
 import { DefinitivTimeEntry } from './definitiv-time-entry';
 
-export interface DefinitivSchedule2 {
+export interface DefinitivScheduleFull {
   workScheduleId: UUID;
   name: string;
   description: string;

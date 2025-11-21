@@ -18,8 +18,8 @@ import { DefinitivOrg } from '../types/definitiv-org';
 import { DefinitivProject } from '../types/definitiv-projects';
 import { DefinitivRole } from '../types/definitiv-role';
 import { DefinitivSchedule } from '../types/definitiv-schedule';
-import { DefinitivSchedule2 } from '../types/definitiv-schedule2';
-import { DefinitivBreak, DefinitivTimeEntry } from '../types/definitiv-time-entry';
+import { DefinitivScheduleFull } from '../types/definitiv-schedule-full';
+import { DefinitivBreak } from '../types/definitiv-time-entry';
 import { DefinitivTimesheet } from '../types/definitiv-timesheet';
 import { DefinitivBody, DefinitivEvent } from '../types/definitiv-body';
 
@@ -150,10 +150,11 @@ async function getWorkSchedules(employeeId: UUID): Promise<DefinitivSchedule[] |
   }
 }
 
-async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID): Promise<DefinitivSchedule2 | undefined> {
+async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID | undefined): Promise<DefinitivScheduleFull | undefined> {
+  if (!workScheduleId) return;
   const url = `${definitivConfig.endpoint}/api/admin/company/${orgId}/work-schedules/${workScheduleId}`;
   try {
-    const res = await axios.get<DefinitivSchedule2>(url, {headers: definitivHeaders});
+    const res = await axios.get<DefinitivScheduleFull>(url, {headers: definitivHeaders});
     return res.data;
   } catch (error: any) {
     console.log(error.response.status, error.response.statusText);
@@ -252,10 +253,12 @@ async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | nul
   return res?.data;
 }
 
-function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, timeZone: string, todaysSchedule: DefinitivTimeEntry): DefinitivBreak[] {
-  const breaks= [] as Array<DefinitivBreak>;
-  if (todaysSchedule.breaks && todaysSchedule.breaks.length > 0) {
-    if (todaysSchedule.breaks.length > 1) console.log('More than one break is not handled.');
+function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, offset: number, workSchedule: DefinitivScheduleFull | undefined): DefinitivBreak[] {
+  const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
+  const shiftDurationHours = (exitTime.getTime() - entryTime.getTime()) / 1000 / 60 / 60;
+  const breaks = [] as Array<DefinitivBreak>;
+  if (todaysSchedule?.breaks && todaysSchedule.breaks.length > 0) {
+    if (todaysSchedule.breaks.length > 1) console.log('Multiple breaks scheduled. Only using the first.');
     const melbourneMidnight = new Date(new Date(new Date(date).toLocaleString('en-US', {timeZone: 'Australia/Melbourne'})).setHours(0,0,0,0));
     const breakStartParts = todaysSchedule.breaks[0].startTimeOfDay.split(':').map(_ => +_);
     const breakStartSeconds = breakStartParts[0] * 3600 + breakStartParts[1] * 60 + breakStartParts[2]
@@ -265,13 +268,25 @@ function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, tim
     const breakEndDateTime = new Date(melbourneMidnight.getTime() + breakEndSeconds * 1000);
     if (breakStartDateTime > entryTime && breakEndDateTime < exitTime) {
       breaks.push(todaysSchedule.breaks[0]);
-      console.log('Break fits');
+      console.log('Added a scheduled break.');
     }
+  } else if (shiftDurationHours > 4.6) {
+    const fourHours = 1000 * 60 * 60 * 60 * 4;
+    const thirtyMinutes = 1000 * 60 * 60 * 30;
+    const startTimeOfDay = new Date(exitTime.getTime() + offset + fourHours).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const endTimeOfDay = new Date(exitTime.getTime() + offset + fourHours + thirtyMinutes).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const smoko = {
+      description: 'Break',
+      startTimeOfDay,
+      endTimeOfDay,
+    } as DefinitivBreak;
+    breaks.push(smoko);
+    console.log('Added an unscheduled break.');
   }
   return breaks;
 }
 
-async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedule: DefinitivSchedule2, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID, offset: number): Promise<DefinitivTimesheet | undefined> {
+async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedule: DefinitivScheduleFull | undefined, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID, offset: number): Promise<DefinitivTimesheet | undefined> {
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry.timestamp) : undefined;
   if (!entryTime) return;
@@ -280,12 +295,9 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   const date = entryTime?.toLocaleDateString('en-CA');
   if (!date) return;
   const timezone = rapidBody.location.timezone;
-  const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
-  // const scheduledStartTime = todaysSchedule?.startTimeOfDay;
-  // const scheduledEndTime = todaysSchedule?.endTimeOfDay;
   const employeeSpecifiedStartTimeOfDay = new Date(entryTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, entryTime, exitTime, timezone, todaysSchedule);
+  const breaks = getAppropriateBreaks(date, entryTime, exitTime, offset, workSchedule);
   const body = {
     employeeId: employee.employeeId,
     projectId,
@@ -311,7 +323,7 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   return res?.data;
 }
 
-async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSchedule: DefinitivSchedule2, rapidBody: RapidBody, offset: number): Promise<any> {
+async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSchedule: DefinitivScheduleFull | undefined, rapidBody: RapidBody, offset: number): Promise<any> {
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry?.timestamp) : undefined;
   if (!entryTime) return;
@@ -319,10 +331,8 @@ async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSched
   if (!exitTime) return;
   const date = entryTime?.toLocaleDateString('en-CA');
   if (!date) return;
-  const timezone = rapidBody.location.timezone;
-  const todaysSchedule = workSchedule?.dailySchedules[0].timeEntries[0];
   const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, entryTime, exitTime, timezone, todaysSchedule);
+  const breaks = getAppropriateBreaks(date, entryTime, exitTime, offset, workSchedule);
   const body = {
     ...timesheet,
     endTimeOfDay: employeeSpecifiedEndTimeOfDay,
@@ -452,9 +462,8 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
   await addToLocalDb(employee, body, entryTime, exitTime);
   const workSchedules = await getWorkSchedules(employee.employeeId);
-  if (!workSchedules || workSchedules.length === 0) return Promise.reject({code: 200, message: 'No work schedules for this employee.'});
-  const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0].workScheduleId);
-  if (!workSchedule) return Promise.reject({code: 200, message: 'Unable to get employee\'s work schedule.', payload: {orgId: employee.organizationId, scheduleId: workSchedules[0].workScheduleId}});
+  if (!workSchedules) return Promise.reject({code: 200, message: 'Unable to get employee\'s work schedules.'});
+  const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0]?.workScheduleId);
   const departments = await getEmployeeDepartments(employee.employeeId);
   const departmentId = departments?.[0]?.departmentId;
   if (!departmentId) return Promise.reject({code: 200, message: 'Unable to get employee\'s department.'});
