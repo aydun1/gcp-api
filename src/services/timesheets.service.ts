@@ -141,58 +141,43 @@ async function getOrgsDefinitiv(): Promise<DefinitivOrg[] | undefined> {
 
 async function getWorkSchedules(employeeId: UUID): Promise<DefinitivSchedule[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/work-schedules`;
-  try {
-    const res = await axios.get<DefinitivSchedule[]>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
+  const res = await axios.get<DefinitivSchedule[]>(url, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
-    return undefined;
-  }
+  });
+  return res?.data;
 }
 
 async function getWorkScheduleById(orgId: UUID, workScheduleId: UUID | undefined): Promise<DefinitivScheduleFull | undefined> {
   if (!workScheduleId) return;
   const url = `${definitivConfig.endpoint}/api/admin/company/${orgId}/work-schedules/${workScheduleId}`;
-  try {
-    const res = await axios.get<DefinitivScheduleFull>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
+  const res = await axios.get<DefinitivScheduleFull>(url, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
-    return undefined;
-  }
+  });
+  return res?.data;
 }
 
 async function getEmployeeRoles(employeeId: UUID): Promise<DefinitivRole[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/roles`;
-  try {
-    const res = await axios.get<DefinitivRole[]>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
+  const res = await axios.get<DefinitivRole[]>(url, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
-    return undefined;
-  }
+  });
+  return res?.data;
 }
 
 async function getEmployeeDepartments(employeeId: UUID): Promise<DefinitivDepartment[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/departments`;
-  try {
-    const res = await axios.get<DefinitivDepartment[]>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
+  const res = await axios.get<DefinitivDepartment[]>(url, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
-    return undefined;
-  }
+  });
+  return res?.data;
 }
 
 async function getEmployeeLocations(employeeId: UUID): Promise<DefinitivLocation[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/employee/${employeeId}/locations`;
-  try {
-    const res = await axios.get<DefinitivLocation[]>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
+  const res = await axios.get<DefinitivLocation[]>(url, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
-    return undefined;
-  }
+  });
+  return res?.data;
 }
 
 async function getEmployeeProjects(employeeId: UUID): Promise<DefinitivProject[] | undefined> {
@@ -211,32 +196,25 @@ async function getEmployeeContactDetailsDefinitiv(employeeId: UUID): Promise<any
   return res?.data;
 }
 
-async function getEmployeesDefinitiv(orgId: UUID): Promise<DefinitivEmployee[]> {
+async function getEmployeesDefinitiv(orgId: UUID): Promise<DefinitivEmployee[] | undefined> {
   const url = `${definitivConfig.endpoint}/api/organisation/${orgId}/employees/team-employees`;
-  try {
-    const res = await axios.get<DefinitivEmployee[]>(url, {headers: definitivHeaders});
-    return res.data;
-  } catch (error: any) {
+  const res = await axios.get<DefinitivEmployee[]>(url, {headers: definitivHeaders}).catch(error => {
     error.response ? console.log(error.response.status, error.response.statusText) : console.log(error);
-    return error;
-  }
+  });
+  return res?.data;
 }
 
 async function getEmployeeDefinitiv(employeeName: string, orgId: UUID): Promise<DefinitivEmployee | undefined>{
-  return getEmployeesDefinitiv(orgId).then(_ => _.find(_ => _.name === employeeName));
+  return getEmployeesDefinitiv(orgId).then(_ => _?.find(_ => _.name === employeeName));
 }
 
-async function createEmployeeDefinitiv(): Promise<void> {
+async function createEmployeeDefinitiv(): Promise<any> {
   const url = `${definitivConfig.endpoint}/api/employees`;
-  const body = {
-  };
-  try {
-    const a = await axios.post<{data: any}>(url, body, {headers: definitivHeaders});
-    console.log(a.data)
-  } catch (error: any) {
+  const body = {};
+  const res = await axios.post<{data: any}>(url, body, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
-    return;
-  }
+  });
+  return res?.data;
 }
 
 async function getTimesheetsDefinitiv(orgId: UUID | null, employeeId: UUID | null, start: Date | null, end: Date | null): Promise<DefinitivTimesheet[] | undefined> {
@@ -339,15 +317,14 @@ async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSched
     employeeSpecifiedEndTimeOfDay: employeeSpecifiedEndTimeOfDay,
     breaks
   };
-  try {
-    const res = await axios.put<DefinitivTimesheet>(`${url}/${timesheet.timesheetId}`, body, {headers: definitivHeaders});
-    console.log('Timesheet updated')
-    return res.data;
-  } catch (error: any) {
+
+
+  const res = await axios.put<DefinitivTimesheet>(`${url}/${timesheet.timesheetId}`, body, {headers: definitivHeaders}).catch(error => {
     console.log(error.response.status, error.response.statusText);
     console.log(error.response.data?.errors);
-    return;
-  }
+  });
+  if (res) console.log('Timesheet updated');
+  return res?.data;
 }
 
 async function getTimeSheetToUpdate(orgId: UUID, employeeId: UUID, entryTime: Date, exitTime: Date): Promise<DefinitivTimesheet | undefined> {
