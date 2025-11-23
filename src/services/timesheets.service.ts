@@ -268,13 +268,14 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry.timestamp) : undefined;
   if (!entryTime) return;
+  const roundedEntryTime = roundTime(entryTime);
   const exitTime = rapidBody.event.data.exit?.timestamp ? new Date(rapidBody.event.data.exit?.timestamp) : undefined;
   if (!exitTime) return;
-  const date = entryTime?.toLocaleDateString('en-CA');
+  const date = roundedEntryTime?.toLocaleDateString('en-CA');
   if (!date) return;
-  const employeeSpecifiedStartTimeOfDay = new Date(entryTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const employeeSpecifiedStartTimeOfDay = new Date(roundedEntryTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, entryTime, exitTime, offset, workSchedule);
+  const breaks = getAppropriateBreaks(date, roundedEntryTime, exitTime, offset, workSchedule);
   const body = {
     employeeId: employee.employeeId,
     projectId,
@@ -305,12 +306,13 @@ async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSched
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry?.timestamp) : undefined;
   if (!entryTime) return;
+  const roundedEntryTime = roundTime(entryTime);
   const exitTime = rapidBody.event.data.exit?.timestamp ? new Date(rapidBody.event.data.exit?.timestamp) : undefined;
   if (!exitTime) return;
-  const date = entryTime?.toLocaleDateString('en-CA');
+  const date = roundedEntryTime?.toLocaleDateString('en-CA');
   if (!date) return;
   const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, entryTime, exitTime, offset, workSchedule);
+  const breaks = getAppropriateBreaks(date, roundedEntryTime, exitTime, offset, workSchedule);
   const body = {
     ...timesheet,
     endTimeOfDay: employeeSpecifiedEndTimeOfDay,
@@ -366,8 +368,6 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
     default:
       return Promise.reject({code: 200, message: `The Definitiv event, ${eventName}, is not supported.`});
   }
-  //const i = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
-  //console.log(i);
 }
 
 export async function syncEmployeesToRapid(): Promise<any | void> {
@@ -416,10 +416,18 @@ async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkI
   await request.query(insertQuery);
 }
 
+function roundTime(time: Date): Date {
+  const rounded = new Date(time);
+  rounded.setSeconds(0, 0);
+  const minutes = rounded.getMinutes();
+  const roundedMinutes = ((((minutes + 9.5) / 15 | 0) * 15) - minutes) * 60 * 1000;
+  return new Date(rounded.getTime() + roundedMinutes); 
+}
+
 function getTzDifference(suburb: string): number {
   const timeZone = timezones.find(_ => _.name === suburb)?.timeZone || 'Australia/Melbourne';
-  const siteTz = new Date().toLocaleString('en', {timeZone,timeZoneName: 'longOffset'}).split('GMT')[1]; // +11:00
-  const serverTz = new Date().toLocaleString('en', {timeZoneName: 'longOffset'}).split('GMT')[1]; // +10:00
+  const siteTz = new Date().toLocaleString('en', {timeZone,timeZoneName: 'longOffset'}).split('GMT')[1];
+  const serverTz = new Date().toLocaleString('en', {timeZoneName: 'longOffset'}).split('GMT')[1];
   const siteMins = siteTz.split(':').reduce((acc, cur, i) => acc + +cur * (i === 0 ? 60 : 1), 0);
   const serverMins = serverTz.split(':').reduce((acc, cur, i) => acc + +cur * (i === 0 ? 60 : 1), 0);
   const minsAhead = siteMins - serverMins;
