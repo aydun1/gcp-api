@@ -141,7 +141,7 @@ app.get('/gp/customers', auth, (req, res) => {
   });
 });
 
-app.get('/gp/customers/:id(*)/addresses', auth, (req, res) => {
+app.get('/gp/customers/:id/addresses', auth, (req, res) => {
   getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
@@ -149,7 +149,7 @@ app.get('/gp/customers/:id(*)/addresses', auth, (req, res) => {
   });
 });
 
-app.get('/gp/customers/:id(*)', auth, (req, res) => {
+app.get('/gp/customers/:id', auth, (req, res) => {
   const custId = req.params.id.replace('\'\'', '\'');
   getCustomer(custId).then(
     result => res.status(200).send(result)
@@ -169,7 +169,7 @@ app.get('/gp/vendors', auth, (req, res) => {
   });
 });
 
-app.get('/gp/vendors/:id(*)/addresses', auth, (req, res) => {
+app.get('/gp/vendors/:id/addresses', auth, (req, res) => {
   getVendorAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
@@ -445,7 +445,7 @@ app.post('/gp/non-inventory-chemicals', auth, (req, res) => {
   });
 });
 
-app.delete('/gp/non-inventory-chemicals/:id(*)', auth, (req, res) => {
+app.delete('/gp/non-inventory-chemicals/:id', auth, (req, res) => {
   const itemNmbr = req.params.id;
   removeNonInventoryChemical(itemNmbr).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
     return handleError(err, res);
