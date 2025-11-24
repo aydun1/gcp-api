@@ -115,6 +115,7 @@ async function createInducteeRapid(firstName: string, lastName: string, email: s
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res = await axios.post<Inductee>(url, body, {headers}).catch(error => {
     console.log(error.response.data);
+    console.log(siteId);
   });
   return res?.data;
 }
