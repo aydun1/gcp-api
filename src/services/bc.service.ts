@@ -31,7 +31,7 @@ async function authenticate(): Promise<string | void> {
 }
 
 export async function updatePalletsBc(customer: string, palletType: string, palletQty: string): Promise<string> {
-  console.log('Received pallet update.');
+  console.log(`Received pallet update: ${customer}, ${palletType}, ${palletQty}`);
   if (expiresAt <= new Date()) await authenticate();
   const headers = {'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}`};
   const url = `${baseURL}/customers`;
