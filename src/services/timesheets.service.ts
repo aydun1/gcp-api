@@ -351,7 +351,7 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   if (!latestEvent.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
   const inductee = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
   const rapidSites = await getSitesRapid();
-  const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory').replace('Cooparoo', 'Olympus Cheese');
+  const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory').replace('Cooparoo', 'Coorparoo');
   const siteId = rapidSites?.find(_ => _.name === definitivLocationName)?.siteId;
   if (!siteId) Promise.reject({code: 200, message: `Could not find a site matching the location: ${definitivLocationName}.`});
   const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace('0', '+61').replace(/\s/g, '');
@@ -376,7 +376,7 @@ export async function syncEmployeesToRapid(): Promise<any | void> {
   const orgs = await getOrgsDefinitiv();
   const orgId = orgs?.find(_ => _.organizationName === orgName)?.organizationId;
   if (!orgId) return;
-  const definitivEmployees = await getEmployeesDefinitiv(orgId);
+  const definitivEmployees = await getEmployeesDefinitiv(orgId) || [];
   const memberContact = readFileSync('private/import.csv', { flag: 'r' });
   let i = 0;
   const memberCsv = parse(memberContact, {columns: true, bom: true});
