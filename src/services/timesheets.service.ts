@@ -354,7 +354,7 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   if (!latestEvent.data.employeeId) return Promise.reject({code: 200, message: `There is no employee ID.`});
   const inductee = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
   const rapidSites = await getSitesRapid();
-  const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory').replace('Cooparoo', 'Coorparoo');
+  const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory').replace('Cooparoo', 'Coorparoo').replace('Dandenong South', 'Dandenong');
   const siteId = rapidSites?.find(_ => _.name === definitivLocationName)?.siteId;
   if (!siteId) return Promise.reject({code: 200, message: `Could not find a site matching the location: ${definitivLocationName}.`});
   const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace('0', '+61').replace(/\s/g, '');
