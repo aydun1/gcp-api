@@ -297,7 +297,7 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
 
   const res = await axios.post<DefinitivTimesheet>(url, body, {headers: definitivHeaders}).catch(error => {
     console.log('Error creating definitiv timesheet:', error.response.status);
-    console.log('Error creating definitiv timesheet:', error.response);
+    console.error(error.response.data?.errors);
   });
   return res?.data;
 }
