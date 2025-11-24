@@ -635,7 +635,7 @@ app.post('/definitiv/webhook/subscriber/events', (req, res) => {
   handleDefinitivEvent(body).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
-    console.log(err);
+    console.log(err.message);
     return res.status(err.code || 404).send(``);
   });
 });
