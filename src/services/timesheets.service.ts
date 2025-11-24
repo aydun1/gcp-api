@@ -351,12 +351,12 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   const latestEvent = body.events[0];
   console.log('Definitiv event received:', latestEvent.eventType);
   const eventName = latestEvent.eventType;
-  if (!latestEvent.data.employeeId) Promise.reject({code: 200, message: `There is no employee ID.`});
+  if (!latestEvent.data.employeeId) return Promise.reject({code: 200, message: `There is no employee ID.`});
   const inductee = await getInducteeRapid(latestEvent.data.employeeNumber, latestEvent.data.firstName, latestEvent.data.surname);
   const rapidSites = await getSitesRapid();
   const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory').replace('Cooparoo', 'Coorparoo');
   const siteId = rapidSites?.find(_ => _.name === definitivLocationName)?.siteId;
-  if (!siteId) Promise.reject({code: 200, message: `Could not find a site matching the location: ${definitivLocationName}.`});
+  if (!siteId) return Promise.reject({code: 200, message: `Could not find a site matching the location: ${definitivLocationName}.`});
   const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace('0', '+61').replace(/\s/g, '');
   const payload = {employeeId: latestEvent.data.employeeNumber, mobile} as Partial<Inductee>;
   switch (eventName) {
