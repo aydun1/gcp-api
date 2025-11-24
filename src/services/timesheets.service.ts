@@ -264,7 +264,7 @@ function getAppropriateBreaks(date: string, entryTime: Date, exitTime: Date, off
   return breaks;
 }
 
-async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedule: DefinitivScheduleFull | undefined, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID, offset: number): Promise<DefinitivTimesheet | undefined> {
+async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedule: DefinitivScheduleFull | undefined, rapidBody: RapidBody, departmentId: UUID, locationId: UUID, projectId: UUID, roleId: UUID, shiftTypeId: UUID | undefined, offset: number): Promise<DefinitivTimesheet | undefined> {
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry.timestamp) : undefined;
   if (!entryTime) return;
@@ -282,6 +282,7 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
     roleId,
     departmentId,
     locationId,
+    shiftTypeId,
     date,
     useTime: true,
     durationHours: null,
@@ -464,6 +465,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!projectId) return Promise.reject({code: 200, message: 'Unable to get employee\'s project.'});
   const roles = await getEmployeeRoles(employee.employeeId);
   const roleId = roles?.[0]?.roleId;
+  const shiftTypeId = roles?.[0]?.defaultShiftTypeId;
   if (!roleId) return Promise.reject({code: 200, message: 'Unable to get employee\'s role.'});
   switch (eventName) {
     case 'CHECKIN_ENTERED':
@@ -476,7 +478,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
       if (previousTimeSheet) {
         await updateTimeSheetDefinitiv(previousTimeSheet, workSchedule, body, tzOffset);
       } else {
-        await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId, tzOffset);
+        await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId, shiftTypeId, tzOffset);
       }
       break;
     default:
