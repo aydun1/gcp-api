@@ -42,6 +42,7 @@ export async function updatePalletsBc(customer: string, palletType: string, pall
   if (!allowedPallets.includes(palletType)) throw new Error('Bad pallet');
   if (qty > 1000 || palletQty !== qty.toString(10)) throw new Error('Bad quantity');
   const getRes = await axios.get<{value: [{id: string}]}>(`${url}?$filter=custNmbr eq '${custNmbr}'`, {headers}).catch(e => {
+    console.log(e);
     return Promise.reject({code: 200, message: `Failed to get customer: ${custNmbr}`});
   });
   const custId = getRes.data.value[0]?.id;
