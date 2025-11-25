@@ -353,7 +353,7 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
   Promise.allSettled([updateGp, updateBc]).then(results => {
     const fulfilled = results.filter((res): res is PromiseFulfilledResult<string> => res.status === 'fulfilled');
     const rejected = results.filter((res): res is PromiseRejectedResult => res.status === 'rejected');
-    rejected?.forEach((result) => console.log(result.reason));
+    rejected?.forEach((result) => console.log(result.reason?.message || result.reason));
   res.status(200).json({result: 'Pallet updated successfully.'});
   }).catch(err => {
     console.log(err?.message || err);
