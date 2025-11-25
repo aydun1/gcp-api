@@ -94,12 +94,8 @@ async function getInducteeRapid(employeeId: string, firstName: string, lastName:
   return res2?.data.collection.find(_ => _.firstName === firstName && _.lastName === lastName);
 }
 
-async function createInducteeRapid(firstName: string, lastName: string, email: string | undefined, employeeId: string, siteId: number | undefined): Promise<Inductee | undefined> {
+async function createInducteeRapid(firstName: string, lastName: string, email: string | undefined, employeeId: string, mobile: string, siteId: number | undefined): Promise<Inductee | undefined> {
   console.log('Creating inductee in Rapid');
-  if (!email) {
-    console.log(' - Email address is missing');
-    return;
-  }
   await getAccessTokenRapid();
   const url = `${rapidConfig.sendEndpoint}/Inductee/Create`;
   const body: Partial<Inductee> = {
@@ -110,22 +106,27 @@ async function createInducteeRapid(firstName: string, lastName: string, email: s
     firstName,
     lastName,
     email,
+    mobile,
     employeeId
   };
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
   const res = await axios.post<Inductee>(url, body, {headers}).catch(error => {
     console.log(error.response.data);
-    console.log(siteId);
   });
+  console.log(res?.data);
   return res?.data;
 }
 
-async function updateInducteeRapid(id: number, payload: Partial<Inductee>): Promise<string | undefined> {
+async function updateInducteeRapid(id: number, employeeId: string, mobile: string): Promise<string | undefined> {
   console.log('Updating inductee in Rapid');
   await getAccessTokenRapid();
   const url = `${rapidConfig.sendEndpoint}/Inductee/${id}`;
+  const body: Partial<Inductee> = {
+    employeeId,
+    mobile
+  };
   const headers = {'Content-Type': 'application/json', Authorization: `Bearer ${authRes.access_token}`};
-  const res = await axios.put<string>(url, payload, {headers}).catch(error => {
+  const res = await axios.put<string>(url, body, {headers}).catch(error => {
     console.log('Error updating inductee.', error.response.status);
   });
   console.log(res?.data);
@@ -357,14 +358,13 @@ export async function handleDefinitivEvent(body: DefinitivBody): Promise<any> {
   const definitivLocationName = latestEvent.data.locations[0]?.location.name.replace('King Island', 'Factory').replace('Cooparoo', 'Coorparoo').replace('Dandenong South', 'Dandenong');
   const siteId = rapidSites?.find(_ => _.name === definitivLocationName)?.siteId;
   if (!siteId) return Promise.reject({code: 200, message: `Could not find a site matching the location: ${definitivLocationName}.`});
-  const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace('0', '+61').replace(/\s/g, '');
-  const payload = {employeeId: latestEvent.data.employeeNumber, mobile} as Partial<Inductee>;
+  const mobile = latestEvent.data.phoneNumbers?.[0]?.value.replace(/^0/, '+61').replace(/\s/g, '');
   switch (eventName) {
     case 'EmployeeCreated':
     case 'EmployeeModified':
       inductee && inductee.inducteeId ?
-      await updateInducteeRapid(inductee.inducteeId, payload) : 
-      await createInducteeRapid(latestEvent.data.firstName, latestEvent.data.surname, latestEvent.data.emailAddresses?.[0]?.value, latestEvent.data.employeeNumber, siteId);
+      await updateInducteeRapid(inductee.inducteeId, latestEvent.data.employeeNumber, mobile) : 
+      await createInducteeRapid(latestEvent.data.firstName, latestEvent.data.surname, latestEvent.data.emailAddresses?.[0]?.value, latestEvent.data.employeeNumber, mobile, siteId);
       break;
     case 'EmployeeDeleted':
       break;
