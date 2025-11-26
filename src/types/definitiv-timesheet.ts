@@ -5,11 +5,11 @@ export interface DefinitivTimesheet {
   employeeId: UUID;
   employeeName: string;
   projectId: UUID;
-  positionId: null;
+  positionId: UUID;
   positionName: null;
   projectApprovalWorkflow: [];
   projectName: string;
-  projectWorkOrderId: null;
+  projectWorkOrderId: UUID;
   workOrderName: null;
   roleId: UUID;
   roleName: string;
@@ -17,7 +17,7 @@ export interface DefinitivTimesheet {
   departmentName: string;
   locationId: UUID;
   locationName: string;
-  shiftTypeId: null;
+  shiftTypeId: UUID;
   shiftTypeName: string;
   date: string; // 2025-07-09
   useTime: boolean;

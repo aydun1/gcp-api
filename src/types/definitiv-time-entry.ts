@@ -3,9 +3,9 @@ import { UUID } from 'crypto';
 export interface DefinitivBreak {
   description: string;
   startTimeOfDay: string;
-  employeeSpecifiedStartTimeOfDay: string;
+  employeeSpecifiedStartTimeOfDay: string | null;
   endTimeOfDay: string;
-  employeeSpecifiedEndTimeOfDay: string;
+  employeeSpecifiedEndTimeOfDay: string | null;
   durationHours: null;
   employeeSpecifiedDurationHours: null;
 }

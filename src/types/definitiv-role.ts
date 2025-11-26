@@ -5,7 +5,7 @@ export interface DefinitivRole {
   roleId: UUID;
   employmentTypeId: UUID;
   employmentTypeName: null;
-  defaultShiftTypeId: null;
+  defaultShiftTypeId: UUID;
   defaultShiftTypeName: null;
   roleName: string;
   isPrimary: boolean;

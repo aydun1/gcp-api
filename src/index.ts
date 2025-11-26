@@ -141,7 +141,7 @@ app.get('/gp/customers', auth, (req, res) => {
   });
 });
 
-app.get('/gp/customers/:id(*)/addresses', auth, (req, res) => {
+app.get('/gp/customers/:id/addresses', auth, (req, res) => {
   getCustomerAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
@@ -149,7 +149,7 @@ app.get('/gp/customers/:id(*)/addresses', auth, (req, res) => {
   });
 });
 
-app.get('/gp/customers/:id(*)', auth, (req, res) => {
+app.get('/gp/customers/:id', auth, (req, res) => {
   const custId = req.params.id.replace('\'\'', '\'');
   getCustomer(custId).then(
     result => res.status(200).send(result)
@@ -169,7 +169,7 @@ app.get('/gp/vendors', auth, (req, res) => {
   });
 });
 
-app.get('/gp/vendors/:id(*)/addresses', auth, (req, res) => {
+app.get('/gp/vendors/:id/addresses', auth, (req, res) => {
   getVendorAddresses(req.params.id).then(
     result => res.status(200).send(result)
   ).catch(err => {
@@ -351,8 +351,10 @@ app.post('/pallets', verifyPalletApiToken, (req, res) => {
   const updateGp = updatePallets(body.customer, body.palletType, body.palletQty);
   const updateBc = updatePalletsBc(body.customer, body.palletType, body.palletQty);
   Promise.allSettled([updateGp, updateBc]).then(results => {
-    results.forEach((result) => console.log(result.status));
-    res.status(200).json({result: 'Pallet updated successfully.'});
+    const fulfilled = results.filter((res): res is PromiseFulfilledResult<string> => res.status === 'fulfilled');
+    const rejected = results.filter((res): res is PromiseRejectedResult => res.status === 'rejected');
+    rejected?.forEach((result) => console.log(result.reason?.message || result.reason));
+  res.status(200).json({result: 'Pallet updated successfully.'});
   }).catch(err => {
     console.log(err?.message || err);
     return res.status(err.code || 200).send(``);
@@ -445,7 +447,7 @@ app.post('/gp/non-inventory-chemicals', auth, (req, res) => {
   });
 });
 
-app.delete('/gp/non-inventory-chemicals/:id(*)', auth, (req, res) => {
+app.delete('/gp/non-inventory-chemicals/:id', auth, (req, res) => {
   const itemNmbr = req.params.id;
   removeNonInventoryChemical(itemNmbr).then(_ => res.status(200).json(_)).catch((err: {code: number, message: string}) => {
     return handleError(err, res);
@@ -635,7 +637,7 @@ app.post('/definitiv/webhook/subscriber/events', (req, res) => {
   handleDefinitivEvent(body).then(_ => {
     res.status(200).send(_);
   }).catch((err: {code: number, message: string}) => {
-    console.log(err);
+    console.log(err.message);
     return res.status(err.code || 404).send(``);
   });
 });

@@ -1,6 +1,6 @@
 export interface RapidLearnerType {
     learnerTypeId: number;
     name: string;
-    vaLoginType: unknown;
+    vaLoginType: string;
     active: boolean;
 }
