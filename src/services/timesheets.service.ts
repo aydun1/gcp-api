@@ -114,7 +114,6 @@ async function createInducteeRapid(firstName: string, lastName: string, email: s
     console.error(error.response);
     console.log('Could not create inductee.');
   });
-  console.log(res?.data);
   return res?.data;
 }
 
