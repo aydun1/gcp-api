@@ -506,7 +506,6 @@ export async function handleRapidEvent(body: RapidBody, skipLog = false): Promis
       if (!entryTime || !exitTime) return;
       console.log('Employee signed out');
       const previousTimeSheet = await getTimeSheetToUpdate(orgId, employee.employeeId, entryTime, exitTime);
-      console.log(previousTimeSheet?.status);
       if (previousTimeSheet) {
         if (previousTimeSheet.status === 'Approved') break;
         await updateTimeSheetDefinitiv(previousTimeSheet, workSchedule, body, tzOffset);
