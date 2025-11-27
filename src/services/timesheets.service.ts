@@ -420,6 +420,38 @@ async function addToLocalDb(employee: DefinitivEmployee, body: RapidBody, checkI
   await request.query(insertQuery);
 }
 
+export async function resyncToDefinitiv(firstDate: string, lastDate: string) {
+  const request = new sqlRequest();
+  const selectQuery = `
+  SELECT * FROM [IMS].[dbo].CheckIns
+  WHERE EntryTime > '${firstDate}'
+  AND EntryTime <= '${lastDate}'
+  AND EventName = 'CHECKIN_EXITED'
+  ORDER BY ExitTime ASC
+  `;
+  const res = await request.query<any[]>(selectQuery).then(_ => _.recordset);
+  res.map(async _ => {
+    const payload = {
+      event: {
+        topic: _.EventName.trimEnd(),
+        data: {
+          entry: {timestamp: _.EntryTime},
+          exit: {timestamp: _.ExitTime}
+        }
+      },
+      labels: [{name: 'King Island Dairy'}],
+      profile: {name: _.EmployeeName.trimEnd()}
+    } as RapidBody;
+    return await handleRapidEvent(payload, true).then(
+      _ => `${payload.profile.name},${new Date(_.EntryTime).toLocaleDateString()},${new Date(_.EntryTime).toLocaleTimeString()},${new Date(_.ExitTime).toLocaleTimeString()},success`
+    ).catch(
+      e => `${payload.profile.name},${new Date(_.EntryTime).toLocaleDateString()},${new Date(_.EntryTime).toLocaleTimeString()},${new Date(_.ExitTime).toLocaleTimeString()},error`
+    );
+  });
+  res.forEach(_ => console.log(_));
+}
+
+
 function roundTime(time: Date): Date {
   const rounded = new Date(time);
   rounded.setSeconds(0, 0);
@@ -438,7 +470,7 @@ function getTzDifference(suburb: string): number {
   return minsAhead * 60 * 1000;
 }
 
-export async function handleRapidEvent(body: RapidBody): Promise<any> {
+export async function handleRapidEvent(body: RapidBody, skipLog = false): Promise<any> {
   console.log('Rapid event received.');
   if (!body.event) return Promise.reject({code: 200, message: 'Not a Rapid event.'});
   const eventName = body.event.topic;
@@ -449,7 +481,7 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
   if (!orgId) return Promise.reject({code: 200, message: 'Not an employee. Nothing to do.'});
   const employee = await getEmployeeDefinitiv(name, orgId);
   if (!employee) return Promise.reject({code: 200, message: 'Unable to match to an employee in Definitiv.'});
-  await addToLocalDb(employee, body, entryTime, exitTime);
+  if (!skipLog) await addToLocalDb(employee, body, entryTime, exitTime);
   const workSchedules = await getWorkSchedules(employee.employeeId);
   if (!workSchedules) return Promise.reject({code: 200, message: 'Unable to get employee\'s work schedules.'});
   const workSchedule = await getWorkScheduleById(employee.organizationId, workSchedules[0]?.workScheduleId);
@@ -475,7 +507,9 @@ export async function handleRapidEvent(body: RapidBody): Promise<any> {
       if (!entryTime || !exitTime) return;
       console.log('Employee signed out');
       const previousTimeSheet = await getTimeSheetToUpdate(orgId, employee.employeeId, entryTime, exitTime);
+      console.log(previousTimeSheet?.status);
       if (previousTimeSheet) {
+        if (previousTimeSheet.status === 'Approved') break;
         await updateTimeSheetDefinitiv(previousTimeSheet, workSchedule, body, tzOffset);
       } else {
         await createTimesheetDefinitiv(employee, workSchedule, body, departmentId, locationId, projectId, roleId, shiftTypeId, tzOffset);
