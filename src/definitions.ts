@@ -15,7 +15,7 @@ export const companies = [
 ];
 
 export const timezones = [
-  {name: 'Cooparoo', timeZone: 'Australia/Brisbane'},
+  {name: 'Coorparoo', timeZone: 'Australia/Brisbane'},
   {name: 'Dandenong South', timeZone: 'Australia/Melbourne'},
   {name: 'Forrestdale', timeZone: 'Australia/Forrestdale'},
   {name: 'King Island', timeZone: 'Australia/Tasmania'},
