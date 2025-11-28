@@ -460,8 +460,9 @@ function roundTime(time: Date): Date {
 }
 
 function getTzDifference(suburb: string): number {
-  const timeZone = timezones.find(_ => _.name === suburb)?.timeZone || 'Australia/Melbourne';
-  const siteTz = new Date().toLocaleString('en', {timeZone,timeZoneName: 'longOffset'}).split('GMT')[1];
+  const timeZone = timezones.find(_ => _.name === suburb)?.timeZone;
+  if (!timeZone) console.log(`Could not determine time zone for location: ${suburb}.`);
+  const siteTz = new Date().toLocaleString('en', {timeZone: timeZone || 'Australia/Melbourne', timeZoneName: 'longOffset'}).split('GMT')[1];
   const serverTz = new Date().toLocaleString('en', {timeZoneName: 'longOffset'}).split('GMT')[1];
   const siteMins = siteTz.split(':').reduce((acc, cur, i) => acc + +cur * (i === 0 ? 60 : 1), 0);
   const serverMins = serverTz.split(':').reduce((acc, cur, i) => acc + +cur * (i === 0 ? 60 : 1), 0);
