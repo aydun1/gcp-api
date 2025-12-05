@@ -15,10 +15,10 @@ export const companies = [
 ];
 
 export const timezones = [
-  {name: 'Coorparoo', timeZone: 'Australia/Brisbane'},
+  {name: 'Coorparoo', timeZone: 'Australia/Brisbane', locationId: 'b422ae27-0818-419d-a462-8f9855334295'},
   {name: 'Dandenong South', timeZone: 'Australia/Melbourne'},
   {name: 'Forrestdale', timeZone: 'Australia/Forrestdale'},
-  {name: 'King Island', timeZone: 'Australia/Tasmania'},
+  {name: 'King Island', timeZone: 'Australia/Tasmania', locationId: '4b1631ed-b361-4693-a352-b1436bebebc4'},
   {name: 'Somersby', timeZone: 'Australia/Sydney'},
   {name: 'Stapylton', timeZone: 'Australia/Brisbane'},
   {name: 'Wingfield', timeZone: 'Australia/Adelaide'}

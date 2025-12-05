@@ -270,14 +270,15 @@ async function createTimesheetDefinitiv(employee: DefinitivEmployee, workSchedul
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry.timestamp) : undefined;
   if (!entryTime) return;
-  const roundedEntryTime = roundTime(entryTime);
+  const roundedEntryTime = roundTime(entryTime, locationId, 'entry');
   const exitTime = rapidBody.event.data.exit?.timestamp ? new Date(rapidBody.event.data.exit?.timestamp) : undefined;
   if (!exitTime) return;
+  const roundedExitTime = roundTime(exitTime, locationId, 'exit');
   const date = roundedEntryTime?.toLocaleDateString('en-CA');
   if (!date) return;
   const employeeSpecifiedStartTimeOfDay = new Date(roundedEntryTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, roundedEntryTime, exitTime, offset, workSchedule);
+  const employeeSpecifiedEndTimeOfDay = new Date(roundedExitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const breaks = getAppropriateBreaks(date, roundedEntryTime, roundedExitTime, offset, workSchedule);
   const body = {
     employeeId: employee.employeeId,
     projectId,
@@ -310,13 +311,14 @@ async function updateTimeSheetDefinitiv(timesheet: DefinitivTimesheet, workSched
   const url = `${definitivConfig.endpoint}/api/timesheets`;
   const entryTime = rapidBody.event.data.entry?.timestamp ? new Date(rapidBody.event.data.entry?.timestamp) : undefined;
   if (!entryTime) return;
-  const roundedEntryTime = roundTime(entryTime);
+  const roundedEntryTime = roundTime(entryTime, timesheet.locationId, 'entry');
   const exitTime = rapidBody.event.data.exit?.timestamp ? new Date(rapidBody.event.data.exit?.timestamp) : undefined;
   if (!exitTime) return;
+  const roundedExitTime = roundTime(exitTime, timesheet.locationId, 'exit');
   const date = roundedEntryTime?.toLocaleDateString('en-CA');
   if (!date) return;
-  const employeeSpecifiedEndTimeOfDay = new Date(exitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  const breaks = getAppropriateBreaks(date, roundedEntryTime, exitTime, offset, workSchedule);
+  const employeeSpecifiedEndTimeOfDay = new Date(roundedExitTime.getTime() + offset).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const breaks = getAppropriateBreaks(date, roundedEntryTime, roundedExitTime, offset, workSchedule);
   const body = {
     ...timesheet,
     endTimeOfDay: employeeSpecifiedEndTimeOfDay,
@@ -450,13 +452,24 @@ export async function resyncToDefinitiv(firstDate: string, lastDate: string) {
   res.forEach(_ => console.log(_));
 }
 
-
-function roundTime(time: Date): Date {
+// For KID. Round entry time, but don't round exit time.
+// For Olympus. Round entry time with grace period, round exit time with no grace period.
+function roundTime(time: Date, locationId: UUID, type: 'entry' | 'exit'): Date {
+  const locationName = timezones.find(_ => _.locationId === locationId)?.name;
   const rounded = new Date(time);
   rounded.setSeconds(0, 0);
   const minutes = rounded.getMinutes();
-  const roundedMinutes = ((((minutes + 9.5) / 15 | 0) * 15) - minutes) * 60 * 1000;
-  return new Date(rounded.getTime() + roundedMinutes); 
+  let roundedMinutes = 0;
+  if (locationName === 'King Island') {
+    if (type === 'entry') roundedMinutes = (((minutes + 9.5) / 15 | 0) * 15) - minutes;
+    if (type === 'exit') roundedMinutes = 0;
+  } else if (locationName === 'Coorparoo') {
+    if (type === 'entry') roundedMinutes = (((minutes + 9.5) / 15 | 0) * 15) - minutes; 
+    if (type === 'exit') roundedMinutes = (((minutes + 0.5) / 15 | 0) * 15) - minutes;
+  }
+  const roundedDate = new Date(rounded.getTime() + roundedMinutes * 60 * 1000);
+  console.log(locationName, time.toLocaleTimeString(), roundedDate.toLocaleTimeString())
+  return roundedDate;
 }
 
 function getTzDifference(suburb: string): number {
