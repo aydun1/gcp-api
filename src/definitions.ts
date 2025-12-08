@@ -37,7 +37,7 @@ export const products = [
   {envuCode: '84417610', gpCode: 'IMIDA5', name: 'MERIT TURF (SL) SC200 4X5L BOT AU'},
   {envuCode: '84984671', gpCode: 'NA', name: 'RESERVE FUNGICIDE SC720 2X10L BOT AU'},
   {envuCode: '85785265', gpCode: 'NA', name: 'SIGNATURE XTRA STGD WG60 4X2.75KG BOT AU'},
-  {envuCode: '84937770', gpCode: 'SPEAR10', name: 'SPEARHEAD (SL) SC398,4 2X10L BOT AU'},
+  {envuCode: 'D00000726', gpCode: 'SPEAR10', name: 'SPEARHEAD (SL) SC398,4 2X10L BOT AU'},
   {envuCode: '88406214', gpCode: 'SPECTICLE250', name: 'SPECTICLE SC200 12X250ML BOT AU'},
   {envuCode: '86711990', gpCode: 'SPECTICLE1', name: 'SPECTICLE SC200 4X1L BOT AU'},
   {envuCode: '84474347', gpCode: 'NA', name: 'TEMPO XTRA (SL) SC75 4X5L BOT AU'},
