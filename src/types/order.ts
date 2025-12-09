@@ -1,3 +1,5 @@
+import { Line } from './line';
+
 export interface Order {
   id: number;
   batchNumber: string;
@@ -33,5 +35,5 @@ export interface Order {
   deliveryRun: string;
   attachments: number;
   comments: number;
-  lines: any[];
+  lines: Line[];
 }

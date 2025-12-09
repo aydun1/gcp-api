@@ -10,8 +10,8 @@ export interface Line {
   cancelledQty: number;
   extendedCost: number;
   ToTransfer: number;
-  palletSpaces: number;
-  lineWeight: number;
+  palletSpaces: number | null;
+  lineWeight: number | null;
   uom: string;
   packQty: number;
 }

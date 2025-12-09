@@ -10,6 +10,7 @@ import { Line } from '../types/line';
 import { InTransitTransferLine } from '../types/in-transit-transfer-line';
 import { InTransitTransfer } from '../types/in-transit-transfer';
 import { Order } from '../types/order';
+import { PerfionSpecs } from '../types/perfion-specs';
 import { ProductionSchedule } from '../types/production-schedule';
 import { parseBranch, sendEmail } from './helper.service';
 import { Comment } from '../types/comment';
@@ -19,7 +20,7 @@ const productionStoredProcedure = '[GPLIVE].[GCP].[dbo].[usp_ProductionReport]';
 
 const driverNoteRegexp = /\*([a-zA-Z0-9\s,.'"/\\|?!@#$%^&():;[\]{}<>\-=]+)\*/g;
 
-function addressFormatter(order: Order | null): string {
+function addressFormatter(order: Partial<Order> | null): string {
   if (!order) return '';
   const lastLine = [order['city'], order['state'], order['postCode']].filter(_ => _).join(' ');
   return [order['address1'], order['address2'], order['address3'], lastLine].filter(_ => _).join('\r\n');
@@ -74,6 +75,26 @@ function getNextDay(): Date {
   date.setDate(date.getDate() + nextDay);
   date.setHours(0,0,0,0);
   return date;
+}
+
+async function getItemSpecs(lines: Line[]): Promise<void> {
+  const request = new sqlRequest();
+  const items = [...new Set(lines.map(_ => _.itemNmbr))];
+  const specsQuery = `
+  SELECT Product, PalletQty, PalletHeight, PackWeight, PackQty
+  FROM [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] WITH (NOLOCK)
+  WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
+  AND Product IN ('${items.join('\', \'')}')
+  `;
+  const specsResult = await request.query<PerfionSpecs[]>(specsQuery).catch(e => {
+    console.log('Could not get pallet specs');
+    return {recordset: []};
+  });
+  lines.forEach(_ => {
+    const match = specsResult.recordset.find(p => p.Product === _.itemNmbr) || {} as PerfionSpecs;
+    _['palletSpaces'] = match.PalletQty ? (match.PalletHeight === 1300 ? 0.5 : 1) * ((_.qtyPrInv + _.qtyToInv) / match.PalletQty) : null;
+    _['lineWeight'] = match.PackQty ? (match.PackWeight || 0) * (_.qtyPrInv + _.qtyToInv) / match.PackQty : null;
+  });
 }
 
 export function getInTransitTransfer(id: string): Promise<InTransitTransfer> {
@@ -575,7 +596,7 @@ export function getOrdersByLine(branch: string, itemNmbrs: string[], components 
   return request.input('locnCode', TYPES.VarChar(12), branch).query(query).then((_: IResult<gpRes>) => {return {orders: _.recordset}});
 }
 
-export function getOrders(branch: string, batch: string, date: string) {
+export async function getOrders(branch: string, batch: string, date: string) {
   const now = date || getNextDay().toLocaleDateString('fr-CA');
   const dt = `${now} 00:00:00.000`;
   branch = parseBranch(branch);
@@ -663,15 +684,12 @@ export function getOrders(branch: string, batch: string, date: string) {
   });
 }
 
-export function getOrderLines(sopType: number, sopNumber: string): Promise<Order> {
+export async function getOrderLines(sopType: number, sopNumber: string): Promise<Order> {
   const request = new sqlRequest();
   const query =
   `
-  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumbe, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNmbr, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.PHNUMBR1) phoneNumber1, RTRIM(a.PHNUMBR2) phoneNumber2, RTRIM(a.PHONE3) phoneNumber3, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
-  CASE WHEN p.PalletHeight = 1300 THEN 0.5 ELSE 1 END * ((QTYPRINV + QTYTOINV) * QTYBSUOM / p.PalletQty) palletSpaces,
-  p.packWeight * (QTYPRINV + QTYTOINV) * QTYBSUOM / p.packQty lineWeight, 
+  SELECT a.SOPTYPE sopType, RTRIM(a.SOPNUMBE) sopNumber, RTRIM(a.BACHNUMB) batchNumber, RTRIM(a.CUSTNMBR) custNumber, RTRIM(a.CUSTNAME) custName, LNITMSEQ lineNumber, RTRIM(b.ITEMNMBR) itemNmbr, RTRIM(b.ITEMDESC) itemDesc, QUANTITY * QTYBSUOM quantity, QTYPRINV * QTYBSUOM qtyPrInv, QTYTOINV * QTYBSUOM qtyToInv, REQSHIPDATE reqShipDate, RTRIM(a.CNTCPRSN) cntPrsn, RTRIM(a.Address1) address1, RTRIM(a.ADDRESS2) address2, RTRIM(a.ADDRESS3) address3, RTRIM(a.CITY) city, RTRIM(a.[STATE]) state, RTRIM(a.ZIPCODE) postCode, RTRIM(a.PHNUMBR1) phoneNumber1, RTRIM(a.PHNUMBR2) phoneNumber2, RTRIM(a.PHONE3) phoneNumber3, RTRIM(a.SHIPMTHD) shipMethod, n.TXTFIELD note, posted,
   d.Status deliveryStatus, d.Run deliveryRun, RTRIM(UOFM) uom, QTYPRINV packQty, d.Attachments attachments, d.id id, e.Comments comments
-
   FROM (
     SELECT BACHNUMB, DOCDATE, ReqShipDate, LOCNCODE, SOPTYPE, SOPNUMBE, ORIGTYPE, ORIGNUMB, CUSTNMBR, PRSTADCD, CUSTNAME, CNTCPRSN, ADDRESS1, ADDRESS2, ADDRESS3, CITY, [state], ZIPCODE, PHNUMBR1, PHNUMBR2, PHONE3, a.SHIPMTHD, 0 posted, NOTEINDX
     FROM [GPLIVE].[GCP].[dbo].[SOP10100] a WITH (NOLOCK)
@@ -705,70 +723,60 @@ export function getOrderLines(sopType: number, sopNumber: string): Promise<Order
   ) b
   ON a.SOPTYPE = b.SOPTYPE
   AND a.SOPNUMBE = b.SOPNUMBE
-  LEFT JOIN (
-    SELECT Product, PalletQty, PalletHeight, PackWeight, PackQty, ROW_NUMBER() OVER(PARTITION BY Product ORDER BY Product DESC) rn
-    FROM [PERFION].[GCP-Perfion-LIVE].[dbo].[ProductSpecs] WITH (NOLOCK)
-    WHERE COALESCE(PalletQty, PackQty, PalletHeight, PackWeight) IS NOT null
-  ) p
-  ON ITEMNMBR = p.Product
   LEFT JOIN [IMS].[dbo].Deliveries d WITH (NOLOCK)
   ON a.SOPNUMBE = d.OrderNumber
   LEFT JOIN (
     SELECT DeliveryId, COUNT(*) as Comments FROM [IMS].[dbo].Comments GROUP BY DeliveryId
   ) e ON d.id = e.DeliveryId
   WHERE a.SOPNUMBE = @sopNumber
-  AND (rn = 1 OR rn IS NULL)
   ORDER BY LNITMSEQ
   `;
-  const lines = request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
-  return lines.then((_: IResult<Array<Line>>) => {
-    const order = _.recordset[0] as unknown as Order;
-    if (!order) return {} as Order;
-    const noteMatch = [...(order.note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
-    const pickStatus = (order['posted'] || order['batchNumber'] === 'FULFILLED') ? 2 : order['batchNumber'] === 'INTERVENE' ? 1 : 0
+  const result = await request.input('soptype', TYPES.SmallInt, sopType).input('sopnumber', TYPES.Char(21), sopNumber).query(query);
+  if (result.recordset.length === 0) return {} as Order;
+  const order = {
+    custNumber: result.recordset[0].custNumber,
+    custName: result.recordset[0].custName,
+    sopType: result.recordset[0].sopType,
+    sopNumber: result.recordset[0].sopNumber,
+    cntPrsn: result.recordset[0].cntPrsn,
+    address1: result.recordset[0].address1,
+    address2: result.recordset[0].address2,
+    address3: result.recordset[0].address3,
+    city: result.recordset[0].city,
+    state: result.recordset[0].state,
+    postCode: result.recordset[0].postCode,
+    phoneNumber1: result.recordset[0].phoneNumber1,
+    phoneNumber2: result.recordset[0].phoneNumber2,
+    phoneNumber3: result.recordset[0].phoneNumber3,
+    shipMethod: result.recordset[0].shipMethod,
+    deliveryStatus: result.recordset[0].deliveryStatus,
+    deliveryRun: result.recordset[0].deliveryRun,
+    attachments: result.recordset[0].attachments,
+    id: result.recordset[0].id,
+  } as Partial<Order>;
+  if (result.recordset[0].reqShipDate) order['reqShipDate'] = new Date(result.recordset[0].reqShipDate);
+  order['address'] = addressFormatter(order);
+  order['note'] = [...(result.recordset[0].note || '').matchAll(driverNoteRegexp)].map(_ => _[1]).join('\r\n');
+  order['pickStatus'] = (result.recordset[0]['posted'] || result.recordset[0]['batchNumber'] === 'FULFILLED') ? 2 : result.recordset[0]['batchNumber'] === 'INTERVENE' ? 1 : 0;
+  order['comments'] = result.recordset[0].comments || 0;
+  order['lines'] = result.recordset.map(l => {
     return {
-      custNumber: order.custNmbr,
-      custName: order.custName,
-      sopType: order.sopType,
-      sopNumber: order.sopNumbe,
-      cntPrsn: order.cntPrsn,
-      address1: order.address1,
-      address2: order.address2,
-      address3: order.address3,
-      city: order.city,
-      state: order.state,
-      postCode: order.postCode,
-      address: addressFormatter(order),
-      phoneNumber1: order.phoneNumber1,
-      phoneNumber2: order.phoneNumber2,
-      phoneNumber3: order.phoneNumber3,
-      shipMethod: order.shipMethod,
-      reqShipDate: new Date(order.reqShipDate),
-      note: noteMatch,
-      pickStatus: pickStatus,
-      deliveryStatus: order.deliveryStatus,
-      deliveryRun: order.deliveryRun,
-      attachments: order.attachments,
-      id: order.id,
-      orderWeight: _.recordset.reduce((acc, cur) => acc += +cur.lineWeight, 0),
-      palletSpaces: _.recordset.reduce((acc, cur) => acc += +cur.palletSpaces, 0),
-      comments: order.comments || 0,
-      lines: _.recordset.map(l => {
-        return {
-          lineNumber: l.lineNumber,
-          itemNmbr: l.itemNmbr,
-          itemDesc: l.itemDesc,
-          quantity: l.quantity,
-          qtyPrInv: l.qtyPrInv,
-          qtyToInv: l.qtyToInv,
-          palletSpaces: l.palletSpaces,
-          lineWeight: l.lineWeight,
-          uom: l.uom.replace('EACH', 'Each'),
-          packQty: l.packQty
-        }
-      })
-    } as Partial<Order> as Order;
+      lineNumber: l.lineNumber,
+      itemNmbr: l.itemNmbr,
+      itemDesc: l.itemDesc,
+      quantity: l.quantity,
+      qtyPrInv: l.qtyPrInv,
+      qtyToInv: l.qtyToInv,
+      palletSpaces: l.palletSpaces,
+      lineWeight: l.lineWeight,
+      uom: l.uom.replace('EACH', 'Each'),
+      packQty: l.packQty
+    } as Line;
   });
+  await getItemSpecs(order['lines']);
+  order['orderWeight'] = order['lines'].reduce((acc, cur) => acc += +(cur.lineWeight || 0), 0);
+  order['palletSpaces'] = order['lines'].reduce((acc, cur) => acc += +(cur.palletSpaces || 0), 0);
+  return order as Order;
 }
 
 export function getDeliveries(branch: string, run: string, deliveryType: string, archived: boolean, orderNumberQuery: string) {
