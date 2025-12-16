@@ -108,8 +108,8 @@ async function getChemicalTransactions(date: string): Promise<EnvuQuery[]> {
   ON trx.DOCTYPE IN (5, 6) AND trx.DOCNUMBR = sop.SOPNUMBE AND trx.ITEMNMBR = sop.ITEMNMBR AND trx.LNSEQNBR = sop.LNITMSEQ
   LEFT JOIN [GPLIVE].[GCP].[dbo].[SOP30200] soh WITH (NOLOCK)
   ON trx.DOCTYPE IN (5, 6) AND sop.SOPNUMBE = soh.SOPNUMBE AND sop.SOPTYPE = soh.SOPTYPE
-  WHERE trx.DOCTYPE IN (2, 3, 5, 6)
-  AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _).join('\', \'')}')
+  WHERE trx.DOCTYPE IN (3, 5, 6)
+  AND trx.ITEMNMBR IN ('${products.map(_ => _.gpCode).filter(_ => _ && _ !== 'NA').join('\', \'')}')
   AND trx.TRXLOCTN NOT LIKE '%TRANS'
   AND trx.DOCDATE >= '${date}'
   AND c.SendDate IS NULL
@@ -246,9 +246,14 @@ function parseTransfers(result: EnvuQuery[]): EnvuTransfer[] {
 
 async function newSaveToDb(result: EnvuQuery[]): Promise<string | void> {
   console.log('Saving data');
-  const v = result.map(l => `('Envu',${l.DOCTYPE},'${l.DOCNUMBR}','${l.DOCDATE.toISOString().slice(0, 19).replace('T', ' ')}','${new Date().toISOString().slice(0, 19).replace('T', ' ')}','${l.ITEMNMBR}',${l.LNSEQNBR},${l.TRXQTY},'${l.TRXLOCTN}',${l.QTYFULFI * l.QTYBSUOM})`);
+  const sendDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const v = result.map(l => {
+    const docDate = l.DOCDATE.toISOString().slice(0, 19).replace('T', ' ');
+    const envuCode = products.find(_ => _.gpCode === l.ITEMNMBR)?.envuCode;
+    return `('Envu',${l.DOCTYPE},'${l.DOCNUMBR}','${docDate}','${sendDate}','${l.ITEMNMBR}',${l.LNSEQNBR},${l.TRXQTY},'${l.TRXLOCTN}',${l.QTYFULFI * l.QTYBSUOM},'${envuCode}')`;
+  });
   const insertQuery = `
-  INSERT INTO [IMS].[dbo].Consignments (Vendor,DOCTYPE,DOCNUMBR,OrderDate,SendDate,ITEMNMBR,LNSEQNBR,TRXQTY,TRXLOCTN,QUANTITY)
+  INSERT INTO [IMS].[dbo].Consignments (Vendor,DOCTYPE,DOCNUMBR,OrderDate,SendDate,ITEMNMBR,LNSEQNBR,TRXQTY,TRXLOCTN,QUANTITY,VendorCode)
   VALUES ${v.join(',\n')};
   `;
   return v.length > 0 ? await new sqlRequest().query(insertQuery).then(() => console.log('Saving data: done')) : '';
